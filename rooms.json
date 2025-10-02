@@ -1,0 +1,23 @@
+{
+  "room_vo7h0v48": {
+    "name": "К",
+    "users": {
+      "J6Da7c_XA7-OJkhaAAAG": {
+        "name": "Artura",
+        "ping": 0,
+        "buffer": 0,
+        "status": "paused",
+        "position": 0,
+        "ready": false
+      }
+    },
+    "currentVideo": "Alien.Earth.S01E08.WEB-DLRip.RGzsRutracker.mp4",
+    "chat": []
+  },
+  "room_wilapx41": {
+    "name": "Один из многих",
+    "users": {},
+    "currentVideo": "Alien.Earth.S01E08.WEB-DLRip.RGzsRutracker.mp4",
+    "chat": []
+  }
+}
