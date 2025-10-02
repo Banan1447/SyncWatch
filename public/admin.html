@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Admin Panel</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <h1>Админ-панель</h1>
+
+  <div class="admin-panel">
+    <h2>Выбор папки с видео</h2>
+    <label for="videoFolder">Путь к папке с видео:</label>
+    <input type="text" id="videoFolder" placeholder="C:\Videos" style="width: 100%; padding: 8px; margin: 10px 0;">
+    <button id="saveFolderBtn">Сохранить</button>
+    <div id="statusMessage" style="margin-top: 10px;"></div>
+  </div>
+
+  <script>
+    document.getElementById('saveFolderBtn').addEventListener('click', () => {
+      const folder = document.getElementById('videoFolder').value.trim();
+      if (!folder) return;
+
+      fetch('/api/set-video-folder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ folder })
+      })
+        .then(res => res.json())
+        .then(data => {
+          const status = document.getElementById('statusMessage');
+          if (data.success) {
+            status.innerHTML = `<span style="color: green;">✅ Папка установлена: ${data.folder}</span>`;
+          } else {
+            status.innerHTML = `<span style="color: red;">❌ Ошибка: ${data.error}</span>`;
+          }
+        });
+    });
+  </script>
+</body>
+</html>

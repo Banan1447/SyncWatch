@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SyncWatch</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+  <div class="header">
+    <h1>SyncWatch</h1>
+    <a href="/files" class="manage-link">Manage Videos</a>
+  </div>
+
+  <!-- Имя пользователя -->
+  <div class="controls">
+    <label for="userName">Your Name:</label>
+    <input type="text" id="userName" placeholder="Enter your name">
+    <button id="saveNameBtn">Save Name</button>
+
+    <!-- Статус "В сети" -->
+    <div class="status-line">
+      В сети: <span id="onlineCount">0</span>
+    </div>
+  </div>
+
+  <div class="main-container">
+    <!-- Левая часть: видео, статус, загрузка -->
+    <div class="left-panel">
+  <!-- Кнопка выхода из комнаты -->
+  <button id="leaveRoomBtn" style="margin-bottom:16px;">Выйти из комнаты</button>
+  <!-- Видео -->
+      <div class="video-container">
+        <video id="videoPlayer" width="100%" controls></video>
+        <!-- Меню качества -->
+        <div class="quality-menu">
+          <button id="qualityBtn" class="quality-btn-player">Settings</button>
+          <div id="qualityDropdown" class="dropdown-content">
+            <a href="#" data-quality="original">Original</a>
+            <a href="#" data-quality="low">Low (240p)</a>
+            <a href="#" data-quality="medium">Medium (720p)</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Загрузка видео -->
+      <div class="upload-section">
+        <button id="uploadBtn"><i class="fas fa-upload"></i> Upload Video</button>
+        <input type="file" id="uploadInput" accept="video/*" style="display:none;">
+        <div class="progress-bar" style="display:none;">
+          <div class="progress-bar-fill"></div>
+        </div>
+      </div>
+
+      <div id="status">Status: Not connected</div>
+
+      <!-- Комментарии -->
+      <div class="comments-section">
+        <h3>Comments</h3>
+        <div id="commentsList"></div>
+        <div class="comment-input">
+          <input type="text" id="commentInput" placeholder="Add a comment...">
+          <button id="sendCommentBtn">Send</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Правая часть: список видео -->
+    <div class="right-panel">
+      <h3>Videos</h3>
+      <div id="videoList"></div>
+    </div>
+  </div>
+
+  <!-- Уведомления -->
+  <div id="notifications"></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>

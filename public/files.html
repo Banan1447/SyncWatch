@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manage Videos</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+  <div class="header">
+    <h1>Manage Videos</h1>
+    <a href="/" class="back-link">Back to SyncWatch</a>
+  </div>
+
+  <div id="fileList"></div>
+
+  <!-- Комментарии -->
+  <div class="footer">
+    <p>SyncWatch v1.0 — Manage your video files</p>
+  </div>
+
+  <script>
+    // Загрузка списка видео
+    fetch('/api/videos')
+      .then(res => res.json())
+      .then(videos => {
+        const fileList = document.getElementById('fileList');
+        videos.forEach(video => {
+          const div = document.createElement('div');
+          div.className = 'file-item';
+          div.innerHTML = `
+            <span class="file-name">${video.name}</span>
+            <input type="text" class="rename-input" value="${video.name}" style="display:none;">
+            <button class="rename-btn"><i class="fas fa-edit"></i></button>
+            <button class="save-btn" style="display:none;"><i class="fas fa-save"></i></button>
+            <button class="delete-btn"><i class="fas fa-trash"></i></button>
+          `;
+          fileList.appendChild(div);
+
+          const renameBtn = div.querySelector('.rename-btn');
+          const saveBtn = div.querySelector('.save-btn');
+          const deleteBtn = div.querySelector('.delete-btn');
+          const fileNameSpan = div.querySelector('.file-name');
+          const renameInput = div.querySelector('.rename-input');
+
+          renameBtn.addEventListener('click', () => {
+            renameInput.style.display = 'inline';
+            fileNameSpan.style.display = 'none';
+            saveBtn.style.display = 'inline';
+            renameBtn.style.display = 'none';
+          });
+
+          saveBtn.addEventListener('click', () => {
+            const newName = renameInput.value.trim();
+            if (newName && newName !== video.name) {
+              fetch('/rename', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ oldName: video.name, newName })
+              })
+                .then(res => res.json())
+                .then(data => {
+                  if (data.success) {
+                    fileNameSpan.textContent = newName;
+                    video.name = newName;
+                  } else {
+                    alert('Rename failed');
+                  }
+                });
+            }
+            renameInput.style.display = 'none';
+            fileNameSpan.style.display = 'inline';
+            saveBtn.style.display = 'none';
+            renameBtn.style.display = 'inline';
+          });
+
+          deleteBtn.addEventListener('click', () => {
+            if (confirm(`Delete ${video.name}?`)) {
+              fetch('/delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: video.name })
+              })
+                .then(res => res.json())
+                .then(data => {
+                  if (data.success) {
+                    div.remove();
+                  } else {
+                    alert('Delete failed');
+                  }
+                });
+            }
+          });
+        });
+      });
+  </script>
+</body>
+</html>

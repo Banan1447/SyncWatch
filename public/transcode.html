@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Transcode Videos</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+  <div class="header">
+    <h1>Transcode Videos</h1>
+    <a href="/" class="back-link">Back to SyncWatch</a>
+  </div>
+
+  <div id="transcodeList"></div>
+
+  <script>
+    fetch('/api/videos')
+      .then(res => res.json())
+      .then(videos => {
+        const list = document.getElementById('transcodeList');
+        videos.forEach(video => {
+          const div = document.createElement('div');
+          div.className = 'transcode-item';
+          div.innerHTML = `
+            <strong>${video.name}</strong>
+            <button class="transcode-btn" data-file="${video.name}" data-quality="low">Low (240p)</button>
+            <button class="transcode-btn" data-file="${video.name}" data-quality="medium">Medium (720p)</button>
+            <div class="progress-bar" style="display:none;">
+              <div class="progress-bar-fill"></div>
+            </div>
+          `;
+          list.appendChild(div);
+
+          const btns = div.querySelectorAll('.transcode-btn');
+          const progressBar = div.querySelector('.progress-bar');
+          const progressBarFill = div.querySelector('.progress-bar-fill');
+
+          btns.forEach(btn => {
+            btn.addEventListener('click', () => {
+              const file = btn.dataset.file;
+              const quality = btn.dataset.quality;
+
+              progressBar.style.display = 'block';
+
+              fetch('/transcode', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ file, quality })
+              })
+                .then(res => res.json())
+                .then(data => {
+                  if (data.success) {
+                    progressBarFill.style.width = '100%';
+                    setTimeout(() => {
+                      progressBar.style.display = 'none';
+                      progressBarFill.style.width = '0';
+                    }, 2000);
+                  } else {
+                    alert('Transcoding failed');
+                    progressBar.style.display = 'none';
+                  }
+                });
+            });
+          });
+        });
+      });
+  </script>
+</body>
+</html>

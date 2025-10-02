@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Room Selection</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="header">
+    <h1>Выбор комнаты</h1>
+  </div>
+  <div class="main-container">
+    <div class="left-panel">
+      <h2>Создать комнату</h2>
+      <form id="createRoomForm">
+        <input type="text" id="newRoomName" placeholder="Название комнаты" required>
+        <button type="submit">Создать</button>
+      </form>
+      <div id="createRoomStatus"></div>
+    </div>
+    <div class="right-panel">
+      <h2>Список комнат</h2>
+      <div id="roomList"></div>
+    </div>
+  </div>
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+    const roomListDiv = document.getElementById('roomList');
+    const createRoomForm = document.getElementById('createRoomForm');
+    const createRoomStatus = document.getElementById('createRoomStatus');
+
+    function renderRoomList(rooms) {
+      roomListDiv.innerHTML = '';
+      if (!rooms.length) {
+        roomListDiv.innerHTML = '<p>Нет доступных комнат</p>';
+        return;
+      }
+      rooms.forEach(room => {
+        const div = document.createElement('div');
+  div.className = 'room-item';
+  div.innerHTML = `<b>${room.name}</b> (${room.userCount} чел.) <button>Войти</button> <button class="delete-btn">Удалить</button>`;
+  div.querySelector('button').onclick = () => joinRoom(room.id);
+  div.querySelector('.delete-btn').onclick = () => deleteRoom(room.id);
+  roomListDiv.appendChild(div);
+    function deleteRoom(roomId) {
+      if (!confirm('Удалить комнату?')) return;
+      socket.emit('delete-room', { roomId }, res => {
+        if (res && res.success) {
+          // Обновление списка произойдет через room-list
+        } else {
+          alert(res && res.error ? res.error : 'Ошибка удаления комнаты');
+        }
+      });
+    }
+      });
+    }
+
+    function joinRoom(roomId) {
+      const name = prompt('Ваше имя?') || '';
+      socket.emit('join-room', { roomId, name }, res => {
+        if (res && res.success) {
+          window.location.href = '/?room=' + roomId;
+        } else {
+          alert(res && res.error ? res.error : 'Ошибка входа в комнату');
+        }
+      });
+    }
+
+    createRoomForm.onsubmit = e => {
+      e.preventDefault();
+      const name = document.getElementById('newRoomName').value.trim();
+      if (!name) return;
+      socket.emit('create-room', { name }, res => {
+        if (res && res.id) {
+          createRoomStatus.textContent = 'Комната создана!';
+          setTimeout(() => joinRoom(res.id), 500);
+        } else {
+          createRoomStatus.textContent = 'Ошибка создания комнаты';
+        }
+      });
+    };
+
+    socket.emit('get-rooms', renderRoomList);
+    socket.on('room-list', renderRoomList);
+  </script>
+</body>
+</html>

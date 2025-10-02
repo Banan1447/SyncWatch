@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YouTube Queue</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+  <div class="header">
+    <h1>SyncWatch</h1>
+    <a href="/files" class="manage-link">Manage Videos</a>
+  </div>
+
+  <div class="controls">
+    <label for="youtubeUrl">YouTube URL:</label>
+    <input type="text" id="youtubeUrl" placeholder="https://www.youtube.com/watch?v=...">
+    <button id="addYoutubeBtn">Add to Queue</button>
+    <button id="clearQueueBtn">Clear Queue</button>
+  </div>
+
+  <div class="main-container">
+    <div class="left-panel">
+      <div class="video-container">
+        <div id="youtubePlayerContainer" style="width:100%; height:360px; background:#000; display:flex; align-items:center; justify-content:center;">
+          <div id="youtubePlayer" style="display:none;"></div>
+        </div>
+      </div>
+
+      <div id="queueSection">
+        <h3>YouTube Queue</h3>
+        <div id="youtubeQueue"></div>
+      </div>
+    </div>
+
+    <div class="right-panel">
+      <h3>Current Video</h3>
+      <div id="currentVideoInfo"></div>
+    </div>
+  </div>
+
+  <div id="notifications"></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+    const youtubeUrlInput = document.getElementById('youtubeUrl');
+    const addYoutubeBtn = document.getElementById('addYoutubeBtn');
+    const clearQueueBtn = document.getElementById('clearQueueBtn');
+    const youtubeQueue = document.getElementById('youtubeQueue');
+    const currentVideoInfo = document.getElementById('currentVideoInfo');
+    const youtubePlayerContainer = document.getElementById('youtubePlayerContainer');
+    const youtubePlayer = document.getElementById('youtubePlayer');
+
+    let youtubeQueueList = [];
+    let currentVideo = null;
+
+    // Load queue from localStorage
+    function loadQueue() {
+      const saved = localStorage.getItem('youtubeQueue');
+      if (saved) {
+        youtubeQueueList = JSON.parse(saved);
+        renderQueue();
+      }
+    }
+
+    // Save queue to localStorage
+    function saveQueue() {
+      localStorage.setItem('youtubeQueue', JSON.stringify(youtubeQueueList));
+    }
+
+    // Render queue
+    function renderQueue() {
+      youtubeQueue.innerHTML = '';
+      if (youtubeQueueList.length === 0) {
+        youtubeQueue.innerHTML = '<p>Queue is empty</p>';
+        return;
+      }
+
+      youtubeQueueList.forEach((video, index) => {
+        const div = document.createElement('div');
+        div.className = 'youtube-queue-item';
+        div.innerHTML = `
+          <div class="queue-info">
+            <strong>${index + 1}. ${video.title}</strong>
+            <small>${video.duration}</small>
+          </div>
+          <div class="queue-actions">
+            ${index === 0 ? '<span class="current">Now Playing</span>' : ''}
+            <button class="remove-btn" data-index="${index}">Remove</button>
+            <button class="play-btn" data-index="${index}">Play</button>
+          </div>
+        `;
+        youtubeQueue.appendChild(div);
+      });
+
+      // Add event listeners
+      document.querySelectorAll('.remove-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+          const index = parseInt(this.getAttribute('data-index'));
+          youtubeQueueList.splice(index, 1);
+          saveQueue();
+          renderQueue();
+        });
+      });
+
+      document.querySelectorAll('.play-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+          const index = parseInt(this.getAttribute('data-index'));
+          playVideoFromQueue(index);
+        });
+      });
+    }
+
+    // Play video from queue
+    function playVideoFromQueue(index) {
+      if (index < 0 || index >= youtubeQueueList.length) return;
+      
+      const video = youtubeQueueList[index];
+      currentVideo = video;
+      renderCurrentVideo();
+      loadYouTubePlayer(video.id);
+    }
+
+    // Render current video info
+    function renderCurrentVideo() {
+      if (!currentVideo) {
+        currentVideoInfo.innerHTML = '<p>No video playing</p>';
+        return;
+      }
+
+      currentVideoInfo.innerHTML = `
+        <div class="current-video-card">
+          <img src="${currentVideo.thumbnail}" alt="${currentVideo.title}" style="width:100%; height:180px; object-fit:cover;">
+          <h4>${currentVideo.title}</h4>
+          <p>${currentVideo.duration}</p>
+          <button id="skipCurrentBtn">Skip</button>
+        </div>
+      `;
+
+      document.getElementById('skipCurrentBtn').addEventListener('click', () => {
+        if (youtubeQueueList.length > 0) {
+          // Remove current video from queue
+          youtubeQueueList.shift();
+          currentVideo = null;
+          renderQueue();
+          renderCurrentVideo();
+          saveQueue();
+        }
+      });
+    }
+
+    // Load YouTube player
+    function loadYouTubePlayer(videoId) {
+      // Clear previous player
+      youtubePlayer.innerHTML = '';
+      youtubePlayer.style.display = 'block';
+      
+      // Create YouTube iframe
+      const iframe = document.createElement('iframe');
+      iframe.width = '100%';
+      iframe.height = '360';
+      iframe.src = `https://www.youtube.com/embed/${videoId}?enablejsapi=1&autoplay=1`;
+      iframe.allow = 'autoplay';
+      iframe.style.border = '0';
+      iframe.setAttribute('frameborder', '0');
+      iframe.setAttribute('allowfullscreen', 'true');
+      iframe.setAttribute('loading', 'lazy');
+
+      youtubePlayer.appendChild(iframe);
+    }
+
+    // Add YouTube video to queue
+    addYoutubeBtn.addEventListener('click', () => {
+      const url = youtubeUrlInput.value.trim();
+      if (!url) {
+        showNotification('Please enter a YouTube URL', 'error');
+        return;
+      }
+
+      // Extract video ID from URL
+      let videoId = '';
+      if (url.includes('youtu.be/')) {
+        videoId = url.split('youtu.be/')[1].split('?')[0];
+      } else if (url.includes('youtube.com')) {
+        videoId = url.split('v=')[1].split('&')[0];
+      } else {
+        showNotification('Invalid YouTube URL', 'error');
+        return;
+      }
+
+      // Fetch video details
+      fetch(`/api/youtube/${videoId}`)
+        .then(res => res.json())
+        .then(data => {
+          const video = {
+            id: videoId,
+            title: data.title,
+            duration: formatDuration(data.duration),
+            thumbnail: data.thumbnail
+          };
+
+          youtubeQueueList.push(video);
+          saveQueue();
+          renderQueue();
+          youtubeUrlInput.value = '';
+          showNotification('Video added to queue', 'success');
+        })
+        .catch(err => {
+          console.error('Error fetching YouTube video:', err);
+          showNotification('Failed to fetch video details', 'error');
+        });
+    });
+
+    // Clear queue
+    clearQueueBtn.addEventListener('click', () => {
+      if (confirm('Clear entire queue?')) {
+        youtubeQueueList = [];
+        currentVideo = null;
+        renderQueue();
+        renderCurrentVideo();
+        saveQueue();
+        showNotification('Queue cleared', 'success');
+      }
+    });
+
+    // Format duration from ISO 8601 to human readable
+    function formatDuration(duration) {
+      const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+      const hours = match[1] ? `${match[1]}h ` : '';
+      const minutes = match[2] ? `${match[2]}m ` : '';
+      const seconds = match[3] ? `${match[3]}s` : '';
+      return `${hours}${minutes}${seconds}`.trim();
+    }
+
+    // Show notification
+    function showNotification(message, type) {
+      const notification = document.createElement('div');
+      notification.className = `notification ${type}`;
+      notification.textContent = message;
+      document.getElementById('notifications').appendChild(notification);
+
+      setTimeout(() => {
+        notification.remove();
+      }, 3000);
+    }
+
+    // Initialize
+    loadQueue();
+    renderQueue();
+    renderCurrentVideo();
+
+    // Socket events
+    socket.on('video-command', (data) => {
+      if (data.type === 'play' && currentVideo && youtubePlayer.style.display === 'block') {
+        // Resume player if paused
+        const iframe = youtubePlayer.querySelector('iframe');
+        if (iframe) {
+          iframe.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'playVideo' }), '*');
+        }
+      } else if (data.type === 'pause' && youtubePlayer.style.display === 'block') {
+        // Pause player
+        const iframe = youtubePlayer.querySelector('iframe');
+        if (iframe) {
+          iframe.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'pauseVideo' }), '*');
+        }
+      } else if (data.type === 'seek' && youtubePlayer.style.display === 'block') {
+        // Seek to time
+        const iframe = youtubePlayer.querySelector('iframe');
+        if (iframe) {
+          iframe.contentWindow.postMessage(JSON.stringify({ 
+            event: 'command', 
+            func: 'seekTo', 
+            args: [data.time, true] 
+          }), '*');
+        }
+      }
+    });
+  </script>
+</body>
+</html>
+</div>
+```
