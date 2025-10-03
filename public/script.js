@@ -108,22 +108,37 @@ function renderRoomVideoList() {
   fetch('/api/videos')
     .then(res => res.json())
     .then(videos => {
+      console.log('API returned videos:', videos); // ✅ Отладка
+      console.log('Total videos from API:', videos.length); // ✅ Отладка
       videos.forEach(video => {
+        const ext = video.name.split('.').pop().toLowerCase();
+        const isSupported = ['mp4', 'webm', 'ogg'].includes(ext);
         const div = document.createElement('div');
         div.className = 'video-item';
         div.innerHTML = `
           <div class="video-info">
-            <strong class="video-title">${video.name}</strong><br>
+            <strong class="video-title">${video.name}</strong>
+            ${!isSupported ? '<br><small style="color: #ff6b6b;">(Не поддерживается браузером)</small>' : ''}
+            <br>
             <small>${video.resolution || 'N/A'} | ${video.bitrate || 'N/A'}</small>
           </div>
           <i class="fas fa-play-circle preview-icon"></i>
         `;
         div.addEventListener('click', () => {
+          if (!isSupported) {
+            if (!confirm('Этот формат видео может не воспроизводиться в браузере. Продолжить?')) {
+              return;
+            }
+          }
           socket.emit('select-video', video.name);
           currentVideoFile = video.name;
         });
         videoList.appendChild(div);
       });
+    })
+    .catch(err => {
+      console.error('Error fetching videos:', err);
+      showNotification('Failed to load video list', 'error');
     });
 }
 
@@ -179,6 +194,7 @@ uploadInput.addEventListener('change', (e) => {
 // --- ROOM STATE ---
 socket.on('room-state', (state) => {
   roomState = state;
+  console.log('Room state received:', state); // ✅ Отладка
   // Видео
   if (state.currentVideo) {
     video.src = `/videos/${state.currentVideo}`;
@@ -203,11 +219,13 @@ socket.on('room-state', (state) => {
 
 // ✅ НОВОЕ: Обработка события video-added
 socket.on('video-added', (newVideo) => {
+  console.log('Video added:', newVideo); // ✅ Отладка
   renderRoomVideoList(); // Обновляем список
 });
 
 // ✅ НОВОЕ: Обработка события video-removed
 socket.on('video-removed', (removedVideoName) => {
+  console.log('Video removed:', removedVideoName); // ✅ Отладка
   renderRoomVideoList(); // Обновляем список
 });
 
@@ -333,4 +351,33 @@ document.addEventListener('DOMContentLoaded', () => {
   refreshBtn.onclick = renderRoomVideoList;
   
   videosHeader.appendChild(refreshBtn);
+
+  // ✅ КНОПКА ДЛЯ ОТЛАДКИ API
+  const debugApiBtn = document.createElement('button');
+  debugApiBtn.innerHTML = '<i class="fas fa-bug"></i> Debug API';
+  debugApiBtn.style = `
+    background: #ffc107;
+    color: black;
+    border: none;
+    border-radius: 4px;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8rem;
+    cursor: pointer;
+    margin-left: 0.5rem;
+    transition: background 0.2s ease;
+  `;
+  debugApiBtn.onclick = () => {
+    fetch('/api/videos')
+      .then(res => res.json())
+      .then(videos => {
+        console.log('API videos:', videos);
+        alert(`API returned ${videos.length} videos. Check console for details.`);
+      })
+      .catch(err => {
+        console.error('API error:', err);
+        alert('Error fetching API videos');
+      });
+  };
+  
+  videosHeader.appendChild(debugApiBtn);
 });

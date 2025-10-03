@@ -6,6 +6,5 @@ module.exports = {
   videoDirectory: './videos', // Change this if videos are stored elsewhere
 
   // Port on which the server will run
-  port: process.env.PORT || 5000, // Default to 3000, can be overridden by environment variable
+  port: process.env.PORT || 3000, // Default to 3000, can be overridden by environment variable
 };
-</contents>

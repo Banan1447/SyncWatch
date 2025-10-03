@@ -7,12 +7,15 @@ const multer = require('multer');
 const ffmpeg = require('fluent-ffmpeg');
 const fs = require('fs');
 
+// ✅ Читаем настройки из config.js
+const config = require('./config.js');
+
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 
-// ✅ Используем текущую директорию для папки videos
-const VIDEO_FOLDER = path.join(process.cwd(), 'videos');
+// ✅ Используем папку из config.js
+const VIDEO_FOLDER = path.join(process.cwd(), config.videoDirectory);
 
 // Создаём папку videos, если её нет
 if (!fs.existsSync(VIDEO_FOLDER)) {
@@ -35,17 +38,18 @@ app.use(express.json());
 app.use(express.static('public'));
 app.use('/videos', express.static(VIDEO_FOLDER));
 
-
-
 // --- ROOM LOGIC ВЫНЕСЕН В rooms.js ---
 const roomsData = require('./rooms.js');
 let rooms = roomsData.getRooms();
 function getRoomList() { return roomsData.getRoomList(); }
 
+// ✅ РАСШИРЕННЫЙ СПИСОК ВИДЕОФОРМАТОВ
+const VIDEO_EXTENSIONS = /\.(mp4|webm|ogg|avi|mov|wmv|flv|mkv|mpg|mpeg|3gp|3g2|ts|mts|m2ts|vob|f4v|f4p|f4a|f4b|mp3|wav|aac|flac|wma|m4a|asf|rm|rmvb|vcd|svcd|dvd|yuv|y4m)$/i;
+
 // Получить список видеофайлов
 function getVideoFiles() {
   try {
-    return fs.readdirSync(VIDEO_FOLDER).filter(file => /\.(mp4|webm|ogg)$/i.test(file));
+    return fs.readdirSync(VIDEO_FOLDER).filter(file => VIDEO_EXTENSIONS.test(file));
   } catch (err) {
     console.error('Ошибка доступа к папке с видео:', err);
     return [];
@@ -77,10 +81,13 @@ app.get('/api/videos', (req, res) => {
   const videos = [];
   if (files.length === 0) return res.json([]);
 
+  let processed = 0;
+
   files.forEach(file => {
     getVideoInfo(file, info => {
       videos.push({ name: file, ...info });
-      if (videos.length === files.length) {
+      processed++;
+      if (processed === files.length) {
         res.json(videos);
       }
     });
@@ -129,6 +136,22 @@ app.get('/admin', (req, res) => {
   }
 });
 
+// ✅ API: получить текущие настройки
+app.get('/api/config', (req, res) => {
+  const clientIP = req.ip || req.connection.remoteAddress;
+  const cleanIP = clientIP.replace(/^::ffff:/, '');
+
+  if (cleanIP !== '127.0.0.1' && cleanIP !== '::1') {
+    return res.status(403).json({ success: false, error: 'Доступ запрещён' });
+  }
+
+  res.json({
+    success: true,
+    port: config.port,
+    videoDirectory: config.videoDirectory
+  });
+});
+
 // ✅ API: установить папку с видео
 app.post('/api/set-video-folder', (req, res) => {
   const { folder } = req.body;
@@ -147,12 +170,88 @@ app.post('/api/set-video-folder', (req, res) => {
     return res.status(400).json({ success: false, error: 'Папка не существует' });
   }
 
-  // ✅ Обновляем путь к видео
-  VIDEO_FOLDER = path.resolve(folder);
-  // Обновляем middleware для раздачи видео
-  app.use('/videos', express.static(VIDEO_FOLDER));
-  console.log(`[ADMIN] Папка с видео изменена на: ${VIDEO_FOLDER}`);
-  res.json({ success: true, folder: VIDEO_FOLDER });
+  // ✅ Безопасное обновление config.js
+  const configPath = path.join(__dirname, 'config.js');
+  let configContent;
+  try {
+    configContent = fs.readFileSync(configPath, 'utf8');
+  } catch (err) {
+    console.error('Ошибка чтения config.js:', err);
+    return res.status(500).json({ success: false, error: 'Не удалось прочитать config.js' });
+  }
+
+  // Заменяем videoDirectory в config.js
+  const newConfigContent = configContent.replace(
+    /(videoDirectory:\s*['"])[^'"]*(['"])/,
+    `$1${folder}$2`
+  );
+
+  // ✅ Проверяем, что результат — валидный JS
+  try {
+    eval(`(${newConfigContent.replace('module.exports =', '')})`);
+  } catch (err) {
+    console.error('Новый config.js содержит ошибки:', err);
+    return res.status(500).json({ success: false, error: 'Новый config.js содержит ошибки' });
+  }
+
+  try {
+    fs.writeFileSync(configPath, newConfigContent);
+  } catch (err) {
+    console.error('Ошибка записи config.js:', err);
+    return res.status(500).json({ success: false, error: 'Не удалось записать config.js' });
+  }
+
+  console.log(`[ADMIN] Папка с видео изменена на: ${folder}`);
+  res.json({ success: true, folder: folder });
+});
+
+// ✅ API: установить порт сервера
+app.post('/api/set-port', (req, res) => {
+  const { port } = req.body;
+  const clientIP = req.ip || req.connection.remoteAddress;
+  const cleanIP = clientIP.replace(/^::ffff:/, '');
+
+  if (cleanIP !== '127.0.0.1' && cleanIP !== '::1') {
+    return res.status(403).json({ success: false, error: 'Доступ запрещён' });
+  }
+
+  if (!port || typeof port !== 'number' || port < 1024 || port > 65535) {
+    return res.status(400).json({ success: false, error: 'Неверный порт (1024-65535)' });
+  }
+
+  // ✅ Безопасное обновление config.js
+  const configPath = path.join(__dirname, 'config.js');
+  let configContent;
+  try {
+    configContent = fs.readFileSync(configPath, 'utf8');
+  } catch (err) {
+    console.error('Ошибка чтения config.js:', err);
+    return res.status(500).json({ success: false, error: 'Не удалось прочитать config.js' });
+  }
+
+  // Заменяем port в config.js
+  const newConfigContent = configContent.replace(
+    /(port:\s*(?:process\.env\.PORT\s*\|\|\s*)?)\d+/,
+    `$1${port}`
+  );
+
+  // ✅ Проверяем, что результат — валидный JS
+  try {
+    eval(`(${newConfigContent.replace('module.exports =', '')})`);
+  } catch (err) {
+    console.error('Новый config.js содержит ошибки:', err);
+    return res.status(500).json({ success: false, error: 'Новый config.js содержит ошибки' });
+  }
+
+  try {
+    fs.writeFileSync(configPath, newConfigContent);
+  } catch (err) {
+    console.error('Ошибка записи config.js:', err);
+    return res.status(500).json({ success: false, error: 'Не удалось записать config.js' });
+  }
+
+  console.log(`[ADMIN] Порт изменён на: ${port}. Перезапустите сервер.`);
+  res.json({ success: true, port: port, message: 'Порт изменён. Перезапустите сервер для применения изменений.' });
 });
 
 // Главная страница
@@ -264,7 +363,7 @@ io.on('connection', (socket) => {
       rooms[joinedRoom].currentVideo = filename;
       roomsData.setRooms(rooms);
       io.to(joinedRoom).emit('video-updated', filename);
-      io.to(joinedRoom).emit('room-state', rooms[joinedRoom]);
+      io.to(joinedRoom).emit('room-state', rooms[roomId]);
     }
   });
 
@@ -296,7 +395,8 @@ io.on('connection', (socket) => {
   });
 });
 
-const PORT = 3000;
+// ✅ Используем порт из config.js
+const PORT = config.port;
 server.listen(PORT, () => {
   console.log(`[SERVER] Запущен на http://localhost:${PORT}`);
   console.log(`[INFO] Админ-панель: http://localhost:${PORT}/admin (только с localhost)`);

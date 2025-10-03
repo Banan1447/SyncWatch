@@ -161,9 +161,49 @@
         "status": "paused",
         "position": 0,
         "ready": false
+      },
+      "4h1DR13NnViXssMCAAAH": {
+        "name": "Artura",
+        "ping": 0,
+        "buffer": 0,
+        "status": "paused",
+        "position": 0,
+        "ready": false
+      },
+      "QHYX4XsJrASgF98VAAAD": {
+        "name": "Artura",
+        "ping": 0,
+        "buffer": 0,
+        "status": "paused",
+        "position": 0,
+        "ready": false
+      },
+      "xT6QzYO3pB7gE1o9AAAD": {
+        "name": "Artura",
+        "ping": 0,
+        "buffer": 0,
+        "status": "paused",
+        "position": 0,
+        "ready": false
+      },
+      "2D3AY9Tjwr8h67oxAAAD": {
+        "name": "Artura",
+        "ping": 0,
+        "buffer": 0,
+        "status": "paused",
+        "position": 0,
+        "ready": false
+      },
+      "nBuVv35iKAiWuIxiAAAD": {
+        "name": "Artura",
+        "ping": 0,
+        "buffer": 0,
+        "status": "paused",
+        "position": 0,
+        "ready": false
       }
     },
-    "currentVideo": "Alien.Earth_CUDA.mp4",
+    "currentVideo": "video.mp4",
     "chat": []
   },
   "room_wilapx41": {

@@ -16,7 +16,44 @@
     <div id="statusMessage" style="margin-top: 10px;"></div>
   </div>
 
+  <div class="admin-panel" style="margin-top: 30px;">
+    <h2>Смена порта сервера</h2>
+    <label for="serverPort">Новый порт сервера:</label>
+    <input type="number" id="serverPort" placeholder="5000" value="5000" min="1024" max="65535" style="width: 100%; padding: 8px; margin: 10px 0;">
+    <button id="changePortBtn">Сменить порт</button>
+    <div id="portStatusMessage" style="margin-top: 10px;"></div>
+    <div style="margin-top: 10px; font-size: 0.9em; color: #aaa;">
+      <small>После смены порта перезапустите сервер вручную.</small>
+    </div>
+  </div>
+
+  <div class="admin-panel" style="margin-top: 30px;">
+    <h2 style="background: #000; color: #aaa; padding: 5px 10px; display: inline-block; border-radius: 4px;">Текущие настройки</h2>
+    <div style="padding: 10px; background: #f0f0f; border-radius: 4px; margin-top: 10px;">
+      <strong>Порт сервера:</strong> <span id="currentPort">Загрузка...</span><br>
+      <strong>Папка с видео:</strong> <span id="currentVideoDir">Загрузка...</span>
+    </div>
+  </div>
+
   <script>
+    // Загружаем текущие настройки при открытии страницы
+    fetch('/api/config')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          document.getElementById('currentPort').textContent = data.port;
+          document.getElementById('currentVideoDir').textContent = data.videoDirectory;
+          document.getElementById('serverPort').value = data.port;
+          document.getElementById('videoFolder').value = data.videoDirectory;
+        } else {
+          console.error('Ошибка получения настроек:', data.error);
+        }
+      })
+      .catch(err => {
+        console.error('Ошибка соединения:', err);
+      });
+
+    // === СМЕНА ПАПКИ ===
     document.getElementById('saveFolderBtn').addEventListener('click', () => {
       const folder = document.getElementById('videoFolder').value.trim();
       if (!folder) return;
@@ -31,9 +68,39 @@
           const status = document.getElementById('statusMessage');
           if (data.success) {
             status.innerHTML = `<span style="color: green;">✅ Папка установлена: ${data.folder}</span>`;
+            document.getElementById('currentVideoDir').textContent = data.folder; // Обновляем отображение
           } else {
             status.innerHTML = `<span style="color: red;">❌ Ошибка: ${data.error}</span>`;
           }
+        });
+    });
+
+    // === СМЕНА ПОРТА ===
+    document.getElementById('changePortBtn').addEventListener('click', () => {
+      const port = parseInt(document.getElementById('serverPort').value.trim());
+      if (!port || port < 1024 || port > 65535) {
+        alert('Порт должен быть числом от 1024 до 65535');
+        return;
+      }
+
+      fetch('/api/set-port', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ port })
+      })
+        .then(res => res.json())
+        .then(data => {
+          const status = document.getElementById('portStatusMessage');
+          if (data.success) {
+            status.innerHTML = `<span style="color: green;">✅ Порт изменён на ${data.port}. Перезапустите сервер.</span>`;
+            document.getElementById('currentPort').textContent = data.port; // Обновляем отображение
+          } else {
+            status.innerHTML = `<span style="color: red;">❌ Ошибка: ${data.error}</span>`;
+          }
+        })
+        .catch(err => {
+          const status = document.getElementById('portStatusMessage');
+          status.innerHTML = `<span style="color: red;">❌ Ошибка соединения: ${err.message}</span>`;
         });
     });
   </script>
