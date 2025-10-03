@@ -1,73 +1,88 @@
-# TODO: Разработка прототипа системы синхронного просмотра видео
+надо Добавить
+// server.js
+const express = require('express');
+const WebSocket = require('ws');
+const http = require('http');
+const path = require('path');
 
-## Этап 1: Подготовка окружения (0.5 дня)
-- [ ] Настроить проект:
-  - Установить Python 3.10+
-  - Создать виртуальное окружение `venv`
-  - Установить зависимости: `fastapi`, `uvicorn`, `pydantic`
-- [ ] Создать структуру проекта:
-  - Добавить папки: `/static`, `/templates`, `/main.py`
-  - Настроить статическую раздачу через FastAPI
-- [ ] Инициализировать Git:
-  - `.gitignore` (включить `venv/`, `*.pyc`)
-  - Первый коммит: `Initial project setup`
+const app = express();
+const server = http.createServer(app);
+const wss = new WebSocket.Server({ server });
 
----
+// Middleware
+app.use(express.json());
+app.use(express.static(path.join(__dirname, 'public'))); // Serve static files (optional)
 
-## Этап 2: Базовый сервер и WebSocket (1 день)
-- [ ] Реализовать WebSocket маршрут `/ws/{room_id}`
-- [ ] Хранение комнат в памяти:
-  - Создать глобальный объект `rooms: dict[str, list[WebSocket]]`
-- [ ] Логика подключения:
-  - При подключении: добавлять клиент в список комнаты
-  - При отключении: удалять клиент из списка
-- [ ] Рассылка команд:
-  - При получении JSON (play/pause/seek) — отправлять всем участникам комнаты
-  - Пример JSON: `{ "type": "play", "position": 123.4 }`
+// In-memory queue (in production, use Redis or DB)
+let videoQueue = [];
 
----
+// Extract YouTube video ID from any valid URL
+function extractYouTubeId(url) {
+  const regex = /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/;
+  const match = url.match(regex);
+  return match ? match[1] : null;
+}
 
-## Этап 3: Фронтенд (1 день)
-- [ ] Главная страница (`index.html`):
-  - Поле ввода ID комнаты
-  - Кнопки "Создать комнату" / "Войти"
-- [ ] Видео-плеер:
-  - HTML5 `<video>` с поддержкой загрузки MP4
-  - Добавить кнопки Play/Pause
-- [ ] WebSocket клиент:
-  - Подключение к `/ws/{room_id}`
-  - Отправка событий при нажатии кнопок
-  - Обработка входящих команд для синхронизации
+// Broadcast updated queue to all connected clients
+function broadcastQueueUpdate() {
+  const message = JSON.stringify({ queue: videoQueue });
+  wss.clients.forEach(client => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(message);
+    }
+  });
+}
 
----
+// API: Add video to queue
+app.post('/api/add-video', (req, res) => {
+  const { url } = req.body;
 
-## Этап 4: Синхронизация видео (0.5 дня)
-- [ ] Обработка событий пользователя:
-  - Отправлять команды на сервер при:
-    - Нажатии Play/Pause
-    - Изменении времени воспроизведения (`ontimeupdate`)
-- [ ] Применение команд на клиенте:
-  - Устанавливать `video.currentTime = position` при получении команды
-- [ ] Защита от цикла:
-  - Добавить флаг `fromServer` для исключения повторной отправки команд
+  if (!url || typeof url !== 'string') {
+    return res.status(400).json({ error: 'Invalid or missing URL' });
+  }
 
----
+  const videoId = extractYouTubeId(url);
+  if (!videoId) {
+    return res.status(400).json({ error: 'Invalid YouTube URL' });
+  }
 
-## Этап 5: Тестирование и демонстрация (0.5 дня)
-- [ ] Запустить сервер: `uvicorn main:app --reload`
-- [ ] Проверить:
-  - Создание/присоединение к комнате
-  - Загрузка видео и синхронизация
-  - Задержка < 500 мс
-- [ ] Демонстрация:
-  - Открыть два браузера → войти в одну комнату
-  - Тестировать Play/Pause/Seek
-  - Проверить подключение нового участника
+  // Prevent duplicates
+  if (videoQueue.includes(videoId)) {
+    return res.status(400).json({ error: 'Video already in queue' });
+  }
 
----
+  videoQueue.push(videoId);
+  console.log(`Added video to queue: ${videoId}`);
+  broadcastQueueUpdate();
 
-## Дальнейшие шаги (после PoC)
-- [ ] Добавить чат
-- [ ] Интегрировать YouTube API
-- [ ] Реализовать HLS-стриминг
-- [ ] Внедрить аутентификацию и Redis для хранения комнат
+  res.status(200).json({ success: true, videoId });
+});
+
+// API: Get current queue
+app.get('/api/video-queue', (req, res) => {
+  res.json({ queue: videoQueue });
+});
+
+// WebSocket: Handle new connections
+wss.on('connection', (ws, req) => {
+  console.log('Client connected');
+
+  // Send current queue on connection
+  ws.send(JSON.stringify({ queue: videoQueue }));
+
+  // Handle client disconnect
+  ws.on('close', () => {
+    console.log('Client disconnected');
+  });
+});
+
+// Start server
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`Server running at http://localhost:${PORT}`);
+});
+
+// Export for testing or modular use
+module.exports = { videoQueue, extractYouTubeId, broadcastQueueUpdate };
+
+прочти оригинальный server.js и добавь твои правки, после чего выдай полностью измененный server.js
