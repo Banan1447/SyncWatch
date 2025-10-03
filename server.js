@@ -46,13 +46,6 @@ function getRoomList() { return roomsData.getRoomList(); }
 // ✅ РАСШИРЕННЫЙ СПИСОК ВИДЕОФОРМАТОВ
 const VIDEO_EXTENSIONS = /\.(mp4|webm|ogg|avi|mov|wmv|flv|mkv|mpg|mpeg|3gp|3g2|ts|mts|m2ts|vob|f4v|f4p|f4a|f4b|mp3|wav|aac|flac|wma|m4a|asf|rm|rmvb|vcd|svcd|dvd|yuv|y4m)$/i;
 
-// ✅ ФУНКЦИЯ ПРОВЕРКИ ПОДДЕРЖИВАЕМЫХ ФОРМАТОВ
-function isSupportedFormat(filename) {
-  const ext = filename.split('.').pop().toLowerCase();
-  const supportedFormats = ['mp4', 'webm', 'ogg'];
-  return supportedFormats.includes(ext);
-}
-
 // Получить список видеофайлов
 function getVideoFiles() {
   try {
@@ -92,13 +85,7 @@ app.get('/api/videos', (req, res) => {
 
   files.forEach(file => {
     getVideoInfo(file, info => {
-      // ✅ ДОБАВЛЯЕМ isSupported В ОТВЕТ
-      const isSupported = isSupportedFormat(file);
-      videos.push({ 
-        name: file, 
-        ...info,
-        isSupported
-      });
+      videos.push({ name: file, ...info });
       processed++;
       if (processed === files.length) {
         res.json(videos);
@@ -342,11 +329,14 @@ const TRANSCODE_QUEUE_FILE = path.join(__dirname, 'transcode-queue.json');
 function loadTranscodeTemplates() {
   try {
     if (fs.existsSync(TRANSCODE_TEMPLATES_FILE)) {
-      return JSON.parse(fs.readFileSync(TRANSCODE_TEMPLATES_FILE, 'utf8'));
+      const data = fs.readFileSync(TRANSCODE_TEMPLATES_FILE, 'utf8');
+      console.log(`[TRANSCODE] Загружены шаблоны из: ${TRANSCODE_TEMPLATES_FILE}`);
+      return JSON.parse(data);
     }
+    console.log(`[TRANSCODE] Файл шаблонов не найден: ${TRANSCODE_TEMPLATES_FILE}`);
     return [];
   } catch (err) {
-    console.error('Error loading transcode templates:', err);
+    console.error('[TRANSCODE] Ошибка загрузки шаблонов:', err);
     return [];
   }
 }
@@ -355,9 +345,10 @@ function loadTranscodeTemplates() {
 function saveTranscodeTemplates(templates) {
   try {
     fs.writeFileSync(TRANSCODE_TEMPLATES_FILE, JSON.stringify(templates, null, 2));
+    console.log(`[TRANSCODE] Сохранены шаблоны в: ${TRANSCODE_TEMPLATES_FILE}`);
     return true;
   } catch (err) {
-    console.error('Error saving transcode templates:', err);
+    console.error('[TRANSCODE] Ошибка сохранения шаблонов:', err);
     return false;
   }
 }
@@ -366,11 +357,14 @@ function saveTranscodeTemplates(templates) {
 function loadTranscodeQueue() {
   try {
     if (fs.existsSync(TRANSCODE_QUEUE_FILE)) {
-      return JSON.parse(fs.readFileSync(TRANSCODE_QUEUE_FILE, 'utf8'));
+      const data = fs.readFileSync(TRANSCODE_QUEUE_FILE, 'utf8');
+      console.log(`[TRANSCODE] Загружена очередь из: ${TRANSCODE_QUEUE_FILE}`);
+      return JSON.parse(data);
     }
+    console.log(`[TRANSCODE] Файл очереди не найден: ${TRANSCODE_QUEUE_FILE}`);
     return [];
   } catch (err) {
-    console.error('Error loading transcode queue:', err);
+    console.error('[TRANSCODE] Ошибка загрузки очереди:', err);
     return [];
   }
 }
@@ -379,9 +373,10 @@ function loadTranscodeQueue() {
 function saveTranscodeQueue(queue) {
   try {
     fs.writeFileSync(TRANSCODE_QUEUE_FILE, JSON.stringify(queue, null, 2));
+    console.log(`[TRANSCODE] Сохранена очередь в: ${TRANSCODE_QUEUE_FILE}`);
     return true;
   } catch (err) {
-    console.error('Error saving transcode queue:', err);
+    console.error('[TRANSCODE] Ошибка сохранения очереди:', err);
     return false;
   }
 }
@@ -396,6 +391,7 @@ app.get('/api/transcode/templates', (req, res) => {
   }
 
   const templates = loadTranscodeTemplates();
+  console.log(`[TRANSCODE] Отправлено ${templates.length} шаблонов`);
   res.json({ success: true, templates });
 });
 
@@ -416,16 +412,19 @@ app.post('/api/transcode/save-template', (req, res) => {
   const templates = loadTranscodeTemplates();
   const id = 'tmpl_' + Math.random().toString(36).substr(2, 8);
   
-  templates.push({
+  const newTemplate = {
     id,
     name,
     description: description || '',
     command,
     createdAt: new Date().toISOString()
-  });
+  };
+  
+  templates.push(newTemplate);
 
   if (saveTranscodeTemplates(templates)) {
-    res.json({ success: true, id });
+    console.log(`[TRANSCODE] Сохранён шаблон: ${name} (${id})`);
+    res.json({ success: true, id, template: newTemplate });
   } else {
     res.status(500).json({ success: false, error: 'Failed to save template' });
   }
@@ -446,9 +445,15 @@ app.post('/api/transcode/delete-template', (req, res) => {
   }
 
   let templates = loadTranscodeTemplates();
+  const templateToDelete = templates.find(t => t.id === id);
+  if (!templateToDelete) {
+    return res.status(400).json({ success: false, error: 'Template not found' });
+  }
+
   templates = templates.filter(t => t.id !== id);
 
   if (saveTranscodeTemplates(templates)) {
+    console.log(`[TRANSCODE] Удалён шаблон: ${templateToDelete.name} (${id})`);
     res.json({ success: true });
   } else {
     res.status(500).json({ success: false, error: 'Failed to delete template' });
@@ -476,6 +481,7 @@ app.get('/api/transcode/queue', (req, res) => {
     };
   });
 
+  console.log(`[TRANSCODE] Отправлена очередь: ${queueWithNames.length} элементов`);
   res.json({ success: true, queue: queueWithNames });
 });
 
@@ -502,21 +508,122 @@ app.post('/api/transcode/add-to-queue', (req, res) => {
   let queue = loadTranscodeQueue();
   const id = 'job_' + Math.random().toString(36).substr(2, 8);
   
-  queue.push({
+  const newItem = {
     id,
     fileId,
     templateId,
     status: 'pending',
     progress: 0,
     createdAt: new Date().toISOString()
-  });
+  };
+  
+  queue.push(newItem);
 
   if (saveTranscodeQueue(queue)) {
-    res.json({ success: true, id });
+    console.log(`[TRANSCODE] Добавлен в очередь: ${fileId} с шаблоном ${template.name} (${id})`);
+    res.json({ success: true, id, item: newItem });
+    
+    // Запускаем обработку очереди
+    processTranscodeQueue();
   } else {
     res.status(500).json({ success: false, error: 'Failed to add to queue' });
   }
 });
+
+// === TRANSCODE PROCESSOR ===
+async function processTranscodeQueue() {
+  const queue = loadTranscodeQueue();
+  const templates = loadTranscodeTemplates();
+  
+  // Находим первый ожидающий элемент
+  const pendingItem = queue.find(item => item.status === 'pending');
+  if (!pendingItem) {
+    console.log('[TRANSCODE] Очередь пуста, ожидание...');
+    return;
+  }
+
+  // Обновляем статус
+  pendingItem.status = 'processing';
+  pendingItem.startedAt = new Date().toISOString();
+  saveTranscodeQueue(queue);
+
+  try {
+    const template = templates.find(t => t.id === pendingItem.templateId);
+    if (!template) throw new Error('Template not found');
+
+    const inputFile = path.join(VIDEO_FOLDER, pendingItem.fileId);
+    const outputFile = path.join(VIDEO_FOLDER, 
+      pendingItem.fileId.replace(/\.[^/.]+$/, "") + "_" + 
+      template.name.toLowerCase().replace(/\s+/g, '_') + ".mp4");
+
+    console.log(`[TRANSCODE] Начало конвертации: ${pendingItem.fileId} → ${outputFile}`);
+
+    // Запускаем ffmpeg
+    const command = ffmpeg(inputFile)
+      .output(outputFile)
+      .on('progress', (progress) => {
+        // Обновляем прогресс
+        if (progress.percent) {
+          pendingItem.progress = progress.percent;
+          saveTranscodeQueue(queue);
+          console.log(`[TRANSCODE] Прогресс: ${pendingItem.fileId} - ${Math.round(progress.percent)}%`);
+        }
+      })
+      .on('end', () => {
+        // Завершено
+        pendingItem.status = 'completed';
+        pendingItem.completedAt = new Date().toISOString();
+        saveTranscodeQueue(queue);
+        console.log(`[TRANSCODE] Завершена конвертация: ${pendingItem.fileId}`);
+        
+        // Запускаем следующий
+        setTimeout(processTranscodeQueue, 1000);
+      })
+      .on('error', (err) => {
+        // Ошибка
+        pendingItem.status = 'error';
+        pendingItem.error = err.message;
+        pendingItem.completedAt = new Date().toISOString();
+        saveTranscodeQueue(queue);
+        console.error(`[TRANSCODE] Ошибка конвертации: ${pendingItem.fileId}`, err);
+        
+        // Запускаем следующий
+        setTimeout(processTranscodeQueue, 1000);
+      });
+
+    // Применяем команду из шаблона
+    if (template.command.includes('-vf')) {
+      const vfMatch = template.command.match(/-vf\s+([^ ]+)/);
+      if (vfMatch) command.videoFilters(vfMatch[1]);
+    }
+    
+    if (template.command.includes('-c:v')) {
+      const codecMatch = template.command.match(/-c:v\s+([^ ]+)/);
+      if (codecMatch) command.videoCodec(codecMatch[1]);
+    }
+    
+    if (template.command.includes('-crf')) {
+      const crfMatch = template.command.match(/-crf\s+(\d+)/);
+      if (crfMatch) command.outputOptions('-crf', crfMatch[1]);
+    }
+    
+    if (template.command.includes('-preset')) {
+      const presetMatch = template.command.match(/-preset\s+([^ ]+)/);
+      if (presetMatch) command.outputOptions('-preset', presetMatch[1]);
+    }
+
+    command.run();
+  } catch (err) {
+    pendingItem.status = 'error';
+    pendingItem.error = err.message;
+    pendingItem.completedAt = new Date().toISOString();
+    saveTranscodeQueue(queue);
+    console.error(`[TRANSCODE] Ошибка обработки очереди:`, err);
+    
+    // Запускаем следующий
+    setTimeout(processTranscodeQueue, 1000);
+  }
+}
 
 // === TRANSCODE PAGE ===
 app.get('/transcode', (req, res) => {
@@ -549,10 +656,12 @@ if (!fs.existsSync(TRANSCODE_TEMPLATES_FILE)) {
     }
   ];
   saveTranscodeTemplates(defaultTemplates);
+  console.log(`[TRANSCODE] Создан файл шаблонов: ${TRANSCODE_TEMPLATES_FILE}`);
 }
 
 if (!fs.existsSync(TRANSCODE_QUEUE_FILE)) {
   saveTranscodeQueue([]);
+  console.log(`[TRANSCODE] Создан файл очереди: ${TRANSCODE_QUEUE_FILE}`);
 }
 
 // ✅ ГЛАВНАЯ СТРАНИЦА - РЕДИРЕКТ НА SELECT-ROOM
@@ -624,7 +733,6 @@ io.on('connection', (socket) => {
       delete rooms[joinedRoom].users[socket.id];
       roomsData.setRooms(rooms);
       socket.leave(joinedRoom);
-      // ✅ УБРАЛИ УДАЛЕНИЕ КОМНАТЫ, ЕСЛИ 0 УЧАСТНИКОВ
       io.to(joinedRoom).emit('room-state', rooms[joinedRoom]);
       io.emit('room-list', getRoomList());
     }
@@ -719,11 +827,10 @@ io.on('connection', (socket) => {
     if (joinedRoom && rooms[joinedRoom]) {
       delete rooms[joinedRoom].users[socket.id];
       roomsData.setRooms(rooms);
-      // ✅ УБРАЛИ УДАЛЕНИЕ КОМНАТЫ, ЕСЛИ 0 УЧАСТНИКОВ
+      // ✅ ИСПРАВЛЕНО: используем joinedRoom вместо roomId
       io.to(joinedRoom).emit('room-state', rooms[joinedRoom]);
       io.emit('room-list', getRoomList());
     }
-    joinedRoom = null; // ✅ Сброс joinedRoom
     console.log('[SOCKET] User disconnected:', socket.id);
   });
 });

@@ -12,5 +12,40 @@
     "description": "1080p MP4 with high quality",
     "command": "-vf scale=1920:1080 -c:v libx264 -crf 18 -preset slow {output}",
     "createdAt": "2025-10-03T21:12:21.831Z"
+  },
+  {
+    "id": "tmpl_2pc2j30k",
+    "name": "Max speed",
+    "description": "Simple template with quality/speed slider",
+    "command": "-c:v libx264 -crf 51 -preset veryslow output.mp4",
+    "createdAt": "2025-10-03T21:33:42.102Z"
+  },
+  {
+    "id": "tmpl_ooihxp64",
+    "name": "1",
+    "description": "Simple template with quality/speed slider",
+    "command": "-c:v libx264 -crf 26 -preset fast output.mp4",
+    "createdAt": "2025-10-03T21:37:52.873Z"
+  },
+  {
+    "id": "tmpl_r56h2rww",
+    "name": "max fast",
+    "description": "Simple template with quality/speed slider",
+    "command": "-c:v libx264 -crf 51 -preset veryslow output.mp4",
+    "createdAt": "2025-10-03T21:48:03.594Z"
+  },
+  {
+    "id": "tmpl_2piixeyx",
+    "name": "1",
+    "description": "Simple template with quality/speed slider",
+    "command": "-c:v libx264 -crf 51 -preset veryslow output.mp4",
+    "createdAt": "2025-10-03T21:54:44.366Z"
+  },
+  {
+    "id": "tmpl_e5gavwpz",
+    "name": "3",
+    "description": "Simple template with quality/speed slider",
+    "command": "-c:v libx264 -crf 51 -preset veryslow output.mp4",
+    "createdAt": "2025-10-03T22:03:13.939Z"
   }
 ]

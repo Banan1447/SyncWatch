@@ -2,6 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Manage Videos</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <style>
@@ -165,6 +166,7 @@
       background: var(--bg-darker);
       border-radius: 4px;
       border: 1px solid var(--border);
+      margin-bottom: 0.5rem;
       transition: background 0.2s ease;
     }
 
@@ -267,6 +269,97 @@
         opacity: 1;
       }
     }
+
+    @media (max-width: 768px) {
+      .main-container {
+        flex-direction: column;
+      }
+
+      .header, .upload-section {
+        padding: 1rem;
+      }
+
+      .file-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+      }
+
+      .file-actions {
+        align-self: flex-end;
+      }
+
+      .rename-input {
+        width: 100%;
+      }
+
+      .file-info {
+        width: 100%;
+      }
+
+      .file-name {
+        white-space: normal;
+        overflow: visible;
+        text-overflow: clip;
+      }
+
+      .file-meta {
+        margin-top: 0.25rem;
+      }
+
+      .unsupported-warning {
+        margin-top: 0.25rem;
+      }
+
+      .back-link {
+        padding: 0.5rem;
+        font-size: 0.9rem;
+      }
+
+      #uploadBtn {
+        padding: 0.5rem 1rem;
+        font-size: 0.9rem;
+      }
+
+      .upload-section {
+        flex-direction: column;
+        gap: 0.5rem;
+        align-items: flex-start;
+      }
+
+      .progress-bar {
+        margin-top: 0.5rem;
+      }
+
+      .main-container {
+        padding: 1rem;
+      }
+
+      .file-list {
+        gap: 0.5rem;
+      }
+
+      .file-item {
+        padding: 0.75rem;
+        margin-bottom: 0.5rem;
+      }
+
+      .action-btn {
+        width: 32px;
+        height: 32px;
+      }
+
+      #notifications {
+        top: 10px;
+        right: 10px;
+        max-width: 280px;
+      }
+
+      .notification {
+        padding: 0.75rem;
+        font-size: 0.9rem;
+      }
+    }
   </style>
 </head>
 <body>
@@ -305,8 +398,11 @@
       </div>
       <h1>SyncWatch</h1>
     </div>
-    <!-- ✅ ПРАВИЛЬНАЯ ССЫЛКА "Back to Player" -->
-    <a href="javascript:void(0)" class="back-link" id="backToPlayerLink">Back to Player</a>
+    <!-- ✅ ДОБАВЛЕНА КНОПКА TRANSCODER -->
+    <div style="display: flex; gap: 1rem;">
+      <a href="javascript:void(0)" class="back-link" id="backToPlayerLink">Back to Player</a>
+      <a href="/transcode" class="back-link">Transcoder</a>
+    </div>
   </div>
 
   <div class="upload-section">
@@ -404,6 +500,11 @@
         .then(files => {
           const fileList = document.getElementById('fileList');
           fileList.innerHTML = '';
+
+          if (files.length === 0) {
+            fileList.innerHTML = '<div class="file-item">No videos found</div>';
+            return;
+          }
 
           files.forEach(file => {
             // ✅ ОПРЕДЕЛЯЕМ, ПОДДЕРЖИВАЕТСЯ ЛИ ФОРМАТ
@@ -523,6 +624,11 @@
     window.addEventListener('DOMContentLoaded', () => {
       // loadFileList() уже вызывается выше
     });
+
+    // === ОБНОВЛЕНИЕ СПИСКА ПРИ ИЗМЕНЕНИИ ===
+    setInterval(() => {
+      loadFileList();
+    }, 5000);
   </script>
 </body>
 </html>

@@ -19,7 +19,7 @@
       --hover-bg: #1e1e1e;
       --progress-bg: #2c2c2c;
       --progress-fill: #007bff;
-      --warning-color: #ff6b6b; /* Красный для предупреждений */
+      --warning-color: #ff6b6b;
     }
 
     * {
@@ -88,6 +88,11 @@
       font-size: 1.8rem;
       font-weight: 600;
       color: var(--primary);
+    }
+
+    .manage-links {
+      display: flex;
+      gap: 1rem;
     }
 
     .manage-link {
@@ -519,6 +524,11 @@
       .right-panel {
         padding: 0.75rem;
       }
+      
+      .manage-links {
+        flex-direction: column;
+        gap: 0.5rem;
+      }
     }
   </style>
 </head>
@@ -558,7 +568,10 @@
       </div>
       <h1>SyncWatch</h1>
     </div>
-    <a href="/select-room.html" class="manage-link">Select Room</a>
+    <div class="manage-links">
+      <a href="/select-room.html" class="manage-link">Select Room</a>
+      <a href="/transcode" class="manage-link">Transcoder</a>
+    </div>
   </div>
 
   <div class="controls">
@@ -907,7 +920,7 @@
       }
     });
 
-    // === SIMPLE SEEKING ===
+    // === ПРОСТОЙ ФУНКЦИОНАЛ ПЕРЕМАТЫВАНИЯ ===
     let lastSeekSent = 0;
     video.addEventListener('seeked', () => {
       if (isVideoReady) {
@@ -919,7 +932,7 @@
       }
     });
 
-    // === RECEIVE COMMAND FROM OTHER USERS ===
+    // === ПРИЁМ КОМАНДЫ ОТ ДРУГИХ ПОЛЬЗОВАТЕЛЕЙ ===
     socket.on('video-command', (data) => {
       if (isVideoReady && video.readyState >= 1) {
         if (data.type === 'play') {
@@ -944,7 +957,7 @@
       }
     });
 
-    // === BUFFER PROGRESS ===
+    // === ПРОГРЕСС БУФЕРА ===
     video.addEventListener('progress', () => {
       const buffered = video.buffered;
       if (buffered.length > 0) {
@@ -964,7 +977,7 @@
       }
     });
 
-    // === NOTIFICATIONS ===
+    // === ФУНКЦИЯ УВЕДОМЛЕНИЙ ===
     function showNotification(message, type) {
       const notification = document.createElement('div');
       notification.className = `notification ${type}`;
@@ -976,18 +989,18 @@
       }, 3000);
     }
 
-    // === NEW VIDEO ADDED ===
+    // === НОВОЕ: ПОЛЬЗОВАТЕЛЬ ВЫГНАН ===
+    socket.on('kicked-from-room', (data) => {
+      alert(data.message || 'You have been kicked from the room');
+      window.location.href = '/select-room.html';
+    });
+
+    // === НОВОЕ: ВИДЕО ОБНОВЛЕНО ===
     socket.on('video-updated', (filename) => {
       video.src = `/videos/${filename}`;
       statusEl.innerHTML = `Video loaded: ${filename}`;
       currentVideoFile = filename;
       isVideoReady = false;
-    });
-
-    // === USER KICKED ===
-    socket.on('kicked-from-room', (data) => {
-      alert(data.message || 'You have been kicked from the room');
-      window.location.href = '/select-room.html';
     });
   </script>
 </body>

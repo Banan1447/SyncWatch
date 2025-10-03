@@ -2,15 +2,7 @@
   "room_qffmy7wu": {
     "name": "1",
     "users": {
-      "dy6KHkZ-NhoUxV7AAAAP": {
-        "name": "Artur",
-        "ping": 0,
-        "buffer": 0,
-        "status": "paused",
-        "position": 0,
-        "ready": false
-      },
-      "Ys3FhjiNku3McM8uAAAJ": {
+      "nm5hJhlLA49Oo0caAAAR": {
         "name": "Artur",
         "ping": 0,
         "buffer": 0,
@@ -19,6 +11,20 @@
         "ready": false
       }
     },
-    "currentVideo": "Alien.Earth_CUDAd1dsокк.mp4"
+    "currentVideo": "Alien.Earth.S01E08.WEB-DLRip.RGzsRutracker.mp4"
+  },
+  "room_6ihn2f4e": {
+    "name": "2",
+    "users": {
+      "WRe1YBk2pLxqjsGbAAAb": {
+        "name": "Artur",
+        "ping": 0,
+        "buffer": 0,
+        "status": "paused",
+        "position": 0,
+        "ready": false
+      }
+    },
+    "currentVideo": "Solo_Leveling_Ep01.mp4"
   }
 }

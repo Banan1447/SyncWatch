@@ -92,12 +92,7 @@
       color: var(--primary);
     }
 
-    .nav-links {
-      display: flex;
-      gap: 1rem;
-    }
-
-    .nav-link {
+    .admin-link {
       color: var(--accent);
       text-decoration: none;
       font-weight: 500;
@@ -106,7 +101,7 @@
       transition: all 0.2s ease;
     }
 
-    .nav-link:hover {
+    .admin-link:hover {
       background: rgba(0, 123, 255, 0.1);
       color: #fff;
     }
@@ -115,7 +110,7 @@
       display: flex;
       gap: 1rem;
       padding: 1rem 2rem;
-      min-height: calc(100vh - 100px);
+      min-height: calc(100vh - 180px);
     }
 
     .left-panel {
@@ -433,32 +428,34 @@
       width: auto;
     }
 
-    #notifications {
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      z-index: 1000;
-      max-width: 300px;
-    }
-
-    .notification {
-      padding: 1rem;
-      margin-bottom: 0.5rem;
-      background: var(--secondary);
-      border-left: 4px solid var(--accent);
-      border-radius: 4px;
-      box-shadow: 0 4px 12px var(--shadow);
-      animation: slideIn 0.3s ease-out;
-    }
-
-    @keyframes slideIn {
-      from {
-        transform: translateX(100%);
-        opacity: 0;
+    @media (max-width: 768px) {
+      .main-container {
+        flex-direction: column;
       }
-      to {
-        transform: translateX(0);
-        opacity: 1;
+
+      .header, .controls {
+        padding: 1rem;
+      }
+
+      .video-container {
+        aspect-ratio: 16 / 9;
+      }
+
+      .quality-menu {
+        top: 5px;
+        right: 5px;
+      }
+
+      .upload-section {
+        padding: 0.75rem;
+      }
+
+      .comments-section {
+        padding: 0.75rem;
+      }
+
+      .right-panel {
+        padding: 0.75rem;
       }
     }
   </style>
@@ -469,13 +466,18 @@
       <div class="logo-icon">
         <div class="logo-svg">
           <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+            <!-- Градиент -->
             <defs>
               <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stop-color="#4a90e2" />
                 <stop offset="100%" stop-color="#8e44ad" />
               </linearGradient>
             </defs>
+
+            <!-- Круговой фон -->
             <circle cx="50" cy="50" r="48" fill="url(#logoGradient)" />
+
+            <!-- Буква S — ровно по центру -->
             <text 
               x="50" 
               y="50" 
@@ -484,6 +486,7 @@
               fill="white" 
               text-anchor="middle" 
               dominant-baseline="middle"
+              alignment-baseline="middle"
               style="paint-order: stroke; stroke: #000; stroke-width: 1px;"
             >
               S
@@ -493,10 +496,7 @@
       </div>
       <h1>SyncWatch</h1>
     </div>
-    <div class="nav-links">
-      <a href="/files" class="nav-link">Manage Videos</a>
-      <a href="/admin" class="nav-link">Admin</a>
-    </div>
+    <a href="/admin" class="admin-link">Admin Console</a>
   </div>
 
   <div class="main-container">
@@ -551,7 +551,7 @@
     align-items: center;
     justify-content: center;
   ">
-    <div class="panel" style="width: 600px; max-width: 95vw; max-height: 90vh; overflow-y: auto;">
+    <div class="panel" style="width: 600px; max-width: 90vw;">
       <h2>Add Conversion Template</h2>
       
       <!-- Переключатель режимов -->
@@ -679,7 +679,6 @@
       
       // Сброс значений
       document.getElementById('templateNameSimple').value = '';
-      document.getElementById('templateNameAdvanced').value = '';
       document.getElementById('templateDescAdvanced').value = '';
       document.getElementById('qualitySpeedSlider').value = 50;
       document.getElementById('crfSlider').value = 23;
@@ -770,43 +769,6 @@
         `Estimated time: ~${estimatedMinutes} min per GB`;
     }
 
-    // === EVENT LISTENERS FOR MODAL ===
-    document.addEventListener('DOMContentLoaded', () => {
-      // Переключение режимов
-      document.querySelectorAll('.mode-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          switchMode(btn.dataset.mode);
-        });
-      });
-      
-      // Слайдеры
-      document.getElementById('qualitySpeedSlider').addEventListener('input', updateSimplePreview);
-      document.getElementById('crfSlider').addEventListener('input', (e) => {
-        document.getElementById('crfValue').textContent = e.target.value;
-        updateAdvancedPreview();
-      });
-      
-      // Выбор разрешения
-      document.getElementById('resolutionSelect').addEventListener('change', (e) => {
-        const customDiv = document.getElementById('customResolution');
-        customDiv.style.display = e.target.value === 'custom' ? 'block' : 'none';
-        updateAdvancedPreview();
-      });
-      
-      document.getElementById('customWidth').addEventListener('input', updateAdvancedPreview);
-      document.getElementById('customHeight').addEventListener('input', updateAdvancedPreview);
-      
-      // Чекбоксы и селекты
-      document.getElementById('useResolution').addEventListener('change', updateAdvancedPreview);
-      document.getElementById('presetSelect').addEventListener('change', updateAdvancedPreview);
-      document.getElementById('enableAudio').addEventListener('change', updateAdvancedPreview);
-      document.getElementById('audioCodec').addEventListener('change', updateAdvancedPreview);
-      
-      // Кнопки
-      document.getElementById('addTemplateBtn').addEventListener('click', openTemplateModal);
-      document.getElementById('saveTemplateBtn').addEventListener('click', saveTemplate);
-    });
-
     // === API CALLS ===
     async function apiCall(url, options = {}) {
       try {
@@ -819,6 +781,50 @@
       } catch (err) {
         console.error('API Error:', err);
         return { success: false, error: err.message };
+      }
+    }
+
+    // === LOAD TEMPLATES ===
+    async function loadTemplates() {
+      try {
+        const res = await fetch('/api/transcode/templates');
+        const data = await res.json();
+        
+        console.log('[TRANSCODE] Получены шаблоны:', data); // ✅ Отладка
+        
+        const container = document.getElementById('templatesList');
+        container.innerHTML = '';
+        
+        if (data.success && data.templates && data.templates.length > 0) {
+          data.templates.forEach(template => {
+            const div = document.createElement('div');
+            div.className = 'template-item';
+            div.innerHTML = `
+              <div class="template-header">
+                <div class="template-name">${template.name}</div>
+                <div style="display: flex; gap: 0.5rem;">
+                  <button class="btn btn-sm" onclick="applyTemplate('${template.id}')">
+                    <i class="fas fa-play"></i> Apply
+                  </button>
+                  <button class="btn btn-sm btn-danger" onclick="deleteTemplate('${template.id}')">
+                    <i class="fas fa-trash"></i>
+                  </button>
+                </div>
+              </div>
+              <div class="template-desc">${template.description || 'N/A'}</div>
+              <div class="template-desc" style="font-family: monospace; font-size: 0.7rem; margin-top: 0.5rem;">
+                ${template.command}
+              </div>
+            `;
+            container.appendChild(div);
+          });
+        } else {
+          container.innerHTML = '<div class="template-item">No templates found</div>';
+        }
+      } catch (err) {
+        console.error('[TRANSCODE] Ошибка загрузки шаблонов:', err);
+        const container = document.getElementById('templatesList');
+        container.innerHTML = '<div class="template-item">Error loading templates</div>';
       }
     }
 
@@ -847,46 +853,32 @@
       });
       
       if (res.success) {
-        showNotification('Template saved successfully', 'success');
+        showNotification(`Template saved: ${name}`, 'success');
         closeTemplateModal();
-        loadTemplates();
+        loadTemplates(); // ✅ Обновляем список шаблонов
       } else {
         showNotification('Failed to save template: ' + res.error, 'error');
       }
     }
 
-    // === LOAD TEMPLATES ===
-    async function loadTemplates() {
-      const res = await apiCall('/api/transcode/templates');
-      const container = document.getElementById('templatesList');
-      container.innerHTML = '';
-      
-      if (res.success && res.templates.length > 0) {
-        res.templates.forEach(template => {
-          const div = document.createElement('div');
-          div.className = 'template-item';
-          div.innerHTML = `
-            <div class="template-header">
-              <div class="template-name">${template.name}</div>
-              <div style="display: flex; gap: 0.5rem;">
-                <button class="btn btn-sm" onclick="applyTemplate('${template.id}')">
-                  <i class="fas fa-play"></i> Apply
-                </button>
-                <button class="btn btn-sm btn-danger" onclick="deleteTemplate('${template.id}')">
-                  <i class="fas fa-trash"></i>
-                </button>
-              </div>
-            </div>
-            <div class="template-desc">${template.description}</div>
-            <div class="template-desc" style="font-family: monospace; font-size: 0.7rem; margin-top: 0.5rem;">
-              ${template.command}
-            </div>
-          `;
-          container.appendChild(div);
+    // === DELETE TEMPLATE ===
+    async function deleteTemplate(templateId) {
+      if (confirm('Delete this template?')) {
+        const res = await apiCall('/api/transcode/delete-template', {
+          body: JSON.stringify({ id: templateId })
         });
-      } else {
-        container.innerHTML = '<div class="template-item">No templates found</div>';
+        if (res.success) {
+          showNotification(`Template deleted`, 'success');
+          loadTemplates(); // ✅ Обновляем список шаблонов
+        } else {
+          showNotification('Delete failed: ' + res.error, 'error');
+        }
       }
+    }
+
+    // === APPLY TEMPLATE ===
+    async function applyTemplate(templateId) {
+      showNotification('Select files to apply this template', 'success');
     }
 
     // === LOAD FILES ===
@@ -895,39 +887,37 @@
       const files = await res.json();
       const container = document.getElementById('filesList');
       container.innerHTML = '';
-      
+
       if (files.length > 0) {
         files.forEach(file => {
+          const ext = file.name.split('.').pop().toLowerCase();
+          const supportedFormats = ['mp4', 'webm', 'ogg'];
+          const isSupported = supportedFormats.includes(ext);
+
           const div = document.createElement('div');
           div.className = 'file-item';
           div.innerHTML = `
             <div class="file-info">
               <div class="file-name">${file.name}</div>
               <div class="file-meta">${file.resolution || 'N/A'} | ${file.bitrate || 'N/A'}</div>
+              ${!isSupported ? `
+                <div class="unsupported-warning" style="color: #ff6b6b; font-size: 0.7rem; margin-top: 0.25rem;">
+                  <i class="fas fa-exclamation-triangle"></i>
+                  Требуется конвертация
+                </div>
+              ` : ''}
             </div>
             <select class="template-selector" data-file="${file.name}" style="padding: 0.25rem; font-size: 0.8rem;">
               <option value="">Select template...</option>
             </select>
           `;
           container.appendChild(div);
-        });
-        
-        // Загружаем шаблоны в селекторы
-        const templatesRes = await apiCall('/api/transcode/templates');
-        if (templatesRes.success) {
-          document.querySelectorAll('.template-selector').forEach(select => {
-            templatesRes.templates.forEach(template => {
-              const option = document.createElement('option');
-              option.value = template.id;
-              option.textContent = template.name;
-              select.appendChild(option);
-            });
-          });
-        }
-        
-        // Добавляем обработчик изменения селектора
-        document.querySelectorAll('.template-selector').forEach(select => {
-          select.addEventListener('change', async (e) => {
+
+          // === ЗАГРУЖАЕМ ШАБЛОНЫ В СЕЛЕКТОР ===
+          loadTemplatesForSelector(div.querySelector('.template-selector'), file.name);
+
+          // === ОБРАБОТЧИК ИЗМЕНЕНИЯ СЕЛЕКТОРА ===
+          div.querySelector('.template-selector').addEventListener('change', async (e) => {
             const fileId = e.target.dataset.file;
             const templateId = e.target.value;
             if (templateId) {
@@ -941,13 +931,26 @@
       }
     }
 
+    // === ЗАГРУЖАЕМ ШАБЛОНЫ В СЕЛЕКТОР ===
+    async function loadTemplatesForSelector(selector, fileId) {
+      const res = await apiCall('/api/transcode/templates');
+      if (res.success) {
+        res.templates.forEach(template => {
+          const option = document.createElement('option');
+          option.value = template.id;
+          option.textContent = template.name;
+          selector.appendChild(option);
+        });
+      }
+    }
+
     // === ADD TO QUEUE ===
     async function addToQueue(fileId, templateId) {
       const res = await apiCall('/api/transcode/add-to-queue', {
         body: JSON.stringify({ fileId, templateId })
       });
       if (res.success) {
-        showNotification('Added to queue', 'success');
+        showNotification(`Added to queue`, 'success');
         loadQueue();
       } else {
         showNotification('Failed to add to queue: ' + res.error, 'error');
@@ -959,7 +962,7 @@
       const res = await apiCall('/api/transcode/queue');
       const container = document.getElementById('queueList');
       container.innerHTML = '';
-      
+
       if (res.success && res.queue.length > 0) {
         res.queue.forEach(item => {
           const div = document.createElement('div');
@@ -968,7 +971,7 @@
             <div class="queue-header">
               <div>
                 <div class="queue-file">${item.fileId}</div>
-                <div class="queue-template">${item.templateName}</div>
+                <div class="queue-template">${item.templateName || 'Unknown'}</div>
               </div>
               <div>
                 <span class="status-badge status-${item.status}">${item.status}</span>
@@ -988,33 +991,13 @@
       }
     }
 
-    // === APPLY TEMPLATE ===
-    async function applyTemplate(templateId) {
-      showNotification('Select files to apply this template', 'success');
-    }
-
-    // === DELETE TEMPLATE ===
-    async function deleteTemplate(templateId) {
-      if (confirm('Delete this template?')) {
-        const res = await apiCall('/api/transcode/delete-template', {
-          body: JSON.stringify({ id: templateId })
-        });
-        if (res.success) {
-          showNotification('Template deleted', 'success');
-          loadTemplates();
-        } else {
-          showNotification('Failed to delete template: ' + res.error, 'error');
-        }
-      }
-    }
-
     // === NOTIFICATIONS ===
     function showNotification(message, type) {
       const notification = document.createElement('div');
       notification.className = `notification ${type}`;
       notification.textContent = message;
       document.getElementById('notifications').appendChild(notification);
-      
+
       setTimeout(() => {
         notification.remove();
       }, 3000);
@@ -1022,12 +1005,50 @@
 
     // === INIT ===
     window.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('addTemplateBtn').addEventListener('click', openTemplateModal);
       loadTemplates();
       loadFiles();
       loadQueue();
-      
+
       // Обновляем очередь каждые 2 секунды
       setInterval(loadQueue, 2000);
+    });
+
+    // === EVENT LISTENERS FOR MODAL ===
+    document.addEventListener('DOMContentLoaded', () => {
+      // Переключение режимов
+      document.querySelectorAll('.mode-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          switchMode(btn.dataset.mode);
+        });
+      });
+      
+      // Слайдеры
+      document.getElementById('qualitySpeedSlider').addEventListener('input', updateSimplePreview);
+      document.getElementById('crfSlider').addEventListener('input', (e) => {
+        document.getElementById('crfValue').textContent = e.target.value;
+        updateAdvancedPreview();
+      });
+      
+      // Выбор разрешения
+      document.getElementById('resolutionSelect').addEventListener('change', (e) => {
+        const customDiv = document.getElementById('customResolution');
+        customDiv.style.display = e.target.value === 'custom' ? 'block' : 'none';
+        updateAdvancedPreview();
+      });
+
+      document.getElementById('customWidth').addEventListener('input', updateAdvancedPreview);
+      document.getElementById('customHeight').addEventListener('input', updateAdvancedPreview);
+      
+      // Чекбоксы и селекты
+      document.getElementById('useResolution').addEventListener('change', updateAdvancedPreview);
+      document.getElementById('presetSelect').addEventListener('change', updateAdvancedPreview);
+      document.getElementById('enableAudio').addEventListener('change', updateAdvancedPreview);
+      document.getElementById('audioCodec').addEventListener('change', updateAdvancedPreview);
+      
+      // Кнопки
+      document.getElementById('addTemplateBtn').addEventListener('click', openTemplateModal);
+      document.getElementById('saveTemplateBtn').addEventListener('click', saveTemplate);
     });
   </script>
 </body>
