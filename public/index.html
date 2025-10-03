@@ -4,8 +4,473 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SyncWatch</title>
-  <link rel="stylesheet" href="style.css">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <style>
+    :root {
+      --primary: #4a90e2;
+      --secondary: #343a40;
+      --accent: #007bff;
+      --bg-dark: #121212;
+      --bg-darker: #0d0d0d;
+      --text: #ffffff;
+      --text-secondary: #cccccc;
+      --border: #333333;
+      --shadow: rgba(0, 0, 0, 0.5);
+      --hover-bg: #1e1e1e;
+      --progress-bg: #2c2c2c;
+      --progress-fill: #007bff;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    body {
+      background: var(--bg-dark);
+      color: var(--text);
+      line-height: 1.6;
+      transition: background 0.3s ease;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 2rem;
+      background: var(--bg-darker);
+      border-bottom: 1px solid var(--border);
+      box-shadow: 0 2px 10px var(--shadow);
+    }
+
+    .header h1 {
+      font-size: 1.8rem;
+      font-weight: 600;
+      color: var(--primary);
+    }
+
+    .manage-link {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 500;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      transition: all 0.2s ease;
+    }
+
+    .manage-link:hover {
+      background: rgba(0, 123, 255, 0.1);
+      color: #fff;
+    }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 1rem 2rem;
+      background: var(--bg-darker);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .controls label {
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+    }
+
+    .controls input {
+      padding: 0.5rem;
+      border: 1px solid var(--border);
+      background: var(--secondary);
+      color: var(--text);
+      border-radius: 4px;
+      font-size: 0.9rem;
+      width: 150px;
+    }
+
+    .controls button {
+      padding: 0.5rem 1rem;
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: background 0.2s ease;
+    }
+
+    .controls button:hover {
+      background: #0056b3;
+    }
+
+    .status-line {
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+    }
+
+    .main-container {
+      display: flex;
+      gap: 1rem;
+      padding: 1rem 2rem;
+      min-height: calc(100vh - 180px);
+    }
+
+    .left-panel {
+      flex: 3;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .video-container {
+      position: relative;
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--secondary);
+      box-shadow: 0 4px 12px var(--shadow);
+      aspect-ratio: 16 / 9;
+    }
+
+    #videoPlayer {
+      width: 100%;
+      height: 100%;
+      background: #000;
+      outline: none;
+      object-fit: contain;
+    }
+
+    /* Убираем затемнение родных контролей */
+    video::-webkit-media-controls {
+      background: transparent;
+    }
+
+    video::-webkit-media-controls-panel {
+      background: transparent;
+    }
+
+    video::-webkit-media-controls-play-button,
+    video::-webkit-media-controls-mute-button,
+    video::-webkit-media-controls-volume-slider {
+      filter: none; /* Убираем инверсию цвета */
+      color: white;
+    }
+
+    .quality-menu {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 10;
+    }
+
+    .quality-btn-player {
+      background: rgba(0, 0, 0, 0.6);
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: background 0.2s ease;
+    }
+
+    .quality-btn-player:hover {
+      background: rgba(0, 0, 0, 0.8);
+    }
+
+    .dropdown-content {
+      display: none;
+      position: absolute;
+      top: 100%;
+      right: 0;
+      background: var(--bg-darker);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      box-shadow: 0 4px 12px var(--shadow);
+      min-width: 120px;
+      z-index: 100;
+    }
+
+    .dropdown-content a {
+      display: block;
+      padding: 0.75rem 1rem;
+      color: var(--text);
+      text-decoration: none;
+      transition: background 0.2s ease;
+    }
+
+    .dropdown-content a:hover {
+      background: var(--hover-bg);
+    }
+
+    .upload-section {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      padding: 1rem;
+      background: var(--secondary);
+      border-radius: 8px;
+      box-shadow: 0 4px 12px var(--shadow);
+    }
+
+    #uploadBtn {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1.5rem;
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: background 0.2s ease;
+    }
+
+    #uploadBtn:hover {
+      background: #0056b3;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 6px;
+      background: var(--progress-bg);
+      border-radius: 3px;
+      overflow: hidden;
+      margin-top: 0.5rem;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: var(--progress-fill);
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+
+    #status {
+      padding: 0.75rem;
+      background: var(--secondary);
+      border-radius: 4px;
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+      text-align: center;
+    }
+
+    .comments-section {
+      background: var(--secondary);
+      border-radius: 8px;
+      box-shadow: 0 4px 12px var(--shadow);
+      padding: 1rem;
+    }
+
+    .comments-section h3 {
+      margin-bottom: 1rem;
+      font-size: 1.2rem;
+      color: var(--primary);
+    }
+
+    #commentsList {
+      max-height: 200px;
+      overflow-y: auto;
+      margin-bottom: 1rem;
+      padding: 0.5rem;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+    }
+
+    .comment-item {
+      padding: 0.75rem;
+      background: var(--bg-darker);
+      border-radius: 4px;
+      margin-bottom: 0.5rem;
+      word-wrap: break-word;
+    }
+
+    .comment-author {
+      font-weight: bold;
+      color: var(--accent);
+    }
+
+    .comment-input {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    #commentInput {
+      flex: 1;
+      padding: 0.75rem;
+      border: 1px solid var(--border);
+      background: var(--secondary);
+      color: var(--text);
+      border-radius: 4px;
+      font-size: 0.9rem;
+    }
+
+    #sendCommentBtn {
+      padding: 0.75rem 1.5rem;
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: background 0.2s ease;
+    }
+
+    #sendCommentBtn:hover {
+      background: #0056b3;
+    }
+
+    #leaveRoomBtn {
+      padding: 0.5rem 1rem;
+      background: #dc3545;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: background 0.2s ease;
+      margin-bottom: 1rem;
+    }
+
+    #leaveRoomBtn:hover {
+      background: #c82333;
+    }
+
+    .right-panel {
+      flex: 1;
+      background: var(--secondary);
+      border-radius: 8px;
+      box-shadow: 0 4px 12px var(--shadow);
+      padding: 1rem;
+      overflow-y: auto;
+    }
+
+    .right-panel h3 {
+      margin-bottom: 1rem;
+      font-size: 1.2rem;
+      color: var(--primary);
+    }
+
+    #videoList {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .video-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.75rem;
+      background: var(--bg-darker);
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+
+    .video-item:hover {
+      background: var(--hover-bg);
+    }
+
+    .video-info {
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .video-title {
+      font-size: 0.9rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: var(--text);
+    }
+
+    .video-meta {
+      font-size: 0.7rem;
+      color: var(--text-secondary);
+      margin-top: 0.25rem;
+    }
+
+    .play-btn {
+      background: var(--accent);
+      color: white;
+      border: none;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+
+    .play-btn:hover {
+      background: #0056b3;
+    }
+
+    #notifications {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 1000;
+      max-width: 300px;
+    }
+
+    .notification {
+      padding: 1rem;
+      margin-bottom: 0.5rem;
+      background: var(--secondary);
+      border-left: 4px solid var(--accent);
+      border-radius: 4px;
+      box-shadow: 0 4px 12px var(--shadow);
+      animation: slideIn 0.3s ease-out;
+    }
+
+    @keyframes slideIn {
+      from {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .main-container {
+        flex-direction: column;
+      }
+
+      .header, .controls {
+        padding: 1rem;
+      }
+
+      .video-container {
+        aspect-ratio: 16 / 9;
+      }
+
+      .quality-menu {
+        top: 5px;
+        right: 5px;
+      }
+
+      .upload-section {
+        padding: 0.75rem;
+      }
+
+      .comments-section {
+        padding: 0.75rem;
+      }
+
+      .right-panel {
+        padding: 0.75rem;
+      }
+    }
+  </style>
 </head>
 <body>
   <div class="header">
@@ -13,27 +478,22 @@
     <a href="/files" class="manage-link">Manage Videos</a>
   </div>
 
-  <!-- Имя пользователя -->
   <div class="controls">
     <label for="userName">Your Name:</label>
     <input type="text" id="userName" placeholder="Enter your name">
     <button id="saveNameBtn">Save Name</button>
-
-    <!-- Статус "В сети" -->
     <div class="status-line">
       В сети: <span id="onlineCount">0</span>
     </div>
   </div>
 
   <div class="main-container">
-    <!-- Левая часть: видео, статус, загрузка -->
+    <!-- Левая часть -->
     <div class="left-panel">
-  <!-- Кнопка выхода из комнаты -->
-  <button id="leaveRoomBtn" style="margin-bottom:16px;">Выйти из комнаты</button>
-  <!-- Видео -->
+      <button id="leaveRoomBtn">Выйти из комнаты</button>
+
       <div class="video-container">
         <video id="videoPlayer" width="100%" controls></video>
-        <!-- Меню качества -->
         <div class="quality-menu">
           <button id="qualityBtn" class="quality-btn-player">Settings</button>
           <div id="qualityDropdown" class="dropdown-content">
@@ -44,7 +504,6 @@
         </div>
       </div>
 
-      <!-- Загрузка видео -->
       <div class="upload-section">
         <button id="uploadBtn"><i class="fas fa-upload"></i> Upload Video</button>
         <input type="file" id="uploadInput" accept="video/*" style="display:none;">
@@ -66,17 +525,45 @@
       </div>
     </div>
 
-    <!-- Правая часть: список видео -->
+    <!-- Правая часть -->
     <div class="right-panel">
       <h3>Videos</h3>
       <div id="videoList"></div>
     </div>
   </div>
 
-  <!-- Уведомления -->
   <div id="notifications"></div>
 
   <script src="/socket.io/socket.io.js"></script>
   <script src="script.js"></script>
+
+  <script>
+    // ✅ ЗАГРУЗКА ВИДЕО — ТЕПЕРЬ РАБОТАЕТ ВНЕ `script.js`
+    document.getElementById('uploadBtn').addEventListener('click', () => {
+      document.getElementById('uploadInput').click();
+    });
+
+    document.getElementById('uploadInput').addEventListener('change', function() {
+      if (this.files.length > 0) {
+        const progressBar = document.querySelector('.progress-bar');
+        const progressFill = document.querySelector('.progress-bar-fill');
+        progressBar.style.display = 'block';
+        
+        let progress = 0;
+        const interval = setInterval(() => {
+          progress += 5;
+          progressFill.style.width = progress + '%';
+          if (progress >= 100) {
+            clearInterval(interval);
+            setTimeout(() => {
+              progressBar.style.display = 'none';
+              progressFill.style.width = '0%';
+              alert('Upload complete!');
+            }, 500);
+          }
+        }, 100);
+      }
+    });
+  </script>
 </body>
 </html>

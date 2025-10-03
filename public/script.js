@@ -7,8 +7,8 @@ if (leaveRoomBtn) {
     });
   };
 }
-// --- ROOM JOIN LOGIC ---
 
+// --- ROOM JOIN LOGIC ---
 function tryAutoJoinRoomFromUrl() {
   const params = new URLSearchParams(window.location.search);
   const room = params.get('room');
@@ -99,12 +99,12 @@ qualityDropdown.querySelectorAll('a').forEach(item => {
   });
 });
 
-
 // --- ROOM-AWARE VIDEO LIST ---
 let roomState = null;
+
 function renderRoomVideoList() {
-  if (!roomState) return;
   videoList.innerHTML = '';
+  // Используем fetch('/api/videos'), как было раньше
   fetch('/api/videos')
     .then(res => res.json())
     .then(videos => {
@@ -112,10 +112,9 @@ function renderRoomVideoList() {
         const div = document.createElement('div');
         div.className = 'video-item';
         div.innerHTML = `
-          <i class="fas fa-film"></i>
           <div class="video-info">
-            <strong>${video.name}</strong><br>
-            <small>${video.resolution} | ${video.bitrate}</small>
+            <strong class="video-title">${video.name}</strong><br>
+            <small>${video.resolution || 'N/A'} | ${video.bitrate || 'N/A'}</small>
           </div>
           <i class="fas fa-play-circle preview-icon"></i>
         `;
@@ -132,7 +131,6 @@ function renderRoomVideoList() {
 uploadBtn.addEventListener('click', () => {
   uploadInput.click();
 });
-
 
 uploadInput.addEventListener('change', (e) => {
   const file = e.target.files[0];
@@ -161,7 +159,8 @@ uploadInput.addEventListener('change', (e) => {
           showNotification(`Video uploaded: ${data.file}`, 'success');
           progressBar.style.display = 'none';
           progressBarFill.style.width = '0';
-          // После загрузки не обновляем список локально, а ждём событие video-updated/room-state
+          // После загрузки обновляем список видео
+          renderRoomVideoList();
         } else {
           showNotification('Upload failed', 'error');
           progressBar.style.display = 'none';
@@ -176,7 +175,6 @@ uploadInput.addEventListener('change', (e) => {
     xhr.send(formData);
   }
 });
-
 
 // --- ROOM STATE ---
 socket.on('room-state', (state) => {
@@ -199,7 +197,18 @@ socket.on('room-state', (state) => {
     div.innerHTML = `<strong>${comment.user}:</strong> ${comment.text}`;
     commentsList.appendChild(div);
   });
+  // ✅ Обновляем список видео
   renderRoomVideoList();
+});
+
+// ✅ НОВОЕ: Обработка события video-added
+socket.on('video-added', (newVideo) => {
+  renderRoomVideoList(); // Обновляем список
+});
+
+// ✅ НОВОЕ: Обработка события video-removed
+socket.on('video-removed', (removedVideoName) => {
+  renderRoomVideoList(); // Обновляем список
 });
 
 // Управление видео — только после загрузки
@@ -277,12 +286,6 @@ video.addEventListener('progress', () => {
   }
 });
 
-
-// setInterval buffer-update отключён для предотвращения сброса видео и лишних событий
-
-
-// user-list больше не нужен, всё через room-state
-
 // Комментарии
 document.getElementById('sendCommentBtn').addEventListener('click', () => {
   const text = document.getElementById('commentInput').value.trim();
@@ -291,7 +294,6 @@ document.getElementById('sendCommentBtn').addEventListener('click', () => {
     document.getElementById('commentInput').value = '';
   }
 });
-
 
 // new-comment: просто обновим room-state, чтобы не было гонок
 socket.on('new-comment', () => {
@@ -309,3 +311,26 @@ function showNotification(message, type) {
     notification.remove();
   }, 3000);
 }
+
+// ✅ НОВОЕ: КНОПКА ОБНОВЛЕНИЯ СПИСКА
+document.addEventListener('DOMContentLoaded', () => {
+  const rightPanel = document.querySelector('.right-panel');
+  const videosHeader = rightPanel.querySelector('h3');
+  
+  const refreshBtn = document.createElement('button');
+  refreshBtn.innerHTML = '<i class="fas fa-sync-alt"></i> Refresh';
+  refreshBtn.style = `
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8rem;
+    cursor: pointer;
+    margin-left: 0.5rem;
+    transition: background 0.2s ease;
+  `;
+  refreshBtn.onclick = renderRoomVideoList;
+  
+  videosHeader.appendChild(refreshBtn);
+});
