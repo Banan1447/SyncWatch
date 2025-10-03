@@ -9,6 +9,22 @@
         "status": "paused",
         "position": 0,
         "ready": false
+      },
+      "cl2FgGHisfZe2hxMAAAJ": {
+        "name": "Artura",
+        "ping": 0,
+        "buffer": 0,
+        "status": "paused",
+        "position": 0,
+        "ready": false
+      },
+      "6fbEUXIDwu6BTBCMAAAH": {
+        "name": "Artura",
+        "ping": 0,
+        "buffer": 0,
+        "status": "paused",
+        "position": 0,
+        "ready": false
       }
     },
     "currentVideo": "Alien.Earth.S01E08.WEB-DLRip.RGzsRutracker.mp4",
@@ -16,8 +32,17 @@
   },
   "room_wilapx41": {
     "name": "Один из многих",
-    "users": {},
-    "currentVideo": "Alien.Earth.S01E08.WEB-DLRip.RGzsRutracker.mp4",
+    "users": {
+      "5MHug6vrpcWJXevjAAAN": {
+        "name": "Artura",
+        "ping": 0,
+        "buffer": 0,
+        "status": "paused",
+        "position": 0,
+        "ready": false
+      }
+    },
+    "currentVideo": "video.mp4",
     "chat": []
   }
 }

@@ -1,0 +1,23 @@
+# Video files
+videos/
+
+# Node.js dependencies
+node_modules/
+
+# Ignore all .log files
+*.log
+
+# Ignore environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Ignore build artifacts
+build/
+dist/
+out/
+*.min.js
+*.min.css
+*.map
