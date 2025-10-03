@@ -1,99 +1,528 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Manage Videos</title>
-  <link rel="stylesheet" href="style.css">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <style>
+    :root {
+      --primary: #4a90e2;
+      --secondary: #343a40;
+      --accent: #007bff;
+      --bg-dark: #121212;
+      --bg-darker: #0d0d0d;
+      --text: #ffffff;
+      --text-secondary: #cccccc;
+      --border: #333333;
+      --shadow: rgba(0, 0, 0, 0.5);
+      --hover-bg: #1e1e1e;
+      --progress-bg: #2c2c2c;
+      --progress-fill: #007bff;
+      --warning-color: #ff6b6b; /* Красный для предупреждений */
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    body {
+      background: var(--bg-dark);
+      color: var(--text);
+      line-height: 1.6;
+      transition: background 0.3s ease;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 2rem;
+      background: var(--bg-darker);
+      border-bottom: 1px solid var(--border);
+      box-shadow: 0 2px 10px var(--shadow);
+    }
+
+    .logo-container {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      cursor: pointer;
+      transition: opacity 0.2s ease;
+    }
+
+    .logo-container:hover {
+      opacity: 0.8;
+    }
+
+    .logo-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #4a90e2, #8e44ad); /* Сине-фиолетовый */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: bold;
+      position: relative;
+    }
+
+    .logo-svg {
+      width: 80%; /* Занимает 80% круга */
+      height: 80%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .logo-svg svg {
+      width: 100%;
+      height: 100%;
+    }
+
+    .header h1 {
+      font-size: 1.8rem;
+      font-weight: 600;
+      color: var(--primary);
+    }
+
+    .back-link {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 500;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      transition: all 0.2s ease;
+    }
+
+    .back-link:hover {
+      background: rgba(0, 123, 255, 0.1);
+      color: #fff;
+    }
+
+    .upload-section {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 2rem;
+      background: var(--bg-darker);
+      border-bottom: 1px solid var(--border);
+    }
+
+    #uploadBtn {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1.5rem;
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: background 0.2s ease;
+    }
+
+    #uploadBtn:hover {
+      background: #0056b3;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 6px;
+      background: var(--progress-bg);
+      border-radius: 3px;
+      overflow: hidden;
+      margin-top: 0.5rem;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: var(--progress-fill);
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+
+    .main-container {
+      padding: 1rem 2rem;
+      min-height: calc(100vh - 180px);
+    }
+
+    .file-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .file-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.75rem;
+      background: var(--bg-darker);
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      transition: background 0.2s ease;
+    }
+
+    .file-item:hover {
+      background: var(--hover-bg);
+    }
+
+    .file-info {
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .file-name {
+      font-size: 0.9rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: var(--text);
+    }
+
+    .file-meta {
+      font-size: 0.7rem;
+      color: var(--text-secondary);
+      margin-top: 0.25rem;
+    }
+
+    /* ✅ НОВЫЙ СТИЛЬ ДЛЯ НЕПОДДЕРЖИВАЕМЫХ ФАЙЛОВ */
+    .unsupported-warning {
+      color: var(--warning-color); /* Красный цвет */
+      font-size: 0.7rem;
+      font-weight: 500;
+      margin-top: 0.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+
+    .unsupported-warning i {
+      font-size: 0.8rem;
+    }
+
+    .file-actions {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .action-btn {
+      background: var(--accent);
+      color: white;
+      border: none;
+      width: 32px;
+      height: 32px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+
+    .action-btn:hover {
+      background: #0056b3;
+    }
+
+    .rename-input {
+      padding: 0.25rem;
+      border: 1px solid var(--border);
+      background: var(--secondary);
+      color: var(--text);
+      border-radius: 4px;
+      font-size: 0.9rem;
+      width: 150px;
+    }
+
+    #notifications {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 1000;
+      max-width: 300px;
+    }
+
+    .notification {
+      padding: 1rem;
+      margin-bottom: 0.5rem;
+      background: var(--secondary);
+      border-left: 4px solid var(--accent);
+      border-radius: 4px;
+      box-shadow: 0 4px 12px var(--shadow);
+      animation: slideIn 0.3s ease-out;
+    }
+
+    @keyframes slideIn {
+      from {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+  </style>
 </head>
 <body>
   <div class="header">
-    <h1>Manage Videos</h1>
-    <a href="/" class="back-link">Back to SyncWatch</a>
+    <div class="logo-container" onclick="window.location.href='/select-room.html'">
+      <div class="logo-icon">
+        <div class="logo-svg">
+          <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+            <!-- Градиент -->
+            <defs>
+              <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#4a90e2" />
+                <stop offset="100%" stop-color="#8e44ad" />
+              </linearGradient>
+            </defs>
+
+            <!-- Круговой фон -->
+            <circle cx="50" cy="50" r="48" fill="url(#logoGradient)" />
+
+            <!-- Буква S -->
+            <text 
+              x="50" 
+              y="50" 
+              font-family="Arial, sans-serif" 
+              font-size="40" 
+              fill="white" 
+              text-anchor="middle" 
+              dominant-baseline="middle"
+              alignment-baseline="middle"
+              style="paint-order: stroke; stroke: #000; stroke-width: 1px;"
+            >
+              S
+            </text>
+          </svg>
+        </div>
+      </div>
+      <h1>SyncWatch</h1>
+    </div>
+    <!-- ✅ ПРАВИЛЬНАЯ ССЫЛКА "Back to Player" -->
+    <a href="javascript:void(0)" class="back-link" id="backToPlayerLink">Back to Player</a>
   </div>
 
-  <div id="fileList"></div>
-
-  <!-- Комментарии -->
-  <div class="footer">
-    <p>SyncWatch v1.0 — Manage your video files</p>
+  <div class="upload-section">
+    <h2>Manage Videos</h2>
+    <div>
+      <button id="uploadBtn"><i class="fas fa-upload"></i> Upload Video</button>
+      <input type="file" id="uploadInput" accept="video/*" style="display:none;">
+      <div class="progress-bar" style="display:none;">
+        <div class="progress-bar-fill"></div>
+      </div>
+    </div>
   </div>
+
+  <div class="main-container">
+    <div class="file-list" id="fileList"></div>
+  </div>
+
+  <div id="notifications"></div>
 
   <script>
-    // Загрузка списка видео
-    fetch('/api/videos')
-      .then(res => res.json())
-      .then(videos => {
-        const fileList = document.getElementById('fileList');
-        videos.forEach(video => {
-          const div = document.createElement('div');
-          div.className = 'file-item';
-          div.innerHTML = `
-            <span class="file-name">${video.name}</span>
-            <input type="text" class="rename-input" value="${video.name}" style="display:none;">
-            <button class="rename-btn"><i class="fas fa-edit"></i></button>
-            <button class="save-btn" style="display:none;"><i class="fas fa-save"></i></button>
-            <button class="delete-btn"><i class="fas fa-trash"></i></button>
-          `;
-          fileList.appendChild(div);
+    // === УСТАВЛИВАЕМ ПРАВИЛЬНУЮ ССЫЛКУ "Back to Player" ===
+    window.addEventListener('DOMContentLoaded', () => {
+      // Проверяем, есть ли комната в URL
+      const urlParams = new URLSearchParams(window.location.search);
+      const roomIdFromUrl = urlParams.get('room');
+      
+      // Если есть — используем её
+      // Если нет — берём из localStorage
+      const roomId = roomIdFromUrl || localStorage.getItem('lastRoomId');
+      
+      const backLink = document.getElementById('backToPlayerLink');
+      if (roomId) {
+        backLink.href = `/player.html?room=${roomId}`;
+        backLink.textContent = 'Back to Player';
+      } else {
+        backLink.href = '/select-room.html';
+        backLink.textContent = 'Select Room';
+      }
+      
+      loadFileList();
+    });
 
-          const renameBtn = div.querySelector('.rename-btn');
-          const saveBtn = div.querySelector('.save-btn');
-          const deleteBtn = div.querySelector('.delete-btn');
-          const fileNameSpan = div.querySelector('.file-name');
-          const renameInput = div.querySelector('.rename-input');
+    // === ЗАГРУЗКА ФАЙЛОВ ===
+    document.getElementById('uploadBtn').addEventListener('click', () => {
+      document.getElementById('uploadInput').click();
+    });
 
-          renameBtn.addEventListener('click', () => {
-            renameInput.style.display = 'inline';
-            fileNameSpan.style.display = 'none';
-            saveBtn.style.display = 'inline';
-            renameBtn.style.display = 'none';
-          });
+    document.getElementById('uploadInput').addEventListener('change', function() {
+      const file = this.files[0];
+      if (file) {
+        const formData = new FormData();
+        formData.append('video', file);
 
-          saveBtn.addEventListener('click', () => {
-            const newName = renameInput.value.trim();
-            if (newName && newName !== video.name) {
-              fetch('/rename', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ oldName: video.name, newName })
-              })
+        // Показать прогресс-бар
+        const progressBar = document.querySelector('.progress-bar');
+        progressBar.style.display = 'block';
+        const progressBarFill = document.querySelector('.progress-bar-fill');
+
+        const xhr = new XMLHttpRequest();
+
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            const percentComplete = (e.loaded / e.total) * 100;
+            progressBarFill.style.width = `${percentComplete}%`;
+          }
+        });
+
+        xhr.addEventListener('load', () => {
+          if (xhr.status === 200) {
+            const data = JSON.parse(xhr.responseText);
+            if (data.success) {
+              showNotification(`Video uploaded: ${data.file}`, 'success');
+              progressBar.style.display = 'none';
+              progressBarFill.style.width = '0';
+              loadFileList();
+            } else {
+              showNotification('Upload failed', 'error');
+              progressBar.style.display = 'none';
+            }
+          } else {
+            showNotification('Upload failed', 'error');
+            progressBar.style.display = 'none';
+          }
+        });
+
+        xhr.open('POST', '/upload');
+        xhr.send(formData);
+      }
+    });
+
+    // === ЗАГРУЗКА СПИСКА ФАЙЛОВ ===
+    function loadFileList() {
+      fetch('/api/videos')
+        .then(res => res.json())
+        .then(files => {
+          const fileList = document.getElementById('fileList');
+          fileList.innerHTML = '';
+
+          files.forEach(file => {
+            // ✅ ОПРЕДЕЛЯЕМ, ПОДДЕРЖИВАЕТСЯ ЛИ ФОРМАТ
+            const ext = file.name.split('.').pop().toLowerCase();
+            const supportedFormats = ['mp4', 'webm', 'ogg'];
+            const isSupported = supportedFormats.includes(ext);
+
+            const div = document.createElement('div');
+            div.className = 'file-item';
+            
+            // ✅ ФОРМИРУЕМ HTML С УЧЁТОМ ПОДДЕРЖКИ
+            let fileInfoHtml = `
+              <div class="file-info">
+                <div class="file-name">${file.name}</div>
+                <div class="file-meta">${file.resolution || 'N/A'} | ${file.bitrate || 'N/A'}</div>
+            `;
+            
+            // ✅ ДОБАВЛЯЕМ ПРЕДУПРЕЖДЕНИЕ, ЕСЛИ ФОРМАТ НЕ ПОДДЕРЖИВАЕТСЯ
+            if (!isSupported) {
+              fileInfoHtml += `
+                <div class="unsupported-warning">
+                  <i class="fas fa-exclamation-triangle"></i>
+                  Требуется конвертация
+                </div>
+              `;
+            }
+            
+            fileInfoHtml += `
+              </div>
+            `;
+            
+            div.innerHTML = fileInfoHtml + `
+              <div class="file-actions">
+                <button class="action-btn rename-btn" data-name="${file.name}"><i class="fas fa-edit"></i></button>
+                <button class="action-btn delete-btn" data-name="${file.name}"><i class="fas fa-trash"></i></button>
+              </div>
+            `;
+            fileList.appendChild(div);
+
+            // === УДАЛЕНИЕ ФАЙЛА ===
+            div.querySelector('.delete-btn').addEventListener('click', () => {
+              if (confirm(`Удалить файл "${file.name}"?`)) {
+                fetch('/api/delete-video', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ filename: file.name })
+                })
                 .then(res => res.json())
                 .then(data => {
                   if (data.success) {
-                    fileNameSpan.textContent = newName;
-                    video.name = newName;
+                    showNotification(`File deleted: ${file.name}`, 'success');
+                    loadFileList();
                   } else {
-                    alert('Rename failed');
+                    showNotification('Delete failed: ' + data.error, 'error');
                   }
                 });
-            }
-            renameInput.style.display = 'none';
-            fileNameSpan.style.display = 'inline';
-            saveBtn.style.display = 'none';
-            renameBtn.style.display = 'inline';
-          });
+              }
+            });
 
-          deleteBtn.addEventListener('click', () => {
-            if (confirm(`Delete ${video.name}?`)) {
-              fetch('/delete', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: video.name })
-              })
-                .then(res => res.json())
-                .then(data => {
-                  if (data.success) {
-                    div.remove();
-                  } else {
-                    alert('Delete failed');
-                  }
-                });
-            }
+            // === ПЕРЕИМЕНОВАНИЕ ФАЙЛА ===
+            div.querySelector('.rename-btn').addEventListener('click', () => {
+              const oldName = file.name;
+              const input = document.createElement('input');
+              input.type = 'text';
+              input.value = oldName;
+              input.className = 'rename-input';
+              div.querySelector('.file-info').innerHTML = '';
+              div.querySelector('.file-info').appendChild(input);
+              input.focus();
+
+              const saveRename = () => {
+                const newName = input.value.trim();
+                if (newName && newName !== oldName) {
+                  fetch('/api/rename-video', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ oldName, newName })
+                  })
+                  .then(res => res.json())
+                  .then(data => {
+                    if (data.success) {
+                      showNotification(`File renamed: ${oldName} → ${newName}`, 'success');
+                      loadFileList();
+                    } else {
+                      showNotification('Rename failed: ' + data.error, 'error');
+                      loadFileList(); // Возвращаем старое имя
+                    }
+                  });
+                } else {
+                  loadFileList(); // Отмена
+                }
+              };
+
+              input.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') saveRename();
+              });
+
+              input.addEventListener('blur', saveRename);
+            });
           });
         });
-      });
+    }
+
+    // === ФУНКЦИЯ УВЕДОМЛЕНИЙ ===
+    function showNotification(message, type) {
+      const notification = document.createElement('div');
+      notification.className = `notification ${type}`;
+      notification.textContent = message;
+      document.getElementById('notifications').appendChild(notification);
+
+      setTimeout(() => {
+        notification.remove();
+      }, 3000);
+    }
+
+    // === ЗАГРУЗКА СПИСКА ПРИ ОТКРЫТИИ ===
+    window.addEventListener('DOMContentLoaded', () => {
+      // loadFileList() уже вызывается выше
+    });
   </script>
 </body>
 </html>

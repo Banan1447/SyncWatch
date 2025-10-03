@@ -1,0 +1,16 @@
+[
+  {
+    "id": "tmpl_1",
+    "name": "Low Quality MP4",
+    "description": "480p MP4 for web playback",
+    "command": "-vf scale=854:480 -c:v libx264 -crf 23 -preset fast {output}",
+    "createdAt": "2025-10-03T21:12:21.831Z"
+  },
+  {
+    "id": "tmpl_2",
+    "name": "High Quality MP4",
+    "description": "1080p MP4 with high quality",
+    "command": "-vf scale=1920:1080 -c:v libx264 -crf 18 -preset slow {output}",
+    "createdAt": "2025-10-03T21:12:21.831Z"
+  }
+]

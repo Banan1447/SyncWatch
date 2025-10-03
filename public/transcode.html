@@ -1,71 +1,1034 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Transcode Videos</title>
-  <link rel="stylesheet" href="style.css">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <style>
+    :root {
+      --primary: #4a90e2;
+      --secondary: #343a40;
+      --accent: #007bff;
+      --bg-dark: #121212;
+      --bg-darker: #0d0d0d;
+      --text: #ffffff;
+      --text-secondary: #cccccc;
+      --border: #333333;
+      --shadow: rgba(0, 0, 0, 0.5);
+      --hover-bg: #1e1e1e;
+      --progress-bg: #2c2c2c;
+      --progress-fill: #007bff;
+      --success: #28a745;
+      --warning: #ffc107;
+      --danger: #dc3545;
+      --info: #17a2b8;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    body {
+      background: var(--bg-dark);
+      color: var(--text);
+      line-height: 1.6;
+      transition: background 0.3s ease;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 2rem;
+      background: var(--bg-darker);
+      border-bottom: 1px solid var(--border);
+      box-shadow: 0 2px 10px var(--shadow);
+    }
+
+    .logo-container {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      cursor: pointer;
+      transition: opacity 0.2s ease;
+    }
+
+    .logo-container:hover {
+      opacity: 0.8;
+    }
+
+    .logo-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #4a90e2, #8e44ad); /* Сине-фиолетовый */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: bold;
+      position: relative;
+    }
+
+    .logo-svg {
+      width: 80%; /* Занимает 80% круга */
+      height: 80%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .logo-svg svg {
+      width: 100%;
+      height: 100%;
+    }
+
+    .header h1 {
+      font-size: 1.8rem;
+      font-weight: 600;
+      color: var(--primary);
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 1rem;
+    }
+
+    .nav-link {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 500;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      transition: all 0.2s ease;
+    }
+
+    .nav-link:hover {
+      background: rgba(0, 123, 255, 0.1);
+      color: #fff;
+    }
+
+    .main-container {
+      display: flex;
+      gap: 1rem;
+      padding: 1rem 2rem;
+      min-height: calc(100vh - 100px);
+    }
+
+    .left-panel {
+      flex: 2;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .right-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .panel {
+      background: var(--bg-darker);
+      border-radius: 8px;
+      box-shadow: 0 4px 12px var(--shadow);
+      padding: 1rem;
+    }
+
+    .panel h2 {
+      margin-bottom: 1rem;
+      font-size: 1.3rem;
+      color: var(--primary);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .btn {
+      padding: 0.5rem 1rem;
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: background 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .btn:hover {
+      background: #0056b3;
+    }
+
+    .btn-sm {
+      padding: 0.25rem 0.5rem;
+      font-size: 0.8rem;
+    }
+
+    .btn-danger {
+      background: var(--danger);
+    }
+
+    .btn-danger:hover {
+      background: #c82333;
+    }
+
+    .btn-info {
+      background: var(--info);
+    }
+
+    .btn-info:hover {
+      background: #138496;
+    }
+
+    .form-group {
+      margin-bottom: 1rem;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 0.5rem;
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      width: 100%;
+      padding: 0.75rem;
+      border: 1px solid var(--border);
+      background: var(--secondary);
+      color: var(--text);
+      border-radius: 4px;
+      font-size: 0.9rem;
+    }
+
+    .template-item {
+      padding: 1rem;
+      background: var(--secondary);
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      margin-bottom: 0.5rem;
+    }
+
+    .template-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.5rem;
+    }
+
+    .template-name {
+      font-weight: 500;
+      color: var(--text);
+    }
+
+    .template-desc {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      margin-top: 0.25rem;
+    }
+
+    .file-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.75rem;
+      background: var(--secondary);
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      margin-bottom: 0.5rem;
+    }
+
+    .file-info {
+      flex: 1;
+    }
+
+    .file-name {
+      font-size: 0.9rem;
+      color: var(--text);
+    }
+
+    .file-meta {
+      font-size: 0.7rem;
+      color: var(--text-secondary);
+      margin-top: 0.25rem;
+    }
+
+    .queue-item {
+      padding: 0.75rem;
+      background: var(--secondary);
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      margin-bottom: 0.5rem;
+    }
+
+    .queue-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.5rem;
+    }
+
+    .queue-file {
+      font-weight: 500;
+      color: var(--text);
+    }
+
+    .queue-template {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 6px;
+      background: var(--progress-bg);
+      border-radius: 3px;
+      overflow: hidden;
+      margin: 0.5rem 0;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: var(--progress-fill);
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+
+    .status-badge {
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      font-weight: 500;
+    }
+
+    .status-pending {
+      background: var(--warning);
+      color: #000;
+    }
+
+    .status-processing {
+      background: var(--accent);
+      color: white;
+    }
+
+    .status-completed {
+      background: var(--success);
+      color: white;
+    }
+
+    .status-error {
+      background: var(--danger);
+      color: white;
+    }
+
+    #notifications {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 1000;
+      max-width: 300px;
+    }
+
+    .notification {
+      padding: 1rem;
+      margin-bottom: 0.5rem;
+      background: var(--secondary);
+      border-left: 4px solid var(--accent);
+      border-radius: 4px;
+      box-shadow: 0 4px 12px var(--shadow);
+      animation: slideIn 0.3s ease-out;
+    }
+
+    @keyframes slideIn {
+      from {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+
+    /* ✅ НОВЫЕ СТИЛИ ДЛЯ РЕЖИМОВ */
+    .mode-switcher {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .mode-btn {
+      flex: 1;
+      padding: 0.75rem;
+      background: var(--secondary);
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.2s ease;
+    }
+
+    .mode-btn.active {
+      background: var(--accent);
+      color: white;
+      border-color: var(--accent);
+    }
+
+    .mode-content {
+      display: none;
+    }
+
+    .mode-content.active {
+      display: block;
+    }
+
+    /* ✅ СТИЛИ ДЛЯ ПРОСТОГО РЕЖИМА */
+    .simple-mode {
+      padding: 1rem 0;
+    }
+
+    .quality-speed-slider {
+      width: 100%;
+      margin: 1rem 0;
+    }
+
+    .slider-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      margin-top: 0.5rem;
+    }
+
+    .estimated-time {
+      text-align: center;
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+      margin: 1rem 0;
+    }
+
+    /* ✅ СТИЛИ ДЛЯ СЛОЖНОГО РЕЖИМА */
+    .advanced-mode {
+      padding: 1rem 0;
+    }
+
+    .advanced-option {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .advanced-option input[type="checkbox"] {
+      width: auto;
+    }
+
+    #notifications {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 1000;
+      max-width: 300px;
+    }
+
+    .notification {
+      padding: 1rem;
+      margin-bottom: 0.5rem;
+      background: var(--secondary);
+      border-left: 4px solid var(--accent);
+      border-radius: 4px;
+      box-shadow: 0 4px 12px var(--shadow);
+      animation: slideIn 0.3s ease-out;
+    }
+
+    @keyframes slideIn {
+      from {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+  </style>
 </head>
 <body>
   <div class="header">
-    <h1>Transcode Videos</h1>
-    <a href="/" class="back-link">Back to SyncWatch</a>
+    <div class="logo-container" onclick="window.location.href='/select-room.html'">
+      <div class="logo-icon">
+        <div class="logo-svg">
+          <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#4a90e2" />
+                <stop offset="100%" stop-color="#8e44ad" />
+              </linearGradient>
+            </defs>
+            <circle cx="50" cy="50" r="48" fill="url(#logoGradient)" />
+            <text 
+              x="50" 
+              y="50" 
+              font-family="Arial, sans-serif" 
+              font-size="40" 
+              fill="white" 
+              text-anchor="middle" 
+              dominant-baseline="middle"
+              style="paint-order: stroke; stroke: #000; stroke-width: 1px;"
+            >
+              S
+            </text>
+          </svg>
+        </div>
+      </div>
+      <h1>SyncWatch</h1>
+    </div>
+    <div class="nav-links">
+      <a href="/files" class="nav-link">Manage Videos</a>
+      <a href="/admin" class="nav-link">Admin</a>
+    </div>
   </div>
 
-  <div id="transcodeList"></div>
+  <div class="main-container">
+    <!-- Левая панель -->
+    <div class="left-panel">
+      <!-- Шаблоны -->
+      <div class="panel">
+        <h2>
+          Conversion Templates
+          <button class="btn" id="addTemplateBtn">
+            <i class="fas fa-plus"></i> Add Template
+          </button>
+        </h2>
+        <div id="templatesList"></div>
+      </div>
+
+      <!-- Файлы для конвертации -->
+      <div class="panel">
+        <h2>Select Files to Convert</h2>
+        <div id="filesList"></div>
+      </div>
+    </div>
+
+    <!-- Правая панель -->
+    <div class="right-panel">
+      <!-- Очередь конвертации -->
+      <div class="panel">
+        <h2>Conversion Queue</h2>
+        <div id="queueList"></div>
+      </div>
+
+      <!-- Прогресс -->
+      <div class="panel">
+        <h2>Progress</h2>
+        <div id="progressSection"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="notifications"></div>
+
+  <!-- Модальное окно для добавления шаблона -->
+  <div id="templateModal" style="
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.8);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+  ">
+    <div class="panel" style="width: 600px; max-width: 95vw; max-height: 90vh; overflow-y: auto;">
+      <h2>Add Conversion Template</h2>
+      
+      <!-- Переключатель режимов -->
+      <div class="mode-switcher">
+        <button class="mode-btn active" data-mode="simple">Simple Mode</button>
+        <button class="mode-btn" data-mode="advanced">Advanced Mode</button>
+      </div>
+
+      <!-- Простой режим -->
+      <div class="mode-content simple-mode active" id="simpleMode">
+        <div class="form-group">
+          <label for="templateNameSimple">Template Name:</label>
+          <input type="text" id="templateNameSimple" placeholder="e.g., Web Quality">
+        </div>
+        
+        <div class="form-group">
+          <label>Quality vs Speed:</label>
+          <input type="range" id="qualitySpeedSlider" min="0" max="100" value="50" class="quality-speed-slider">
+          <div class="slider-labels">
+            <span>Speed</span>
+            <span>Balanced</span>
+            <span>Quality</span>
+          </div>
+        </div>
+        
+        <div class="estimated-time" id="estimatedTime">
+          Estimated time: Calculating...
+        </div>
+        
+        <div class="form-group">
+          <label>Preview:</label>
+          <div id="simplePreview" style="font-family: monospace; font-size: 0.8rem; background: var(--secondary); padding: 0.5rem; border-radius: 4px;">
+            -c:v libx264 -crf 23 -preset medium output.mp4
+          </div>
+        </div>
+      </div>
+
+      <!-- Сложный режим -->
+      <div class="mode-content advanced-mode" id="advancedMode">
+        <div class="form-group">
+          <label for="templateNameAdvanced">Template Name:</label>
+          <input type="text" id="templateNameAdvanced" placeholder="e.g., Custom HD">
+        </div>
+        
+        <div class="form-group">
+          <label for="templateDescAdvanced">Description:</label>
+          <input type="text" id="templateDescAdvanced" placeholder="e.g., 1080p H.264 High Quality">
+        </div>
+        
+        <div class="form-group">
+          <label>Video Options:</label>
+          <div class="advanced-option">
+            <input type="checkbox" id="useResolution" checked>
+            <label for="useResolution">Set Resolution</label>
+          </div>
+          <select id="resolutionSelect">
+            <option value="1920:1080">1080p (1920×1080)</option>
+            <option value="1280:720">720p (1280×720)</option>
+            <option value="854:480">480p (854×480)</option>
+            <option value="640:360">360p (640×360)</option>
+            <option value="custom">Custom...</option>
+          </select>
+          <div id="customResolution" style="display: none; margin-top: 0.5rem;">
+            <input type="text" id="customWidth" placeholder="Width" style="width: 45%; display: inline-block;">
+            <span style="display: inline-block; text-align: center; width: 10%;">×</span>
+            <input type="text" id="customHeight" placeholder="Height" style="width: 45%; display: inline-block;">
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label>CRF (Quality): 51 (worst) ← → 0 (best)</label>
+          <input type="range" id="crfSlider" min="0" max="51" value="23">
+          <div style="text-align: center; font-size: 0.9rem;">
+            Current: <span id="crfValue">23</span>
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label>Preset (Speed):</label>
+          <select id="presetSelect">
+            <option value="ultrafast">Ultra Fast</option>
+            <option value="superfast">Super Fast</option>
+            <option value="veryfast">Very Fast</option>
+            <option value="faster">Faster</option>
+            <option value="fast">Fast</option>
+            <option value="medium" selected>Medium</option>
+            <option value="slow">Slow</option>
+            <option value="slower">Slower</option>
+            <option value="veryslow">Very Slow</option>
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label>Audio Options:</label>
+          <div class="advanced-option">
+            <input type="checkbox" id="enableAudio" checked>
+            <label for="enableAudio">Enable Audio</label>
+          </div>
+          <select id="audioCodec">
+            <option value="aac">AAC</option>
+            <option value="mp3">MP3</option>
+            <option value="opus">Opus</option>
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label>Preview:</label>
+          <div id="advancedPreview" style="font-family: monospace; font-size: 0.8rem; background: var(--secondary); padding: 0.5rem; border-radius: 4px;">
+            Loading...
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+        <button class="btn" id="saveTemplateBtn">Save Template</button>
+        <button class="btn" style="background: #6c757d;" onclick="closeTemplateModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
 
   <script>
-    fetch('/api/videos')
-      .then(res => res.json())
-      .then(videos => {
-        const list = document.getElementById('transcodeList');
-        videos.forEach(video => {
-          const div = document.createElement('div');
-          div.className = 'transcode-item';
-          div.innerHTML = `
-            <strong>${video.name}</strong>
-            <button class="transcode-btn" data-file="${video.name}" data-quality="low">Low (240p)</button>
-            <button class="transcode-btn" data-file="${video.name}" data-quality="medium">Medium (720p)</button>
-            <div class="progress-bar" style="display:none;">
-              <div class="progress-bar-fill"></div>
-            </div>
-          `;
-          list.appendChild(div);
+    // === MODAL FUNCTIONS ===
+    function openTemplateModal() {
+      document.getElementById('templateModal').style.display = 'flex';
+      
+      // Сброс значений
+      document.getElementById('templateNameSimple').value = '';
+      document.getElementById('templateNameAdvanced').value = '';
+      document.getElementById('templateDescAdvanced').value = '';
+      document.getElementById('qualitySpeedSlider').value = 50;
+      document.getElementById('crfSlider').value = 23;
+      document.getElementById('crfValue').textContent = '23';
+      document.getElementById('presetSelect').value = 'medium';
+      
+      // Показываем простой режим по умолчанию
+      switchMode('simple');
+      updateSimplePreview();
+      updateAdvancedPreview();
+    }
 
-          const btns = div.querySelectorAll('.transcode-btn');
-          const progressBar = div.querySelector('.progress-bar');
-          const progressBarFill = div.querySelector('.progress-bar-fill');
+    function closeTemplateModal() {
+      document.getElementById('templateModal').style.display = 'none';
+    }
 
-          btns.forEach(btn => {
-            btn.addEventListener('click', () => {
-              const file = btn.dataset.file;
-              const quality = btn.dataset.quality;
+    // === MODE SWITCHING ===
+    function switchMode(mode) {
+      // Обновляем кнопки
+      document.querySelectorAll('.mode-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.dataset.mode === mode) {
+          btn.classList.add('active');
+        }
+      });
+      
+      // Показываем нужный контент
+      document.getElementById('simpleMode').classList.toggle('active', mode === 'simple');
+      document.getElementById('advancedMode').classList.toggle('active', mode === 'advanced');
+    }
 
-              progressBar.style.display = 'block';
+    // === PREVIEW UPDATES ===
+    function updateSimplePreview() {
+      const sliderValue = parseInt(document.getElementById('qualitySpeedSlider').value);
+      const crf = Math.round(51 - (sliderValue * 0.51)); // 0-100 → 51-0
+      const presets = ['ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium', 'slow', 'slower', 'veryslow'];
+      const presetIndex = Math.round((100 - sliderValue) / 12.5); // 0-100 → 0-8
+      const preset = presets[Math.min(presets.length - 1, Math.max(0, presetIndex))];
+      
+      const preview = `-c:v libx264 -crf ${crf} -preset ${preset} output.mp4`;
+      document.getElementById('simplePreview').textContent = preview;
+      
+      // Расчёт времени (примерный)
+      calculateEstimatedTime(sliderValue);
+    }
 
-              fetch('/transcode', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ file, quality })
-              })
-                .then(res => res.json())
-                .then(data => {
-                  if (data.success) {
-                    progressBarFill.style.width = '100%';
-                    setTimeout(() => {
-                      progressBar.style.display = 'none';
-                      progressBarFill.style.width = '0';
-                    }, 2000);
-                  } else {
-                    alert('Transcoding failed');
-                    progressBar.style.display = 'none';
-                  }
-                });
-            });
-          });
+    function updateAdvancedPreview() {
+      const useResolution = document.getElementById('useResolution').checked;
+      const resolutionSelect = document.getElementById('resolutionSelect').value;
+      const customWidth = document.getElementById('customWidth').value;
+      const customHeight = document.getElementById('customHeight').value;
+      const crf = document.getElementById('crfSlider').value;
+      const preset = document.getElementById('presetSelect').value;
+      const enableAudio = document.getElementById('enableAudio').checked;
+      const audioCodec = document.getElementById('audioCodec').value;
+      
+      let filters = [];
+      if (useResolution) {
+        if (resolutionSelect === 'custom' && customWidth && customHeight) {
+          filters.push(`scale=${customWidth}:${customHeight}`);
+        } else if (resolutionSelect !== 'custom') {
+          filters.push(`scale=${resolutionSelect}`);
+        }
+      }
+      
+      let command = '';
+      if (filters.length > 0) {
+        command += `-vf ${filters.join(',')} `;
+      }
+      command += `-c:v libx264 -crf ${crf} -preset ${preset}`;
+      
+      if (enableAudio) {
+        command += ` -c:a ${audioCodec}`;
+      }
+      
+      command += ' output.mp4';
+      
+      document.getElementById('advancedPreview').textContent = command;
+    }
+
+    // === ESTIMATED TIME CALCULATION ===
+    function calculateEstimatedTime(sliderValue) {
+      // Примерный расчёт: 0-100 → 1-10 минут на 1ГБ
+      const timePerGB = 1 + ((100 - sliderValue) * 0.09); // 1-10 минут
+      const estimatedMinutes = Math.round(timePerGB);
+      
+      document.getElementById('estimatedTime').innerHTML = 
+        `Estimated time: ~${estimatedMinutes} min per GB`;
+    }
+
+    // === EVENT LISTENERS FOR MODAL ===
+    document.addEventListener('DOMContentLoaded', () => {
+      // Переключение режимов
+      document.querySelectorAll('.mode-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          switchMode(btn.dataset.mode);
         });
       });
+      
+      // Слайдеры
+      document.getElementById('qualitySpeedSlider').addEventListener('input', updateSimplePreview);
+      document.getElementById('crfSlider').addEventListener('input', (e) => {
+        document.getElementById('crfValue').textContent = e.target.value;
+        updateAdvancedPreview();
+      });
+      
+      // Выбор разрешения
+      document.getElementById('resolutionSelect').addEventListener('change', (e) => {
+        const customDiv = document.getElementById('customResolution');
+        customDiv.style.display = e.target.value === 'custom' ? 'block' : 'none';
+        updateAdvancedPreview();
+      });
+      
+      document.getElementById('customWidth').addEventListener('input', updateAdvancedPreview);
+      document.getElementById('customHeight').addEventListener('input', updateAdvancedPreview);
+      
+      // Чекбоксы и селекты
+      document.getElementById('useResolution').addEventListener('change', updateAdvancedPreview);
+      document.getElementById('presetSelect').addEventListener('change', updateAdvancedPreview);
+      document.getElementById('enableAudio').addEventListener('change', updateAdvancedPreview);
+      document.getElementById('audioCodec').addEventListener('change', updateAdvancedPreview);
+      
+      // Кнопки
+      document.getElementById('addTemplateBtn').addEventListener('click', openTemplateModal);
+      document.getElementById('saveTemplateBtn').addEventListener('click', saveTemplate);
+    });
+
+    // === API CALLS ===
+    async function apiCall(url, options = {}) {
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          ...options
+        });
+        return await res.json();
+      } catch (err) {
+        console.error('API Error:', err);
+        return { success: false, error: err.message };
+      }
+    }
+
+    // === SAVE TEMPLATE ===
+    async function saveTemplate() {
+      const activeMode = document.querySelector('.mode-btn.active').dataset.mode;
+      let name, description, command;
+      
+      if (activeMode === 'simple') {
+        name = document.getElementById('templateNameSimple').value.trim();
+        description = 'Simple template with quality/speed slider';
+        command = document.getElementById('simplePreview').textContent;
+      } else {
+        name = document.getElementById('templateNameAdvanced').value.trim();
+        description = document.getElementById('templateDescAdvanced').value.trim();
+        command = document.getElementById('advancedPreview').textContent;
+      }
+      
+      if (!name || !command) {
+        showNotification('Please fill all required fields', 'error');
+        return;
+      }
+      
+      const res = await apiCall('/api/transcode/save-template', {
+        body: JSON.stringify({ name, description, command })
+      });
+      
+      if (res.success) {
+        showNotification('Template saved successfully', 'success');
+        closeTemplateModal();
+        loadTemplates();
+      } else {
+        showNotification('Failed to save template: ' + res.error, 'error');
+      }
+    }
+
+    // === LOAD TEMPLATES ===
+    async function loadTemplates() {
+      const res = await apiCall('/api/transcode/templates');
+      const container = document.getElementById('templatesList');
+      container.innerHTML = '';
+      
+      if (res.success && res.templates.length > 0) {
+        res.templates.forEach(template => {
+          const div = document.createElement('div');
+          div.className = 'template-item';
+          div.innerHTML = `
+            <div class="template-header">
+              <div class="template-name">${template.name}</div>
+              <div style="display: flex; gap: 0.5rem;">
+                <button class="btn btn-sm" onclick="applyTemplate('${template.id}')">
+                  <i class="fas fa-play"></i> Apply
+                </button>
+                <button class="btn btn-sm btn-danger" onclick="deleteTemplate('${template.id}')">
+                  <i class="fas fa-trash"></i>
+                </button>
+              </div>
+            </div>
+            <div class="template-desc">${template.description}</div>
+            <div class="template-desc" style="font-family: monospace; font-size: 0.7rem; margin-top: 0.5rem;">
+              ${template.command}
+            </div>
+          `;
+          container.appendChild(div);
+        });
+      } else {
+        container.innerHTML = '<div class="template-item">No templates found</div>';
+      }
+    }
+
+    // === LOAD FILES ===
+    async function loadFiles() {
+      const res = await fetch('/api/videos');
+      const files = await res.json();
+      const container = document.getElementById('filesList');
+      container.innerHTML = '';
+      
+      if (files.length > 0) {
+        files.forEach(file => {
+          const div = document.createElement('div');
+          div.className = 'file-item';
+          div.innerHTML = `
+            <div class="file-info">
+              <div class="file-name">${file.name}</div>
+              <div class="file-meta">${file.resolution || 'N/A'} | ${file.bitrate || 'N/A'}</div>
+            </div>
+            <select class="template-selector" data-file="${file.name}" style="padding: 0.25rem; font-size: 0.8rem;">
+              <option value="">Select template...</option>
+            </select>
+          `;
+          container.appendChild(div);
+        });
+        
+        // Загружаем шаблоны в селекторы
+        const templatesRes = await apiCall('/api/transcode/templates');
+        if (templatesRes.success) {
+          document.querySelectorAll('.template-selector').forEach(select => {
+            templatesRes.templates.forEach(template => {
+              const option = document.createElement('option');
+              option.value = template.id;
+              option.textContent = template.name;
+              select.appendChild(option);
+            });
+          });
+        }
+        
+        // Добавляем обработчик изменения селектора
+        document.querySelectorAll('.template-selector').forEach(select => {
+          select.addEventListener('change', async (e) => {
+            const fileId = e.target.dataset.file;
+            const templateId = e.target.value;
+            if (templateId) {
+              await addToQueue(fileId, templateId);
+              e.target.value = ''; // Сбрасываем селектор
+            }
+          });
+        });
+      } else {
+        container.innerHTML = '<div class="file-item">No videos found</div>';
+      }
+    }
+
+    // === ADD TO QUEUE ===
+    async function addToQueue(fileId, templateId) {
+      const res = await apiCall('/api/transcode/add-to-queue', {
+        body: JSON.stringify({ fileId, templateId })
+      });
+      if (res.success) {
+        showNotification('Added to queue', 'success');
+        loadQueue();
+      } else {
+        showNotification('Failed to add to queue: ' + res.error, 'error');
+      }
+    }
+
+    // === LOAD QUEUE ===
+    async function loadQueue() {
+      const res = await apiCall('/api/transcode/queue');
+      const container = document.getElementById('queueList');
+      container.innerHTML = '';
+      
+      if (res.success && res.queue.length > 0) {
+        res.queue.forEach(item => {
+          const div = document.createElement('div');
+          div.className = 'queue-item';
+          div.innerHTML = `
+            <div class="queue-header">
+              <div>
+                <div class="queue-file">${item.fileId}</div>
+                <div class="queue-template">${item.templateName}</div>
+              </div>
+              <div>
+                <span class="status-badge status-${item.status}">${item.status}</span>
+              </div>
+            </div>
+            ${item.progress ? `
+              <div class="progress-bar">
+                <div class="progress-bar-fill" style="width: ${item.progress}%"></div>
+              </div>
+              <div style="font-size: 0.8rem; text-align: center;">${Math.round(item.progress)}%</div>
+            ` : ''}
+          `;
+          container.appendChild(div);
+        });
+      } else {
+        container.innerHTML = '<div class="queue-item">Queue is empty</div>';
+      }
+    }
+
+    // === APPLY TEMPLATE ===
+    async function applyTemplate(templateId) {
+      showNotification('Select files to apply this template', 'success');
+    }
+
+    // === DELETE TEMPLATE ===
+    async function deleteTemplate(templateId) {
+      if (confirm('Delete this template?')) {
+        const res = await apiCall('/api/transcode/delete-template', {
+          body: JSON.stringify({ id: templateId })
+        });
+        if (res.success) {
+          showNotification('Template deleted', 'success');
+          loadTemplates();
+        } else {
+          showNotification('Failed to delete template: ' + res.error, 'error');
+        }
+      }
+    }
+
+    // === NOTIFICATIONS ===
+    function showNotification(message, type) {
+      const notification = document.createElement('div');
+      notification.className = `notification ${type}`;
+      notification.textContent = message;
+      document.getElementById('notifications').appendChild(notification);
+      
+      setTimeout(() => {
+        notification.remove();
+      }, 3000);
+    }
+
+    // === INIT ===
+    window.addEventListener('DOMContentLoaded', () => {
+      loadTemplates();
+      loadFiles();
+      loadQueue();
+      
+      // Обновляем очередь каждые 2 секунды
+      setInterval(loadQueue, 2000);
+    });
   </script>
 </body>
 </html>

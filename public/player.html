@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SyncWatch Player</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <style>
+    :root {
+      --primary: #4a90e2;
+      --secondary: #343a40;
+      --accent: #007bff;
+      --bg-dark: #121212;
+      --bg-darker: #0d0d0d;
+      --text: #ffffff;
+      --text-secondary: #cccccc;
+      --border: #333333;
+      --shadow: rgba(0, 0, 0, 0.5);
+      --hover-bg: #1e1e1e;
+      --progress-bg: #2c2c2c;
+      --progress-fill: #007bff;
+      --warning-color: #ff6b6b; /* Красный для предупреждений */
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    body {
+      background: var(--bg-dark);
+      color: var(--text);
+      line-height: 1.6;
+      transition: background 0.3s ease;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 2rem;
+      background: var(--bg-darker);
+      border-bottom: 1px solid var(--border);
+      box-shadow: 0 2px 10px var(--shadow);
+    }
+
+    .logo-container {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      cursor: pointer;
+      transition: opacity 0.2s ease;
+    }
+
+    .logo-container:hover {
+      opacity: 0.8;
+    }
+
+    .logo-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #4a90e2, #8e44ad); /* Сине-фиолетовый */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: bold;
+      position: relative;
+    }
+
+    .logo-svg {
+      width: 80%; /* Занимает 80% круга */
+      height: 80%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .logo-svg svg {
+      width: 100%;
+      height: 100%;
+    }
+
+    .header h1 {
+      font-size: 1.8rem;
+      font-weight: 600;
+      color: var(--primary);
+    }
+
+    .manage-link {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 500;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      transition: all 0.2s ease;
+    }
+
+    .manage-link:hover {
+      background: rgba(0, 123, 255, 0.1);
+      color: #fff;
+    }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 1rem 2rem;
+      background: var(--bg-darker);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .controls label {
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+    }
+
+    .controls input {
+      padding: 0.5rem;
+      border: 1px solid var(--border);
+      background: var(--secondary);
+      color: var(--text);
+      border-radius: 4px;
+      font-size: 0.9rem;
+      width: 150px;
+    }
+
+    .controls button {
+      padding: 0.5rem 1rem;
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: background 0.2s ease;
+    }
+
+    .controls button:hover {
+      background: #0056b3;
+    }
+
+    .status-line {
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+    }
+
+    .main-container {
+      display: flex;
+      gap: 1rem;
+      padding: 1rem 2rem;
+      min-height: calc(100vh - 180px);
+    }
+
+    .left-panel {
+      flex: 3;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .video-container {
+      position: relative;
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--secondary);
+      box-shadow: 0 4px 12px var(--shadow);
+      aspect-ratio: 16 / 9;
+    }
+
+    #videoPlayer {
+      width: 100%;
+      height: 100%;
+      background: #000;
+      outline: none;
+      object-fit: contain;
+    }
+
+    /* Убираем затемнение родных контролей */
+    video::-webkit-media-controls {
+      background: transparent;
+    }
+
+    video::-webkit-media-controls-panel {
+      background: transparent;
+    }
+
+    video::-webkit-media-controls-play-button,
+    video::-webkit-media-controls-mute-button,
+    video::-webkit-media-controls-volume-slider {
+      filter: none; /* Убираем инверсию цвета */
+      color: white;
+    }
+
+    .quality-menu {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 10;
+    }
+
+    .quality-btn-player {
+      background: rgba(0, 0, 0, 0.6);
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: background 0.2s ease;
+    }
+
+    .quality-btn-player:hover {
+      background: rgba(0, 0, 0, 0.8);
+    }
+
+    .dropdown-content {
+      display: none;
+      position: absolute;
+      top: 100%;
+      right: 0;
+      background: var(--bg-darker);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      box-shadow: 0 4px 12px var(--shadow);
+      min-width: 120px;
+      z-index: 100;
+    }
+
+    .dropdown-content a {
+      display: block;
+      padding: 0.75rem 1rem;
+      color: var(--text);
+      text-decoration: none;
+      transition: background 0.2s ease;
+    }
+
+    .dropdown-content a:hover {
+      background: var(--hover-bg);
+    }
+
+    .upload-section {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      padding: 1rem;
+      background: var(--secondary);
+      border-radius: 8px;
+      box-shadow: 0 4px 12px var(--shadow);
+    }
+
+    #uploadBtn {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1.5rem;
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: background 0.2s ease;
+    }
+
+    #uploadBtn:hover {
+      background: #0056b3;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 6px;
+      background: var(--progress-bg);
+      border-radius: 3px;
+      overflow: hidden;
+      margin-top: 0.5rem;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: var(--progress-fill);
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+
+    #status {
+      padding: 0.75rem;
+      background: var(--secondary);
+      border-radius: 4px;
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+      text-align: center;
+    }
+
+    #leaveRoomBtn {
+      padding: 0.5rem 1rem;
+      background: #dc3545;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: background 0.2s ease;
+      margin-bottom: 1rem;
+    }
+
+    #leaveRoomBtn:hover {
+      background: #c82333;
+    }
+
+    .right-panel {
+      flex: 1;
+      background: var(--secondary);
+      border-radius: 8px;
+      box-shadow: 0 4px 12px var(--shadow);
+      padding: 1rem;
+      overflow-y: auto;
+    }
+
+    .right-panel h3 {
+      margin-bottom: 1rem;
+      font-size: 1.2rem;
+      color: var(--primary);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .manage-videos-link {
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: normal;
+    }
+
+    .manage-videos-link:hover {
+      text-decoration: underline;
+    }
+
+    #videoList {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .video-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.75rem;
+      background: var(--bg-darker);
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+
+    .video-item:hover {
+      background: var(--hover-bg);
+    }
+
+    .video-info {
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .video-title {
+      font-size: 0.9rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: var(--text);
+    }
+
+    .video-meta {
+      font-size: 0.7rem;
+      color: var(--text-secondary);
+      margin-top: 0.25rem;
+    }
+
+    /* ✅ НОВЫЙ СТИЛЬ ДЛЯ НЕПОДДЕРЖИВАЕМЫХ ФАЙЛОВ */
+    .unsupported-warning {
+      color: var(--warning-color); /* Красный цвет */
+      font-size: 0.7rem;
+      font-weight: 500;
+      margin-top: 0.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+
+    .unsupported-warning i {
+      font-size: 0.8rem;
+    }
+
+    .play-btn {
+      background: var(--accent);
+      color: white;
+      border: none;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+
+    .play-btn:hover {
+      background: #0056b3;
+    }
+
+    .users-section {
+      margin-top: 2rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border);
+    }
+
+    .users-section h3 {
+      margin-bottom: 1rem;
+      font-size: 1.2rem;
+      color: var(--primary);
+    }
+
+    #usersList {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .user-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.75rem;
+      background: var(--bg-darker);
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+
+    .user-name {
+      font-size: 0.9rem;
+      color: var(--text);
+    }
+
+    .kick-btn {
+      background: #dc3545;
+      color: white;
+      border: none;
+      width: 32px;
+      height: 32px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+
+    .kick-btn:hover {
+      background: #c82333;
+    }
+
+    #notifications {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 1000;
+      max-width: 300px;
+    }
+
+    .notification {
+      padding: 1rem;
+      margin-bottom: 0.5rem;
+      background: var(--secondary);
+      border-left: 4px solid var(--accent);
+      border-radius: 4px;
+      box-shadow: 0 4px 12px var(--shadow);
+      animation: slideIn 0.3s ease-out;
+    }
+
+    @keyframes slideIn {
+      from {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .main-container {
+        flex-direction: column;
+      }
+
+      .header, .controls {
+        padding: 1rem;
+      }
+
+      .video-container {
+        aspect-ratio: 16 / 9;
+      }
+
+      .quality-menu {
+        top: 5px;
+        right: 5px;
+      }
+
+      .upload-section {
+        padding: 0.75rem;
+      }
+
+      .right-panel {
+        padding: 0.75rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo-container" onclick="window.location.href='/select-room.html'">
+      <div class="logo-icon">
+        <div class="logo-svg">
+          <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+            <!-- Градиент -->
+            <defs>
+              <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#4a90e2" />
+                <stop offset="100%" stop-color="#8e44ad" />
+              </linearGradient>
+            </defs>
+
+            <!-- Круговой фон -->
+            <circle cx="50" cy="50" r="48" fill="url(#logoGradient)" />
+
+            <!-- Буква S -->
+            <text 
+              x="50" 
+              y="50" 
+              font-family="Arial, sans-serif" 
+              font-size="40" 
+              fill="white" 
+              text-anchor="middle" 
+              dominant-baseline="middle"
+              alignment-baseline="middle"
+              style="paint-order: stroke; stroke: #000; stroke-width: 1px;"
+            >
+              S
+            </text>
+          </svg>
+        </div>
+      </div>
+      <h1>SyncWatch</h1>
+    </div>
+    <a href="/select-room.html" class="manage-link">Select Room</a>
+  </div>
+
+  <div class="controls">
+    <label for="userName">Your Name:</label>
+    <input type="text" id="userName" placeholder="Enter your name">
+    <button id="saveNameBtn">Save Name</button>
+    <div class="status-line">
+      В сети: <span id="onlineCount">0</span>
+    </div>
+  </div>
+
+  <div class="main-container">
+    <!-- Левая часть -->
+    <div class="left-panel">
+      <button id="leaveRoomBtn">Выйти из комнаты</button>
+
+      <div class="video-container">
+        <video id="videoPlayer" width="100%" controls></video>
+        <div class="quality-menu">
+          <button id="qualityBtn" class="quality-btn-player">Settings</button>
+          <div id="qualityDropdown" class="dropdown-content">
+            <a href="#" data-quality="original">Original</a>
+            <a href="#" data-quality="low">Low (240p)</a>
+            <a href="#" data-quality="medium">Medium (720p)</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="upload-section">
+        <button id="uploadBtn"><i class="fas fa-upload"></i> Upload Video</button>
+        <input type="file" id="uploadInput" accept="video/*" style="display:none;">
+        <div class="progress-bar" style="display:none;">
+          <div class="progress-bar-fill"></div>
+        </div>
+      </div>
+
+      <div id="status">Status: Not connected</div>
+    </div>
+
+    <!-- Правая часть -->
+    <div class="right-panel">
+      <h3>
+        Videos
+        <a href="javascript:void(0)" class="manage-videos-link" id="manageVideosLink">Manage Videos</a>
+      </h3>
+      <div id="videoList"></div>
+
+      <!-- Список пользователей -->
+      <div class="users-section">
+        <h3>Users Online</h3>
+        <div id="usersList"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="notifications"></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    // === SOCKET CONNECTION ===
+    const socket = io();
+    let joinedRoom = null;
+    let currentVideoFile = null;
+    let isVideoReady = false;
+    let currentUserIsHost = false;
+
+    // === URL PARAMS ===
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomId = urlParams.get('room');
+
+    if (!roomId) {
+      window.location.href = '/select-room.html';
+    }
+
+    // === ROOM JOIN LOGIC ===
+    function joinRoom() {
+      const name = localStorage.getItem('userName') || '';
+      socket.emit('join-room', { roomId, name }, res => {
+        if (!(res && res.success)) {
+          alert(res && res.error ? res.error : 'Ошибка входа в комнату');
+          window.location.href = '/select-room.html';
+        } else {
+          joinedRoom = roomId;
+        }
+      });
+    }
+
+    // === DOM LOADED ===
+    window.addEventListener('DOMContentLoaded', () => {
+      // === ЗАПОМИНАЕМ КОМНАТУ ПРИ ЗАГРУЗКЕ СТРАНИЦЫ ===
+      if (roomId) {
+        localStorage.setItem('lastRoomId', roomId);
+      }
+      
+      joinRoom();
+    });
+
+    // === ELEMENTS ===
+    const video = document.getElementById('videoPlayer');
+    const statusEl = document.getElementById('status');
+    const videoList = document.getElementById('videoList');
+    const userNameInput = document.getElementById('userName');
+    const saveNameBtn = document.getElementById('saveNameBtn');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const uploadInput = document.getElementById('uploadInput');
+    const qualityBtn = document.getElementById('qualityBtn');
+    const qualityDropdown = document.getElementById('qualityDropdown');
+    const leaveRoomBtn = document.getElementById('leaveRoomBtn');
+    const usersList = document.getElementById('usersList');
+
+    // === MANAGE VIDEOS LINK WITH ROOM REMEMBER ===
+    document.getElementById('manageVideosLink').addEventListener('click', () => {
+      if (roomId) {
+        localStorage.setItem('lastRoomId', roomId);
+        window.location.href = `/files?room=${roomId}`;
+      } else {
+        window.location.href = '/files';
+      }
+    });
+
+    // === NAME INPUT ===
+    if (localStorage.getItem('userName')) {
+      userNameInput.value = localStorage.getItem('userName');
+    }
+
+    saveNameBtn.addEventListener('click', () => {
+      const name = userNameInput.value.trim();
+      if (name) {
+        localStorage.setItem('userName', name);
+        socket.emit('set-name', name);
+      }
+    });
+
+    // === QUALITY MENU ===
+    qualityBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      qualityDropdown.classList.toggle('show');
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!qualityBtn.contains(e.target) && !qualityDropdown.contains(e.target)) {
+        qualityDropdown.classList.remove('show');
+      }
+    });
+
+    qualityDropdown.querySelectorAll('a').forEach(item => {
+      item.addEventListener('click', (e) => {
+        e.preventDefault();
+        const quality = item.dataset.quality;
+
+        if (!currentVideoFile) return;
+
+        if (quality === 'original') {
+          socket.emit('select-video', currentVideoFile);
+          qualityDropdown.classList.remove('show');
+          return;
+        }
+
+        // Проверяем, существует ли перекодированное видео
+        fetch(`/api/check-quality/${currentVideoFile}/${quality}`)
+          .then(res => res.json())
+          .then(data => {
+            if (data.exists) {
+              socket.emit('select-video', data.filename);
+              qualityDropdown.classList.remove('show');
+            } else {
+              if (confirm(`Quality ${quality} not available. Start transcoding?`)) {
+                window.location.href = '/transcode';
+              }
+            }
+          });
+      });
+    });
+
+    // === ROOM-AWARE VIDEO LIST ===
+    let roomState = null;
+    function renderRoomVideoList() {
+      if (!roomState) return;
+      videoList.innerHTML = '';
+      fetch('/api/videos')
+        .then(res => res.json())
+        .then(videos => {
+          videos.forEach(video => {
+            // ✅ ОПРЕДЕЛЯЕМ, ПОДДЕРЖИВАЕТСЯ ЛИ ФОРМАТ
+            const ext = video.name.split('.').pop().toLowerCase();
+            const supportedFormats = ['mp4', 'webm', 'ogg'];
+            const isSupported = supportedFormats.includes(ext);
+
+            const div = document.createElement('div');
+            div.className = 'video-item';
+            
+            // ✅ ФОРМИРУЕМ HTML С УЧЁТОМ ПОДДЕРЖКИ
+            let videoInfoHtml = `
+              <div class="video-info">
+                <strong class="video-title">${video.name}</strong><br>
+                <small class="video-meta">${video.resolution || 'N/A'} | ${video.bitrate || 'N/A'}</small>
+            `;
+            
+            // ✅ ДОБАВЛЯЕМ ПРЕДУПРЕЖДЕНИЕ, ЕСЛИ ФОРМАТ НЕ ПОДДЕРЖИВАЕТСЯ
+            if (!isSupported) {
+              videoInfoHtml += `
+                <div class="unsupported-warning">
+                  <i class="fas fa-exclamation-triangle"></i>
+                  Требуется конвертация
+                </div>
+              `;
+            }
+            
+            videoInfoHtml += `
+              </div>
+            `;
+            
+            div.innerHTML = videoInfoHtml + `
+              <i class="fas fa-play-circle preview-icon"></i>
+            `;
+            
+            div.addEventListener('click', () => {
+              if (!isSupported) {
+                if (!confirm('Этот формат видео может не воспроизводиться в браузере. Продолжить?')) {
+                  return;
+                }
+              }
+              socket.emit('select-video', video.name);
+              currentVideoFile = video.name;
+            });
+            videoList.appendChild(div);
+          });
+        });
+    }
+
+    // === USERS LIST ===
+    function renderUsersList() {
+      if (!roomState || !roomState.users) return;
+      usersList.innerHTML = '';
+
+      Object.keys(roomState.users).forEach(userId => {
+        const user = roomState.users[userId];
+        const div = document.createElement('div');
+        div.className = 'user-item';
+        div.innerHTML = `
+          <div class="user-name">${user.name}</div>
+          <button class="kick-btn" data-id="${userId}"><i class="fas fa-times"></i></button>
+        `;
+        usersList.appendChild(div);
+
+        // === KICK USER ===
+        div.querySelector('.kick-btn').addEventListener('click', () => {
+          if (confirm(`Kick user "${user.name}" from room?`)) {
+            socket.emit('kick-user', { userId, roomId }, res => {
+              if (res && res.success) {
+                showNotification(`User kicked: ${user.name}`, 'success');
+              } else {
+                showNotification('Kick failed: ' + (res?.error || 'Unknown error'), 'error');
+              }
+            });
+          }
+        });
+      });
+    }
+
+    // === UPLOAD VIDEO ===
+    uploadBtn.addEventListener('click', () => {
+      uploadInput.click();
+    });
+
+    uploadInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const formData = new FormData();
+        formData.append('video', file);
+
+        // Показать прогресс-бар
+        const progressBar = document.querySelector('.progress-bar');
+        progressBar.style.display = 'block';
+        const progressBarFill = document.querySelector('.progress-bar-fill');
+
+        const xhr = new XMLHttpRequest();
+
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            const percentComplete = (e.loaded / e.total) * 100;
+            progressBarFill.style.width = `${percentComplete}%`;
+          }
+        });
+
+        xhr.addEventListener('load', () => {
+          if (xhr.status === 200) {
+            const data = JSON.parse(xhr.responseText);
+            if (data.success) {
+              showNotification(`Video uploaded: ${data.file}`, 'success');
+              progressBar.style.display = 'none';
+              progressBarFill.style.width = '0';
+              // После загрузки не обновляем список локально, а ждём событие video-updated/room-state
+            } else {
+              showNotification('Upload failed', 'error');
+              progressBar.style.display = 'none';
+            }
+          } else {
+            showNotification('Upload failed', 'error');
+            progressBar.style.display = 'none';
+          }
+        });
+
+        xhr.open('POST', '/upload');
+        xhr.send(formData);
+      }
+    });
+
+    // === ROOM STATE ===
+    socket.on('room-state', (state) => {
+      roomState = state;
+      // Видео
+      if (state.currentVideo) {
+        video.src = `/videos/${state.currentVideo}`;
+        statusEl.innerHTML = `Video loaded: ${state.currentVideo}`;
+        currentVideoFile = state.currentVideo;
+        isVideoReady = false;
+      }
+      // Пользователи
+      document.getElementById('onlineCount').textContent = Object.keys(state.users).length;
+      renderRoomVideoList();
+      renderUsersList();
+    });
+
+    // === LEAVE ROOM ===
+    leaveRoomBtn.addEventListener('click', () => {
+      socket.emit('leave-room', () => {
+        window.location.href = '/select-room.html';
+      });
+    });
+
+    // === VIDEO EVENTS ===
+    video.addEventListener('loadedmetadata', () => {
+      isVideoReady = true;
+    });
+
+    video.addEventListener('play', () => {
+      if (isVideoReady) {
+        socket.emit('video-command', { type: 'play' });
+      }
+    });
+
+    video.addEventListener('pause', () => {
+      if (isVideoReady) {
+        socket.emit('video-command', { type: 'pause' });
+      }
+    });
+
+    // === SIMPLE SEEKING ===
+    let lastSeekSent = 0;
+    video.addEventListener('seeked', () => {
+      if (isVideoReady) {
+        const now = Date.now();
+        if (now - lastSeekSent > 500) {
+          socket.emit('video-command', { type: 'seek', time: video.currentTime });
+          lastSeekSent = now;
+        }
+      }
+    });
+
+    // === RECEIVE COMMAND FROM OTHER USERS ===
+    socket.on('video-command', (data) => {
+      if (isVideoReady && video.readyState >= 1) {
+        if (data.type === 'play') {
+          if (video.paused) {
+            const playPromise = video.play();
+            if (playPromise !== undefined) {
+              playPromise.then(() => {}).catch(error => {
+                console.warn('Play command blocked by browser:', error);
+              });
+            }
+          }
+        } else if (data.type === 'pause') {
+          if (!video.paused) {
+            video.pause();
+          }
+        } else if (data.type === 'seek' && typeof data.time === 'number') {
+          if (Math.abs(video.currentTime - data.time) > 0.5) {
+            lastSeekSent = Date.now();
+            video.currentTime = data.time;
+          }
+        }
+      }
+    });
+
+    // === BUFFER PROGRESS ===
+    video.addEventListener('progress', () => {
+      const buffered = video.buffered;
+      if (buffered.length > 0) {
+        const bufferedEnd = buffered.end(0);
+        const duration = video.duration;
+        const percent = (bufferedEnd / duration) * 100;
+
+        let bufferBar = document.querySelector('.buffer-progress');
+        if (!bufferBar) {
+          bufferBar = document.createElement('div');
+          bufferBar.className = 'buffer-progress';
+          bufferBar.innerHTML = '<div class="buffer-progress-fill"></div>';
+          video.parentNode.insertBefore(bufferBar, video.nextSibling);
+        }
+
+        bufferBar.querySelector('.buffer-progress-fill').style.width = `${percent}%`;
+      }
+    });
+
+    // === NOTIFICATIONS ===
+    function showNotification(message, type) {
+      const notification = document.createElement('div');
+      notification.className = `notification ${type}`;
+      notification.textContent = message;
+      document.getElementById('notifications').appendChild(notification);
+
+      setTimeout(() => {
+        notification.remove();
+      }, 3000);
+    }
+
+    // === NEW VIDEO ADDED ===
+    socket.on('video-updated', (filename) => {
+      video.src = `/videos/${filename}`;
+      statusEl.innerHTML = `Video loaded: ${filename}`;
+      currentVideoFile = filename;
+      isVideoReady = false;
+    });
+
+    // === USER KICKED ===
+    socket.on('kicked-from-room', (data) => {
+      alert(data.message || 'You have been kicked from the room');
+      window.location.href = '/select-room.html';
+    });
+  </script>
+</body>
+</html>
