@@ -154,6 +154,7 @@ app.get('/api/videos', async (req, res) => {
       const ext = file.split('.').pop().toLowerCase();
       const supportedFormats = ['mp4', 'webm', 'ogg'];
       const isSupported = supportedFormats.includes(ext);
+      // Возвращаем полный путь к файлу, чтобы плеер мог его правильно воспроизвести
       return { name: file, ...info, isSupported };
     });
 
@@ -476,8 +477,7 @@ function saveTranscodeQueue(queue) {
 }
 
 // API: получить шаблоны
-// УБРАНО isLocalhostOnly для /api/transcode/templates, чтобы player.html мог получить шаблоны
-app.get('/api/transcode/templates', (req, res) => { // <-- УБРАНО isLocalhostOnly
+app.get('/api/transcode/templates', isLocalhostOnly, (req, res) => {
   const clientIP = req.ip || req.connection.remoteAddress;
   logClientRequest(clientIP, 'N/A', 'GET /api/transcode/templates', '');
 
@@ -544,8 +544,7 @@ app.post('/api/transcode/delete-template', isLocalhostOnly, (req, res) => {
 });
 
 // API: получить очередь
-// УБРАНО isLocalhostOnly для /api/transcode/queue, чтобы player.html мог получить очередь
-app.get('/api/transcode/queue', (req, res) => { // <-- УБРАНО isLocalhostOnly
+app.get('/api/transcode/queue', isLocalhostOnly, (req, res) => {
   const clientIP = req.ip || req.connection.remoteAddress;
   logClientRequest(clientIP, 'N/A', 'GET /api/transcode/queue', '');
 
@@ -755,7 +754,7 @@ async function processTranscodeQueue() {
   console.log(`[TRANSCODE] Обработка задания: ${pendingItem.id} (${pendingItem.fileId})`); // Лог для отладки
 
   // Проверяем, не отменено ли задание в процессе выполнения (например, если оно было отменено сразу после запуска)
-  // Загружаем очередь снова, на случай, если другой процесс её изменил (например, удалил)
+  // Загружаем очередь снова, на случай, если другой процесс её изменил
   const freshQueue = loadTranscodeQueue();
   const freshItem = freshQueue.find(item => item.id === pendingItem.id);
   if (freshItem && freshItem.isCancelled) {
@@ -796,74 +795,52 @@ async function processTranscodeQueue() {
     // fluent-ffmpeg позволяет остановить процесс через .kill()
     let ffmpegProcess = null;
 
-    // Функция для проверки отмены и удаления (может быть вызвана периодически)
-    const checkCancellationAndRemove = async () => {
+    // Функция для проверки отмены (может быть вызвана периодически)
+    const checkCancellation = () => {
       const queueDuringProcess = loadTranscodeQueue();
       const itemDuringProcess = queueDuringProcess.find(item => item.id === pendingItem.id);
-
-      // Если задание больше не существует, останавливаем ffmpeg
-      if (!itemDuringProcess) {
-        console.log(`[TRANSCODE] Задание ${pendingItem.id} удалено во время обработки, останавливаем ffmpeg...`);
+      if (itemDuringProcess && itemDuringProcess.isCancelled) {
+        console.log(`[TRANSCODE] Задание ${pendingItem.id} отменено во время обработки, останавливаем ffmpeg...`);
         if (ffmpegProcess) {
-          ffmpegProcess.kill('SIGKILL');
+          ffmpegProcess.kill('SIGKILL'); // Принудительно останавливаем ffmpeg
+        }
+        // Обновляем статус в очереди
+        const itemInOriginalQueue = queue.find(item => item.id === pendingItem.id);
+        if (itemInOriginalQueue) {
+          itemInOriginalQueue.status = 'cancelled';
+          itemInOriginalQueue.progress = 0; // Или оставить последний прогресс?
+          itemInOriginalQueue.completedAt = new Date().toISOString();
+          saveTranscodeQueue(queue);
         }
         // Запускаем следующий
         setTimeout(() => {
           processTranscodeQueue();
         }, 1000);
-        return true; // Удалено
+        return true; // Отменено
       }
-
-      // Если задание отменено, останавливаем ffmpeg и удаляем
-      if (itemDuringProcess.isCancelled) {
-        console.log(`[TRANSCODE] Задание ${pendingItem.id} отменено во время обработки, останавливаем ffmpeg и удаляем...`);
-        if (ffmpegProcess) {
-          ffmpegProcess.kill('SIGKILL');
-        }
-        // Удаляем задание из очереди
-        const queueToRemove = loadTranscodeQueue();
-        const indexToRemove = queueToRemove.findIndex(item => item.id === pendingItem.id);
-        if (indexToRemove > -1) {
-          queueToRemove.splice(indexToRemove, 1);
-          if (saveTranscodeQueue(queueToRemove)) {
-            console.log(`[TRANSCODE] Задание ${pendingItem.id} удалено из очереди после отмены.`);
-          } else {
-            console.error(`[TRANSCODE] Ошибка удаления задания ${pendingItem.id} из очереди после отмены.`);
-          }
-        }
-        // Запускаем следующий
-        setTimeout(() => {
-          processTranscodeQueue();
-        }, 1000);
-        return true; // Отменено и удалено
-      }
-      return false; // Не отменено и не удалено
+      return false; // Не отменено
     };
 
     const command = ffmpeg(inputFile)
       .output(outputFile)
       .on('start', (cmd) => {
         console.log(`[TRANSCODE] FFmpeg запущен для ${pendingItem.fileId}: ${cmd}`);
-        // Запускаем проверку отмены и удаления каждые 2 секунды
-        const cancelCheckInterval = setInterval(async () => {
-          if (await checkCancellationAndRemove()) {
+        // Сохраняем ссылку на процесс ffmpeg (нужно немного хакнуть fluent-ffmpeg)
+        // fluent-ffmpeg использует внутренний процесс spawn, можно попытаться получить его
+        // Это зависит от версии fluent-ffmpeg. В новой версии можно получить через .on('codecData', ...) и доступ к процессу
+        // Но проще передать ffmpegProcess в on('start')
+        // fluent-ffmpeg не предоставляет прямого доступа к child_process напрямую через .on('start')
+        // Однако, мы можем использовать setInterval для периодической проверки
+        const cancelCheckInterval = setInterval(() => {
+          if (checkCancellation()) {
             clearInterval(cancelCheckInterval);
           }
-        }, 2000);
+        }, 2000); // Проверяем каждые 2 секунды
 
         command.on('end', () => {
           clearInterval(cancelCheckInterval); // Останавливаем проверку при завершении
-          // Проверяем, не было ли задание удалено до завершения
-          const queueAfterEnd = loadTranscodeQueue();
-          const itemAfterEnd = queueAfterEnd.find(item => item.id === pendingItem.id);
-          if (!itemAfterEnd) {
-            console.log(`[TRANSCODE] Задание ${pendingItem.fileId} завершено, но было удалено из очереди.`);
-            // Запускаем следующий
-            setTimeout(() => {
-              processTranscodeQueue();
-            }, 1000);
-            return;
-          }
+          // Проверяем отмену ещё раз перед обновлением статуса
+          if (checkCancellation()) return; // Если было отменено во время завершения, выходим
 
           // Завершено успешно
           const itemInOriginalQueue = queue.find(item => item.id === pendingItem.id);
@@ -881,17 +858,8 @@ async function processTranscodeQueue() {
 
         command.on('error', (err) => {
           clearInterval(cancelCheckInterval); // Останавливаем проверку при ошибке
-          // Проверяем, не было ли задание удалено до ошибки
-          const queueAfterError = loadTranscodeQueue();
-          const itemAfterError = queueAfterError.find(item => item.id === pendingItem.id);
-          if (!itemAfterError) {
-            console.log(`[TRANSCODE] Задание ${pendingItem.fileId} завершено с ошибкой, но было удалено из очереди.`);
-            // Запускаем следующий
-            setTimeout(() => {
-              processTranscodeQueue();
-            }, 1000);
-            return;
-          }
+          // Проверяем отмену ещё раз перед обновлением статуса ошибки
+          if (checkCancellation()) return; // Если было отменено во время ошибки, выходим
 
           // Ошибка выполнения ffmpeg
           const itemInOriginalQueue = queue.find(item => item.id === pendingItem.id);
@@ -982,9 +950,7 @@ if (!fs.existsSync(TRANSCODE_QUEUE_FILE)) {
   console.log(`[TRANSCODE] Создан файл очереди: ${TRANSCODE_QUEUE_FILE}`);
 }
 
-// === НОВОЕ: API ДЛЯ РАБОТЫ С ПАПКАМИ ===
-
-// ✅ ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ДЛЯ РАБОТЫ С ФАЙЛОВОЙ СИСТЕМОЙ ===
+// === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ДЛЯ РАБОТЫ С ФАЙЛОВОЙ СИСТЕМОЙ ===
 
 // ✅ Функция для получения относительного пути от VIDEO_FOLDER
 function getRelativePath(fullPath) {
@@ -998,24 +964,10 @@ function getAbsolutePath(relativePath) {
   return path.join(VIDEO_FOLDER, normalizedPath);
 }
 
-// ✅ Функция для рекурсивного создания директории С .empty
-function ensureDirWithEmpty(dirPath) {
+// ✅ Функция для рекурсивного создания директории
+function ensureDir(dirPath) {
   if (!fs.existsSync(dirPath)) {
     fs.mkdirSync(dirPath, { recursive: true });
-    console.log(`[FILES] Создана папка: ${dirPath}`);
-    // ✅ Создаём пустышку в новой папке
-    createEmptyFile(dirPath);
-  }
-}
-
-// ✅ Функция для создания файла .empty
-function createEmptyFile(dirPath) {
-  const emptyFilePath = path.join(dirPath, '.empty');
-  try {
-    fs.writeFileSync(emptyFilePath, ''); // Создаём пустой файл
-    console.log(`[FILES] Создан файл-пустышка: ${emptyFilePath}`);
-  } catch (err) {
-    console.error(`[FILES] Ошибка создания файла-пустышки в ${dirPath}:`, err);
   }
 }
 
@@ -1039,7 +991,7 @@ function getDirectoryStructure(dir, basePath = '') {
           path: relativePath,
           children: getDirectoryStructure(fullPath, relativePath) // Рекурсивный вызов
         });
-      } else if (VIDEO_EXTENSIONS.test(item)) { // Используем существующую константу VIDEO_EXTENSIONS
+      } else if (VIDEO_EXTENSIONS.test(item)) {
         result.push({
           name: item,
           type: 'file',
@@ -1056,8 +1008,7 @@ function getDirectoryStructure(dir, basePath = '') {
 // === НОВЫЕ API ДЛЯ РАБОТЫ С ПАПКАМИ ===
 
 // API: получить структуру папок и файлов
-// УБРАНО isLocalhostOnly для /api/files/list, чтобы player.html мог получить структуру
-app.get('/api/files/list', (req, res) => { // <-- УБРАНО isLocalhostOnly
+app.get('/api/files/list', isLocalhostOnly, (req, res) => { // Можно убрать isLocalhostOnly, если нужно доступ из сети
   const clientIP = req.ip || req.connection.remoteAddress;
   logClientRequest(clientIP, 'N/A', 'GET /api/files/list', '');
   try {
@@ -1088,7 +1039,7 @@ app.post('/api/files/create-folder', isLocalhostOnly, (req, res) => {
   }
 
   try {
-    ensureDirWithEmpty(fullPath); // ✅ Используем обновлённую функцию
+    ensureDir(fullPath);
     console.log(`[FILES] Папка создана: ${fullPath}`);
     res.json({ success: true });
   } catch (err) {
@@ -1140,7 +1091,7 @@ const folderAwareStorage = multer.diskStorage({
     relativeFolderPath = path.normalize(relativeFolderPath).replace(/^(\.\.(\/|\\|$))+/, '');
     const absoluteFolderPath = path.join(VIDEO_FOLDER, relativeFolderPath);
     // Создаем папку, если её нет
-    ensureDirWithEmpty(absoluteFolderPath); // ✅ Используем обновлённую функцию
+    ensureDir(absoluteFolderPath);
     cb(null, absoluteFolderPath);
   },
   filename: (req, file, cb) => {
@@ -1165,12 +1116,58 @@ app.post('/api/upload/to-folder', folderAwareUpload.single('video'), (req, res) 
   }
 });
 
-// ✅ НОВОЕ: МАРШРУТ ДЛЯ ФАЙЛА-ПУСТЫШКИ ===
-// Перенаправляет в корневую папку видео
-app.get('/.empty', (req, res) => {
+// === НОВОЕ: API ДЛЯ ПЕРЕМЕЩЕНИЯ ФАЙЛОВ И ПАПОК ===
+
+// API: переместить файл или папку
+app.post('/api/files/move', isLocalhostOnly, (req, res) => {
+  const { sourcePath, destPath } = req.body; // sourcePath и destPath - относительные пути
   const clientIP = req.ip || req.connection.remoteAddress;
-  logClientRequest(clientIP, 'N/A', 'GET /.empty', 'Redirecting to root video folder');
-  res.redirect('/files'); // Перенаправляем на страницу управления файлами в корне
+  logClientRequest(clientIP, 'N/A', 'POST /api/files/move', `Source: ${sourcePath}, Dest: ${destPath}`);
+
+  if (!sourcePath || !destPath || typeof sourcePath !== 'string' || typeof destPath !== 'string') {
+    return res.status(400).json({ success: false, error: 'Неверные пути' });
+  }
+
+  // Получаем абсолютные пути
+  const fullSourcePath = getAbsolutePath(sourcePath);
+  const fullDestPath = getAbsolutePath(destPath);
+
+  // Проверяем, что исходный путь существует
+  if (!fs.existsSync(fullSourcePath)) {
+    return res.status(400).json({ success: false, error: 'Исходный файл/папка не существует' });
+  }
+
+  // Проверяем, что целевой путь существует и является папкой
+  if (!fs.existsSync(fullDestPath) || !fs.statSync(fullDestPath).isDirectory()) {
+    return res.status(400).json({ success: false, error: 'Целевая папка не существует или не является папкой' });
+  }
+
+  // Формируем путь к новому месту
+  const sourceName = path.basename(sourcePath);
+  const newFullPath = path.join(fullDestPath, sourceName);
+
+  // Проверяем, что новый путь не существует
+  if (fs.existsSync(newFullPath)) {
+    return res.status(400).json({ success: false, error: 'Файл/папка с таким именем уже существует в целевой папке' });
+  }
+
+  // Проверяем, что не пытаемся переместить папку внутрь себя
+  const realSource = fs.realpathSync(fullSourcePath);
+  const realDest = fs.realpathSync(fullDestPath);
+  if (realDest.startsWith(realSource + path.sep)) {
+    return res.status(400).json({ success: false, error: 'Нельзя переместить папку внутрь себя' });
+  }
+
+  try {
+    // Перемещаем файл или папку
+    fs.renameSync(fullSourcePath, newFullPath);
+    console.log(`[FILES] Перемещено: ${sourcePath} → ${path.join(destPath, sourceName)}`);
+    res.json({ success: true });
+    // Оповещение комнат не требуется, так как это File Manager
+  } catch (err) {
+    console.error('[FILES] Ошибка перемещения:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 // ✅ ГЛАВНАЯ СТРАНИЦА - РЕДИРЕКТ НА SELECT-ROOM

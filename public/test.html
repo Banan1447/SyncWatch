@@ -1,4 +1,3 @@
-<!-- public/test.html -->
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -175,6 +174,15 @@
       background: #138496;
     }
 
+    .btn-warning {
+      background: var(--warning);
+      color: #212529;
+    }
+
+    .btn-warning:hover {
+      background: #e0a800;
+    }
+
     .form-group {
       margin-bottom: 1rem;
     }
@@ -243,6 +251,11 @@
       border-left: 4px solid var(--warning);
     }
 
+    .test-result.info {
+      color: var(--info);
+      border-left: 4px solid var(--info);
+    }
+
     .sync-test-container {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -255,6 +268,7 @@
       background: var(--bg-dark);
       border-radius: 4px;
       border: 1px solid var(--border);
+      max-height: 300px;
     }
 
     .sync-stats {
@@ -281,6 +295,17 @@
       display: flex;
       gap: 0.5rem;
       margin-top: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .loading {
+      opacity: 0.6;
+      pointer-events: none;
+    }
+
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
     }
 
     #notifications {
@@ -299,6 +324,22 @@
       border-radius: 4px;
       box-shadow: 0 4px 12px var(--shadow);
       animation: slideIn 0.3s ease-out;
+    }
+
+    .notification.success {
+      border-left-color: var(--success);
+    }
+
+    .notification.error {
+      border-left-color: var(--danger);
+    }
+
+    .notification.warning {
+      border-left-color: var(--warning);
+    }
+
+    .notification.info {
+      border-left-color: var(--info);
     }
 
     @keyframes slideIn {
@@ -349,6 +390,10 @@
 
       .sync-test-container {
         grid-template-columns: 1fr;
+      }
+
+      .sync-controls {
+        flex-direction: column;
       }
     }
   </style>
@@ -462,6 +507,9 @@
           </button>
           <button class="btn btn-info" id="forceSyncBtn">
             <i class="fas fa-sync"></i> Принудительная синхронизация
+          </button>
+          <button class="btn btn-warning" id="resetSyncTestBtn">
+            <i class="fas fa-redo"></i> Сбросить тест
           </button>
         </div>
 
@@ -593,6 +641,12 @@
             return;
         }
         
+        // Проверяем тип файла
+        if (!file.type.startsWith('video/')) {
+            showNotification('Пожалуйста, выберите видео файл', 'error');
+            return;
+        }
+        
         if (currentVideoObjectURL) {
             URL.revokeObjectURL(currentVideoObjectURL);
         }
@@ -602,15 +656,43 @@
         const video1 = document.getElementById('video1');
         const video2 = document.getElementById('video2');
         
+        // Сбрасываем источники
+        video1.src = '';
+        video2.src = '';
+        
+        // Устанавливаем новые источники
         video1.src = currentVideoObjectURL;
         video2.src = currentVideoObjectURL;
         
-        Promise.all([
-            new Promise(resolve => video1.addEventListener('loadedmetadata', resolve, { once: true })),
-            new Promise(resolve => video2.addEventListener('loadedmetadata', resolve, { once: true }))
-        ]).then(() => {
+        // Сбрасываем состояние
+        video1.currentTime = 0;
+        video2.currentTime = 0;
+        video1.pause();
+        video2.pause();
+        
+        // Обновляем статистику
+        updateSyncStats();
+        
+        const loadPromises = [
+            new Promise(resolve => {
+                video1.addEventListener('loadedmetadata', resolve, { once: true });
+                video1.addEventListener('error', () => {
+                    resolve();
+                    showNotification('Ошибка загрузки видео в плеер 1', 'error');
+                }, { once: true });
+            }),
+            new Promise(resolve => {
+                video2.addEventListener('loadedmetadata', resolve, { once: true });
+                video2.addEventListener('error', () => {
+                    resolve();
+                    showNotification('Ошибка загрузки видео в плеер 2', 'error');
+                }, { once: true });
+            })
+        ];
+
+        Promise.all(loadPromises).then(() => {
             testVideoLoaded = true;
-            document.getElementById('syncTestResult').textContent = `Тестовое видео загружено: ${file.name}`;
+            document.getElementById('syncTestResult').textContent = `Тестовое видео загружено: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
             document.getElementById('syncTestResult').className = 'test-result success';
             showNotification(`Видео "${file.name}" успешно загружено для тестирования`, 'success');
         }).catch(error => {
@@ -640,13 +722,16 @@
       let syncStatus = 'Не синхронизировано';
       let statusClass = 'error';
       
-      if (timeDiff < 0.1) {
+      if (timeDiff < 0.05) {
         syncStatus = 'Идеальная синхронизация';
         statusClass = 'success';
-      } else if (timeDiff < 0.5) {
+      } else if (timeDiff < 0.1) {
+        syncStatus = 'Отличная синхронизация';
+        statusClass = 'success';
+      } else if (timeDiff < 0.2) {
         syncStatus = 'Хорошая синхронизация';
         statusClass = 'success';
-      } else if (timeDiff < 1.0) {
+      } else if (timeDiff < 0.5) {
         syncStatus = 'Приемлемая синхронизация';
         statusClass = 'warning';
       } else {
@@ -662,7 +747,7 @@
       if (video.paused) {
         return video.ended ? 'Завершено' : 'Пауза';
       } else {
-        return 'Воспроизведение';
+        return video.seeking ? 'Перемотка' : 'Воспроизведение';
       }
     }
 
@@ -675,19 +760,33 @@
         return;
       }
       
+      if (video1.readyState < 2 || video2.readyState < 2) {
+        showNotification('Видео еще не готово к воспроизведению', 'warning');
+        return;
+      }
+      
       const startTime = 0;
       video1.currentTime = startTime;
       video2.currentTime = startTime;
       
-      video1.play().catch(e => console.error('Video1 play error:', e));
-      video2.play().catch(e => console.error('Video2 play error:', e));
+      const playPromise1 = video1.play();
+      const playPromise2 = video2.play();
       
-      syncTestInterval = setInterval(updateSyncStats, 100);
-      
-      document.getElementById('syncTestResult').textContent = 'Тест синхронизации запущен';
-      document.getElementById('syncTestResult').className = 'test-result success';
-      
-      showNotification('Тест синхронизации запущен', 'success');
+      Promise.all([playPromise1, playPromise2]).then(() => {
+        // Запуск мониторинга синхронизации
+        if (syncTestInterval) {
+          clearInterval(syncTestInterval);
+        }
+        syncTestInterval = setInterval(updateSyncStats, 50); // Увеличена частота обновления
+        
+        document.getElementById('syncTestResult').textContent = 'Тест синхронизации запущен';
+        document.getElementById('syncTestResult').className = 'test-result success';
+        
+        showNotification('Тест синхронизации запущен', 'success');
+      }).catch(error => {
+        console.error('Ошибка воспроизведения:', error);
+        showNotification('Ошибка воспроизведения видео: ' + error.message, 'error');
+      });
     }
 
     function stopSyncTest() {
@@ -704,7 +803,7 @@
       
       updateSyncStats();
       document.getElementById('syncTestResult').textContent = 'Тест синхронизации остановлен';
-      document.getElementById('syncTestResult').className = 'test-result';
+      document.getElementById('syncTestResult').className = 'test-result info';
       
       showNotification('Тест синхронизации остановлен', 'info');
     }
@@ -713,9 +812,16 @@
       const video1 = document.getElementById('video1');
       const video2 = document.getElementById('video2');
       
+      if (!testVideoLoaded) {
+        showNotification('Сначала загрузите тестовое видео', 'error');
+        return;
+      }
+      
+      // Синхронизируем по времени первого плеера
       const syncTime = video1.currentTime;
       video2.currentTime = syncTime;
       
+      // Если первый плеер воспроизводится, синхронизируем состояние
       if (!video1.paused) {
         video2.play().catch(e => console.error('Force sync play error:', e));
       } else {
@@ -726,16 +832,52 @@
       showNotification('Принудительная синхронизация выполнена', 'success');
     }
 
+    function resetSyncTest() {
+      stopSyncTest();
+      
+      const video1 = document.getElementById('video1');
+      const video2 = document.getElementById('video2');
+      
+      video1.currentTime = 0;
+      video2.currentTime = 0;
+      
+      // Сбрасываем статистику
+      document.getElementById('time1').textContent = '0.000s';
+      document.getElementById('time2').textContent = '0.000s';
+      document.getElementById('timeDiff').textContent = '0.000s';
+      document.getElementById('syncStatus').textContent = 'Не синхронизировано';
+      document.getElementById('syncStatus').className = 'stat-value error';
+      document.getElementById('state1').textContent = 'Остановлен';
+      document.getElementById('state2').textContent = 'Остановлен';
+      
+      document.getElementById('syncTestResult').textContent = 'Тест сброшен';
+      document.getElementById('syncTestResult').className = 'test-result info';
+      
+      showNotification('Тест синхронизации сброшен', 'info');
+    }
+
+    // Очистка при разгрузке страницы
     window.addEventListener('beforeunload', () => {
         if (currentVideoObjectURL) {
             URL.revokeObjectURL(currentVideoObjectURL);
         }
+        if (syncTestInterval) {
+            clearInterval(syncTestInterval);
+        }
     });
 
-    // === TEST FUNCTIONS ===
+    // === УЛУЧШЕННЫЕ TEST FUNCTIONS ===
     async function testApi(endpoint, method = 'GET', data = null, testName = '') {
       const resultEl = document.getElementById(`test${testName}Result`);
+      const button = document.querySelector(`#test${testName}Btn`);
+      
       try {
+        // Показываем состояние загрузки
+        button.disabled = true;
+        button.classList.add('loading');
+        resultEl.textContent = 'Testing...';
+        resultEl.className = 'test-result info';
+
         const config = {
           method: method,
           headers: { 'Content-Type': 'application/json' }
@@ -745,19 +887,100 @@
           config.body = JSON.stringify(data);
         }
 
-        const res = await fetch(endpoint, config);
-        const dataRes = await res.json();
+        const response = await fetch(endpoint, config);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const dataRes = await response.json();
 
-        if (dataRes.success) {
-          resultEl.textContent = `Success: ${JSON.stringify(dataRes)}`;
+        // ⚡ ИСПРАВЛЕНИЕ: Специальная проверка для /api/videos
+        if (endpoint === '/api/videos' && Array.isArray(dataRes)) {
+          resultEl.textContent = `Success: Found ${dataRes.length} videos\n${JSON.stringify(dataRes, null, 2)}`;
           resultEl.className = 'test-result success';
+          showNotification(`Test ${testName} passed - Found ${dataRes.length} videos`, 'success');
+        }
+        // Стандартная проверка для других API
+        else if (dataRes.success !== false) {
+          resultEl.textContent = `Success: ${JSON.stringify(dataRes, null, 2)}`;
+          resultEl.className = 'test-result success';
+          showNotification(`Test ${testName} passed`, 'success');
         } else {
-          throw new Error(dataRes.error || 'Unknown error');
+          throw new Error(dataRes.error || 'Unknown API error');
         }
       } catch (err) {
         resultEl.textContent = `Error: ${err.message}`;
         resultEl.className = 'test-result error';
+        showNotification(`Test ${testName} failed: ${err.message}`, 'error');
+        console.error(`Test ${testName} error:`, err);
+      } finally {
+        button.disabled = false;
+        button.classList.remove('loading');
       }
+    }
+
+    // === УЛУЧШЕННАЯ ФУНКЦИЯ ДЛЯ ТЕСТИРОВАНИЯ ЗАГРУЗКИ ФАЙЛОВ ===
+    function setupUploadTest() {
+      const uploadBtn = document.getElementById('testUploadBtn');
+      const uploadInput = document.getElementById('testUploadInput');
+      const resultEl = document.getElementById('testUploadResult');
+
+      uploadBtn.addEventListener('click', () => {
+        uploadInput.click();
+      });
+
+      uploadInput.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        // Проверяем тип файла
+        if (!file.type.startsWith('video/') && !file.type.startsWith('audio/')) {
+          resultEl.textContent = 'Error: Please select a video or audio file';
+          resultEl.className = 'test-result error';
+          showNotification('Please select a video or audio file', 'error');
+          return;
+        }
+
+        // Показываем состояние загрузки
+        uploadBtn.disabled = true;
+        uploadBtn.classList.add('loading');
+        resultEl.textContent = 'Uploading...';
+        resultEl.className = 'test-result info';
+
+        const formData = new FormData();
+        formData.append('video', file);
+
+        try {
+          const response = await fetch('/upload', {
+            method: 'POST',
+            body: formData
+          });
+
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+
+          const result = await response.json();
+
+          if (result.success) {
+            resultEl.textContent = `Success: File "${result.file}" uploaded successfully`;
+            resultEl.className = 'test-result success';
+            showNotification(`File "${result.file}" uploaded successfully`, 'success');
+          } else {
+            throw new Error(result.error || 'Upload failed');
+          }
+        } catch (err) {
+          resultEl.textContent = `Error: ${err.message}`;
+          resultEl.className = 'test-result error';
+          showNotification(`Upload failed: ${err.message}`, 'error');
+          console.error('Upload error:', err);
+        } finally {
+          uploadBtn.disabled = false;
+          uploadBtn.classList.remove('loading');
+          uploadInput.value = ''; // Сбрасываем input
+        }
+      });
     }
 
     // === DOM LOADED ===
@@ -767,6 +990,10 @@
       document.getElementById('startSyncTestBtn').addEventListener('click', startSyncTest);
       document.getElementById('stopSyncTestBtn').addEventListener('click', stopSyncTest);
       document.getElementById('forceSyncBtn').addEventListener('click', forceSync);
+      document.getElementById('resetSyncTestBtn').addEventListener('click', resetSyncTest);
+
+      // Настройка теста загрузки файлов
+      setupUploadTest();
 
       // 1. API: Get Video List
       document.getElementById('testGetVideosBtn').addEventListener('click', () => {
@@ -780,19 +1007,51 @@
 
       // 3. API: Create Room
       document.getElementById('testCreateRoomBtn').addEventListener('click', () => {
-        testApi('/api/rooms', 'POST', { name: 'Test Room' }, 'CreateRoom');
+        testApi('/api/rooms', 'POST', { name: 'Test Room ' + Date.now() }, 'CreateRoom');
       });
 
       // 4. API: Join Room
       document.getElementById('testJoinRoomBtn').addEventListener('click', async () => {
-        const res = await fetch('/api/rooms');
-        const data = await res.json();
-        if (data.success && data.rooms.length > 0) {
-          const roomId = data.rooms[0].id;
-          testApi('/api/join-room', 'POST', { roomId, name: 'Tester' }, 'JoinRoom');
-        } else {
-          document.getElementById('testJoinRoomResult').textContent = 'Error: No rooms found';
-          document.getElementById('testJoinRoomResult').className = 'test-result error';
+        const resultEl = document.getElementById('testJoinRoomResult');
+        const button = document.getElementById('testJoinRoomBtn');
+        
+        try {
+          button.disabled = true;
+          button.classList.add('loading');
+          resultEl.textContent = 'Getting room list...';
+          resultEl.className = 'test-result info';
+
+          const res = await fetch('/api/rooms');
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          
+          const data = await res.json();
+          
+          if (data.success && data.rooms && data.rooms.length > 0) {
+            const roomId = data.rooms[0].id;
+            await testApi('/api/join-room', 'POST', { roomId, name: 'Tester' + Date.now() }, 'JoinRoom');
+          } else {
+            // Если нет комнат, создаем одну
+            showNotification('No rooms found, creating a test room first...', 'info');
+            const createRes = await fetch('/api/rooms', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name: 'Auto Test Room' })
+            });
+            
+            const createData = await createRes.json();
+            if (createData.success) {
+              await testApi('/api/join-room', 'POST', { roomId: createData.id, name: 'Tester' + Date.now() }, 'JoinRoom');
+            } else {
+              throw new Error('Failed to create test room');
+            }
+          }
+        } catch (err) {
+          resultEl.textContent = `Error: ${err.message}`;
+          resultEl.className = 'test-result error';
+          showNotification(`Join room test failed: ${err.message}`, 'error');
+        } finally {
+          button.disabled = false;
+          button.classList.remove('loading');
         }
       });
 
@@ -803,73 +1062,107 @@
 
       // 6. API: Delete Room
       document.getElementById('testDeleteRoomBtn').addEventListener('click', async () => {
-        const res = await fetch('/api/rooms');
-        const data = await res.json();
-        if (data.success && data.rooms.length > 0) {
-          const roomId = data.rooms[0].id;
-          testApi('/api/delete-room', 'POST', { roomId }, 'DeleteRoom');
-        } else {
-          document.getElementById('testDeleteRoomResult').textContent = 'Error: No rooms found';
-          document.getElementById('testDeleteRoomResult').className = 'test-result error';
-        }
-      });
+        const resultEl = document.getElementById('testDeleteRoomResult');
+        const button = document.getElementById('testDeleteRoomBtn');
+        
+        try {
+          button.disabled = true;
+          button.classList.add('loading');
+          resultEl.textContent = 'Getting room list...';
+          resultEl.className = 'test-result info';
 
-      // 7. API: Upload Video
-      document.getElementById('testUploadBtn').addEventListener('click', () => {
-        document.getElementById('testUploadInput').click();
-      });
-
-      document.getElementById('testUploadInput').addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        if (file) {
-          const formData = new FormData();
-          formData.append('video', file);
-
-          const xhr = new XMLHttpRequest();
-          xhr.addEventListener('load', () => {
-            if (xhr.status === 200) {
-              const data = JSON.parse(xhr.responseText);
-              if (data.success) {
-                document.getElementById('testUploadResult').textContent = `Success: ${data.file}`;
-                document.getElementById('testUploadResult').className = 'test-result success';
-              } else {
-                document.getElementById('testUploadResult').textContent = `Error: ${data.error}`;
-                document.getElementById('testUploadResult').className = 'test-result error';
-              }
-            } else {
-              document.getElementById('testUploadResult').textContent = `Error: HTTP ${xhr.status}`;
-              document.getElementById('testUploadResult').className = 'test-result error';
-            }
-          });
-          xhr.open('POST', '/upload');
-          xhr.send(formData);
+          const res = await fetch('/api/rooms');
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          
+          const data = await res.json();
+          
+          if (data.success && data.rooms && data.rooms.length > 0) {
+            const roomId = data.rooms[0].id;
+            await testApi('/api/delete-room', 'POST', { roomId }, 'DeleteRoom');
+          } else {
+            throw new Error('No rooms found to delete');
+          }
+        } catch (err) {
+          resultEl.textContent = `Error: ${err.message}`;
+          resultEl.className = 'test-result error';
+          showNotification(`Delete room test failed: ${err.message}`, 'error');
+        } finally {
+          button.disabled = false;
+          button.classList.remove('loading');
         }
       });
 
       // 8. API: Delete Video
       document.getElementById('testDeleteVideoBtn').addEventListener('click', async () => {
-        const res = await fetch('/api/videos');
-        const data = await res.json();
-        if (data.length > 0) {
-          const filename = data[0].name;
-          testApi('/api/delete-video', 'POST', { filename }, 'DeleteVideo');
-        } else {
-          document.getElementById('testDeleteVideoResult').textContent = 'Error: No videos found';
-          document.getElementById('testDeleteVideoResult').className = 'test-result error';
+        const resultEl = document.getElementById('testDeleteVideoResult');
+        const button = document.getElementById('testDeleteVideoBtn');
+        
+        try {
+          button.disabled = true;
+          button.classList.add('loading');
+          resultEl.textContent = 'Getting video list...';
+          resultEl.className = 'test-result info';
+
+          const res = await fetch('/api/videos');
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          
+          const data = await res.json();
+          
+          if (data && data.length > 0) {
+            // Ищем тестовый файл для удаления (не оригинальные видео)
+            const testFile = data.find(video => 
+              video.name && (
+                video.name.includes('_renamed') || 
+                video.name.includes('_max_') ||
+                video.name.includes('test')
+              )
+            );
+            
+            const filename = testFile ? testFile.name : data[0].name;
+            await testApi('/api/delete-video', 'POST', { filename }, 'DeleteVideo');
+          } else {
+            throw new Error('No videos found to delete');
+          }
+        } catch (err) {
+          resultEl.textContent = `Error: ${err.message}`;
+          resultEl.className = 'test-result error';
+          showNotification(`Delete video test failed: ${err.message}`, 'error');
+        } finally {
+          button.disabled = false;
+          button.classList.remove('loading');
         }
       });
 
       // 9. API: Rename Video
       document.getElementById('testRenameVideoBtn').addEventListener('click', async () => {
-        const res = await fetch('/api/videos');
-        const data = await res.json();
-        if (data.length > 0) {
-          const oldName = data[0].name;
-          const newName = oldName.replace(/\.[^/.]+$/, "") + "_renamed.mp4";
-          testApi('/api/rename-video', 'POST', { oldName, newName }, 'RenameVideo');
-        } else {
-          document.getElementById('testRenameVideoResult').textContent = 'Error: No videos found';
-          document.getElementById('testRenameVideoResult').className = 'test-result error';
+        const resultEl = document.getElementById('testRenameVideoResult');
+        const button = document.getElementById('testRenameVideoBtn');
+        
+        try {
+          button.disabled = true;
+          button.classList.add('loading');
+          resultEl.textContent = 'Getting video list...';
+          resultEl.className = 'test-result info';
+
+          const res = await fetch('/api/videos');
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          
+          const data = await res.json();
+          
+          if (data && data.length > 0) {
+            const oldName = data[0].name;
+            const newName = oldName.replace(/\.[^/.]+$/, "") + "_renamed_" + Date.now() + ".mp4";
+            await testApi('/api/rename-video', 'POST', { oldName, newName }, 'RenameVideo');
+          } else {
+            throw new Error('No videos found to rename');
+          }
+        } catch (err) {
+          resultEl.textContent = `Error: ${err.message}`;
+          resultEl.className = 'test-result error';
+          showNotification(`Rename video test failed: ${err.message}`, 'error');
+        } finally {
+          button.disabled = false;
+          button.classList.remove('loading');
         }
       });
 
@@ -885,14 +1178,33 @@
 
       // 12. API: Quick Transcode
       document.getElementById('testQuickTranscodeBtn').addEventListener('click', async () => {
-        const res = await fetch('/api/videos');
-        const data = await res.json();
-        if (data.length > 0) {
-          const filename = data[0].name;
-          testApi('/api/transcode/quick-transcode', 'POST', { filename }, 'QuickTranscode');
-        } else {
-          document.getElementById('testQuickTranscodeResult').textContent = 'Error: No videos found';
-          document.getElementById('testQuickTranscodeResult').className = 'test-result error';
+        const resultEl = document.getElementById('testQuickTranscodeResult');
+        const button = document.getElementById('testQuickTranscodeBtn');
+        
+        try {
+          button.disabled = true;
+          button.classList.add('loading');
+          resultEl.textContent = 'Getting video list...';
+          resultEl.className = 'test-result info';
+
+          const res = await fetch('/api/videos');
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          
+          const data = await res.json();
+          
+          if (data && data.length > 0) {
+            const filename = data[0].name;
+            await testApi('/api/transcode/quick-transcode', 'POST', { filename }, 'QuickTranscode');
+          } else {
+            throw new Error('No videos found to transcode');
+          }
+        } catch (err) {
+          resultEl.textContent = `Error: ${err.message}`;
+          resultEl.className = 'test-result error';
+          showNotification(`Quick transcode test failed: ${err.message}`, 'error');
+        } finally {
+          button.disabled = false;
+          button.classList.remove('loading');
         }
       });
 
@@ -910,23 +1222,44 @@
       // 15. API: Delete Folder
       document.getElementById('testDeleteFolderBtn').addEventListener('click', async () => {
         const folderPath = 'test_folder_to_delete_' + Math.random().toString(36).substr(2, 8);
-        const createRes = await fetch('/api/files/create-folder', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ folderPath })
-        });
-        const createData = await createRes.json();
-        if (createData.success) {
-          testApi('/api/files/delete-folder', 'POST', { folderPath }, 'DeleteFolder');
-        } else {
-          document.getElementById('testDeleteFolderResult').textContent = `Error creating folder: ${createData.error}`;
-          document.getElementById('testDeleteFolderResult').className = 'test-result error';
+        const resultEl = document.getElementById('testDeleteFolderResult');
+        const button = document.getElementById('testDeleteFolderBtn');
+        
+        try {
+          button.disabled = true;
+          button.classList.add('loading');
+          resultEl.textContent = 'Creating test folder...';
+          resultEl.className = 'test-result info';
+
+          // First, create a folder to delete
+          const createRes = await fetch('/api/files/create-folder', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ folderPath })
+          });
+          
+          if (!createRes.ok) throw new Error(`HTTP ${createRes.status}`);
+          
+          const createData = await createRes.json();
+          if (createData.success) {
+            // Then, delete it
+            await testApi('/api/files/delete-folder', 'POST', { folderPath }, 'DeleteFolder');
+          } else {
+            throw new Error(createData.error || 'Failed to create test folder');
+          }
+        } catch (err) {
+          resultEl.textContent = `Error: ${err.message}`;
+          resultEl.className = 'test-result error';
+          showNotification(`Delete folder test failed: ${err.message}`, 'error');
+        } finally {
+          button.disabled = false;
+          button.classList.remove('loading');
         }
       });
     });
 
-    // === NOTIFICATION FUNCTION ===
-    function showNotification(message, type) {
+    // === ФУНКЦИЯ УВЕДОМЛЕНИЙ ===
+    function showNotification(message, type = 'info') {
       const notification = document.createElement('div');
       notification.className = `notification ${type}`;
       notification.textContent = message;
@@ -934,8 +1267,15 @@
 
       setTimeout(() => {
         notification.remove();
-      }, 3000);
+      }, 5000);
     }
+
+    // Автоматическая проверка доступности API при загрузке
+    window.addEventListener('load', () => {
+      setTimeout(() => {
+        showNotification('SyncWatch Test Page loaded successfully', 'success');
+      }, 1000);
+    });
   </script>
 </body>
 </html>

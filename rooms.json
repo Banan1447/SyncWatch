@@ -124,6 +124,40 @@
           "playbackRate": 1,
           "lastUpdated": "2025-10-04T05:49:31.450Z"
         }
+      },
+      "s518YZOzHlcyuH2KAAAL": {
+        "name": "Artur",
+        "ping": 0,
+        "buffer": 0,
+        "status": "paused",
+        "position": 0,
+        "ready": false,
+        "userState": {
+          "isReady": false,
+          "isBuffering": false,
+          "currentPosition": 0,
+          "currentVolume": 1,
+          "isMuted": false,
+          "playbackRate": 1,
+          "lastUpdated": "2025-10-04T06:59:43.656Z"
+        }
+      },
+      "uD0o7BeyX_73pUByAAAV": {
+        "name": "Artur",
+        "ping": 0,
+        "buffer": 0,
+        "status": "paused",
+        "position": 0,
+        "ready": false,
+        "userState": {
+          "isReady": false,
+          "isBuffering": false,
+          "currentPosition": 0,
+          "currentVolume": 1,
+          "isMuted": false,
+          "playbackRate": 1,
+          "lastUpdated": "2025-10-04T07:18:10.277Z"
+        }
       }
     },
     "currentVideo": "Alien.Earth.S01E04.WEB-DLRip.RGzsRutracker_max_speed.mp4",
