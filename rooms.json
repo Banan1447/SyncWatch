@@ -69,12 +69,46 @@
           "playbackRate": 1,
           "lastUpdated": "2025-10-04T16:38:45.107Z"
         }
+      },
+      "9ut5_kXGpDOZbi4XAAAJ": {
+        "name": "Artur",
+        "ping": 0,
+        "buffer": 0,
+        "status": "paused",
+        "position": 0,
+        "ready": false,
+        "userState": {
+          "isReady": false,
+          "isBuffering": false,
+          "currentPosition": 0,
+          "currentVolume": 1,
+          "isMuted": false,
+          "playbackRate": 1,
+          "lastUpdated": "2025-10-04T17:30:32.656Z"
+        }
+      },
+      "A3V532uoaLcMB38yAAAF": {
+        "name": "User2123",
+        "ping": 0,
+        "buffer": 0,
+        "status": "paused",
+        "position": 0,
+        "ready": false,
+        "userState": {
+          "isReady": false,
+          "isBuffering": false,
+          "currentPosition": 0,
+          "currentVolume": 1,
+          "isMuted": false,
+          "playbackRate": 1,
+          "lastUpdated": "2025-10-04T17:33:21.314Z"
+        }
       }
     },
-    "currentVideo": "Alien.Earth.S01E08.WEB-DLRip.RGzsRutracker.mp4",
+    "currentVideo": "Alien.Earth.S01E04.WEB-DLRip.RGzsRutracker_max_speed.mp4",
     "state": {
-      "currentVideo": "Alien.Earth.S01E08.WEB-DLRip.RGzsRutracker.mp4",
-      "currentTime": 2576.253315,
+      "currentVideo": "Alien.Earth.S01E04.WEB-DLRip.RGzsRutracker_max_speed.mp4",
+      "currentTime": 1690.336246,
       "isPlaying": false,
       "playbackRate": 1,
       "volume": 1,
@@ -82,7 +116,7 @@
       "quality": "original",
       "subtitles": null,
       "createdAt": "2025-10-04T01:39:23.084Z",
-      "updatedAt": "2025-10-04T16:38:50.321Z"
+      "updatedAt": "2025-10-04T17:37:50.338Z"
     },
     "chat": [],
     "createdAt": "2025-10-04T01:39:23.084Z",
@@ -205,7 +239,7 @@
       "quality": "original",
       "subtitles": null,
       "createdAt": "2025-10-04T04:13:02.760Z",
-      "updatedAt": "2025-10-04T16:31:21.641Z"
+      "updatedAt": "2025-10-04T17:30:53.419Z"
     },
     "chat": [],
     "createdAt": "2025-10-04T04:13:02.760Z",

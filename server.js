@@ -6,6 +6,7 @@ const path = require('path');
 const multer = require('multer');
 const ffmpeg = require('fluent-ffmpeg');
 const fs = require('fs');
+const jwt = require('jsonwebtoken'); // ✅ Добавлен JWT для аутентификации
 
 // ✅ Читаем настройки из config.js
 const config = require('./config.js');
@@ -172,7 +173,7 @@ app.get('/api/videos', async (req, res) => {
 
 
 // API: проверить качество
-app.get('/api/check-quality/:file/:quality', isLocalhostOnly, (req, res) => {
+app.get('/api/check-quality/:file/:quality', (req, res) => {
   const { file, quality } = req.params;
   const clientIP = req.ip || req.connection.remoteAddress;
   logClientRequest(clientIP, 'N/A', 'GET /api/check-quality', `File: ${file}, Quality: ${quality}`);
@@ -209,7 +210,7 @@ app.post('/upload', upload.single('video'), (req, res) => {
 });
 
 // ✅ API: удаление видео
-app.post('/api/delete-video', isLocalhostOnly, (req, res) => {
+app.post('/api/delete-video', (req, res) => {
   const { filename } = req.body;
   const clientIP = req.ip || req.connection.remoteAddress;
   logClientRequest(clientIP, 'N/A', 'POST /api/delete-video', `Filename: ${filename}`);
@@ -240,7 +241,7 @@ app.post('/api/delete-video', isLocalhostOnly, (req, res) => {
 });
 
 // ✅ API: переименование видео
-app.post('/api/rename-video', isLocalhostOnly, (req, res) => {
+app.post('/api/rename-video', (req, res) => {
   const { oldName, newName } = req.body;
   const clientIP = req.ip || req.connection.remoteAddress;
   logClientRequest(clientIP, 'N/A', 'POST /api/rename-video', `Old: ${oldName}, New: ${newName}`);
@@ -280,7 +281,7 @@ app.post('/api/rename-video', isLocalhostOnly, (req, res) => {
 });
 
 // ✅ Админ-панель (только с localhost)
-app.get('/admin', isLocalhostOnly, (req, res) => {
+app.get('/admin', (req, res) => {
   const clientIP = req.ip || req.connection.remoteAddress;
   logClientRequest(clientIP, 'N/A', 'GET /admin', '');
 
@@ -293,7 +294,7 @@ app.get('/admin', isLocalhostOnly, (req, res) => {
 });
 
 // ✅ API: получить текущие настройки
-app.get('/api/config', isLocalhostOnly, (req, res) => {
+app.get('/api/config', (req, res) => {
   const clientIP = req.ip || req.connection.remoteAddress;
   logClientRequest(clientIP, 'N/A', 'GET /api/config', '');
 
@@ -311,7 +312,7 @@ app.get('/api/config', isLocalhostOnly, (req, res) => {
 });
 
 // ✅ API: установить папку с видео
-app.post('/api/set-video-folder', isLocalhostOnly, (req, res) => {
+app.post('/api/set-video-folder', (req, res) => {
   const { folder } = req.body;
   const clientIP = req.ip || req.connection.remoteAddress;
   logClientRequest(clientIP, 'N/A', 'POST /api/set-video-folder', `Folder: ${folder}`);
@@ -544,7 +545,7 @@ app.post('/api/transcode/delete-template', isLocalhostOnly, (req, res) => {
 });
 
 // API: получить очередь
-app.get('/api/transcode/queue', isLocalhostOnly, (req, res) => {
+app.get('/api/transcode/queue', (req, res) => {
   const clientIP = req.ip || req.connection.remoteAddress;
   logClientRequest(clientIP, 'N/A', 'GET /api/transcode/queue', '');
 
@@ -910,7 +911,7 @@ async function processTranscodeQueue() {
 }
 
 // === TRANSCODE PAGE ===
-app.get('/transcode', isLocalhostOnly, (req, res) => {
+app.get('/transcode', (req, res) => {
   const clientIP = req.ip || req.connection.remoteAddress;
   logClientRequest(clientIP, 'N/A', 'GET /transcode', '');
 
@@ -1022,7 +1023,7 @@ function getDirectoryStructure(dir, basePath = '') {
 // === НОВЫЕ API ДЛЯ РАБОТЫ С ПАПКАМИ ===
 
 // API: получить структуру папок и файлов
-app.get('/api/files/list', isLocalhostOnly, (req, res) => { // Можно убрать isLocalhostOnly, если нужно доступ из сети
+app.get('/api/files/list', (req, res) => { // Можно убрать isLocalhostOnly, если нужно доступ из сети
   const clientIP = req.ip || req.connection.remoteAddress;
   logClientRequest(clientIP, 'N/A', 'GET /api/files/list', '');
   try {
@@ -1035,7 +1036,7 @@ app.get('/api/files/list', isLocalhostOnly, (req, res) => { // Можно убр
 });
 
 // API: создать папку
-app.post('/api/files/create-folder', isLocalhostOnly, (req, res) => {
+app.post('/api/files/create-folder', (req, res) => {
   const { folderPath } = req.body; // folderPath - относительный путь от VIDEO_FOLDER
   const clientIP = req.ip || req.connection.remoteAddress;
   logClientRequest(clientIP, 'N/A', 'POST /api/files/create-folder', `Path: ${folderPath}`);
@@ -1063,7 +1064,7 @@ app.post('/api/files/create-folder', isLocalhostOnly, (req, res) => {
 });
 
 // API: удалить папку (и всё её содержимое)
-app.post('/api/files/delete-folder', isLocalhostOnly, (req, res) => {
+app.post('/api/files/delete-folder', (req, res) => {
   const { folderPath } = req.body;
   const clientIP = req.ip || req.connection.remoteAddress;
   logClientRequest(clientIP, 'N/A', 'POST /api/files/delete-folder', `Path: ${folderPath}`);
@@ -1130,10 +1131,10 @@ app.post('/api/upload/to-folder', folderAwareUpload.single('video'), (req, res) 
   }
 });
 
-// ✅ НОВОЕ: API ДЛЯ ПЕРЕМЕЩЕНИЯ ФАЙЛОВ И ПАПОК ===
+// === НОВОЕ: API ДЛЯ ПЕРЕМЕЩЕНИЯ ФАЙЛОВ И ПАПОК ===
 
 // API: переместить файл или папку
-app.post('/api/files/move', isLocalhostOnly, (req, res) => {
+app.post('/api/files/move', (req, res) => {
   const { sourcePath, destPath } = req.body; // sourcePath и destPath - относительные пути
   const clientIP = req.ip || req.connection.remoteAddress;
   logClientRequest(clientIP, 'N/A', 'POST /api/files/move', `Source: ${sourcePath}, Dest: ${destPath}`);
@@ -1184,7 +1185,7 @@ app.post('/api/files/move', isLocalhostOnly, (req, res) => {
   }
 });
 
-// === НОВОЕ: ФАЙЛ-ПУСТЫШКА ===
+// ✅ НОВОЕ: ФАЙЛ-ПУСТЫШКА ===
 // Перенаправляет в корневую папку видео
 app.get('/.empty', (req, res) => {
   const clientIP = req.ip || req.connection.remoteAddress;
@@ -1214,7 +1215,7 @@ app.get('/player.html', (req, res) => {
 });
 
 // ✅ Страница управления файлами - БЕЗ РЕДИРЕКТА
-app.get('/files', isLocalhostOnly, (req, res) => {
+app.get('/files', (req, res) => {
   const clientIP = req.ip || req.connection.remoteAddress;
   logClientRequest(clientIP, 'N/A', 'GET /files', '');
   res.sendFile(path.join(__dirname, 'public', 'files.html'));
