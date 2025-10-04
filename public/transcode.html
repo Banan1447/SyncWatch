@@ -281,6 +281,40 @@
       font-size: 0.8rem;
     }
 
+    .file-actions {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    .template-selector {
+      padding: 0.25rem;
+      border: 1px solid var(--border);
+      background: var(--secondary);
+      color: var(--text);
+      border-radius: 4px;
+      font-size: 0.8rem;
+      width: 150px;
+    }
+
+    .quick-transcode-btn {
+      background: var(--accent);
+      color: white;
+      border: none;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+
+    .quick-transcode-btn:hover {
+      background: #0056b3;
+    }
+
     .queue-item {
       padding: 0.75rem;
       background: var(--secondary);
@@ -378,80 +412,6 @@
       }
     }
 
-    /* ✅ НОВЫЕ СТИЛИ ДЛЯ РЕЖИМОВ */
-    .mode-switcher {
-      display: flex;
-      gap: 0.5rem;
-      margin-bottom: 1rem;
-    }
-
-    .mode-btn {
-      flex: 1;
-      padding: 0.75rem;
-      background: var(--secondary);
-      color: var(--text-secondary);
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      cursor: pointer;
-      font-weight: 500;
-      transition: all 0.2s ease;
-    }
-
-    .mode-btn.active {
-      background: var(--accent);
-      color: white;
-      border-color: var(--accent);
-    }
-
-    .mode-content {
-      display: none;
-    }
-
-    .mode-content.active {
-      display: block;
-    }
-
-    /* ✅ СТИЛИ ДЛЯ ПРОСТОГО РЕЖИМА */
-    .simple-mode {
-      padding: 1rem 0;
-    }
-
-    .quality-speed-slider {
-      width: 100%;
-      margin: 1rem 0;
-    }
-
-    .slider-labels {
-      display: flex;
-      justify-content: space-between;
-      font-size: 0.8rem;
-      color: var(--text-secondary);
-      margin-top: 0.5rem;
-    }
-
-    .estimated-time {
-      text-align: center;
-      font-size: 0.9rem;
-      color: var(--text-secondary);
-      margin: 1rem 0;
-    }
-
-    /* ✅ СТИЛИ ДЛЯ СЛОЖНОГО РЕЖИМА */
-    .advanced-mode {
-      padding: 1rem 0;
-    }
-
-    .advanced-option {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      margin-bottom: 0.5rem;
-    }
-
-    .advanced-option input[type="checkbox"] {
-      width: auto;
-    }
-
     @media (max-width: 768px) {
       .main-container {
         flex-direction: column;
@@ -489,7 +449,6 @@
     <div class="logo-container" onclick="window.location.href='/select-room.html'">
       <div class="logo-icon">
         <div class="logo-svg">
-          <!-- ✅ РОВНЫЙ SVG-ЛОГОТИП -->
           <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
             <!-- Градиент -->
             <defs>
@@ -562,140 +521,6 @@
   </div>
 
   <div id="notifications"></div>
-
-  <!-- Модальное окно для добавления шаблона -->
-  <div id="templateModal" style="
-    display: none;
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0,0,0,0.8);
-    z-index: 1000;
-    align-items: center;
-    justify-content: center;
-  ">
-    <div class="panel" style="width: 600px; max-width: 90vw;">
-      <h2>Add Conversion Template</h2>
-      
-      <!-- Переключатель режимов -->
-      <div class="mode-switcher">
-        <button class="mode-btn active" data-mode="simple">Simple Mode</button>
-        <button class="mode-btn" data-mode="advanced">Advanced Mode</button>
-      </div>
-
-      <!-- Простой режим -->
-      <div class="mode-content simple-mode active" id="simpleMode">
-        <div class="form-group">
-          <label for="templateNameSimple">Template Name:</label>
-          <input type="text" id="templateNameSimple" placeholder="e.g., Web Quality">
-        </div>
-        
-        <div class="form-group">
-          <label>Quality vs Speed:</label>
-          <input type="range" id="qualitySpeedSlider" min="0" max="100" value="50" class="quality-speed-slider">
-          <div class="slider-labels">
-            <span>Speed</span>
-            <span>Balanced</span>
-            <span>Quality</span>
-          </div>
-        </div>
-        
-        <div class="estimated-time" id="estimatedTime">
-          Estimated time: Calculating...
-        </div>
-        
-        <div class="form-group">
-          <label>Preview:</label>
-          <div id="simplePreview" style="font-family: monospace; font-size: 0.8rem; background: var(--secondary); padding: 0.5rem; border-radius: 4px;">
-            -c:v libx264 -crf 23 -preset medium output.mp4
-          </div>
-        </div>
-      </div>
-
-      <!-- Сложный режим -->
-      <div class="mode-content advanced-mode" id="advancedMode">
-        <div class="form-group">
-          <label for="templateNameAdvanced">Template Name:</label>
-          <input type="text" id="templateNameAdvanced" placeholder="e.g., Custom HD">
-        </div>
-        
-        <div class="form-group">
-          <label for="templateDescAdvanced">Description:</label>
-          <input type="text" id="templateDescAdvanced" placeholder="e.g., 1080p H.264 High Quality">
-        </div>
-        
-        <div class="form-group">
-          <label>Video Options:</label>
-          <div class="advanced-option">
-            <input type="checkbox" id="useResolution" checked>
-            <label for="useResolution">Set Resolution</label>
-          </div>
-          <select id="resolutionSelect">
-            <option value="1920:1080">1080p (1920×1080)</option>
-            <option value="1280:720">720p (1280×720)</option>
-            <option value="854:480">480p (854×480)</option>
-            <option value="640:360">360p (640×360)</option>
-            <option value="custom">Custom...</option>
-          </select>
-          <div id="customResolution" style="display: none; margin-top: 0.5rem;">
-            <input type="text" id="customWidth" placeholder="Width" style="width: 45%; display: inline-block;">
-            <span style="display: inline-block; text-align: center; width: 10%;">×</span>
-            <input type="text" id="customHeight" placeholder="Height" style="width: 45%; display: inline-block;">
-          </div>
-        </div>
-        
-        <div class="form-group">
-          <label>CRF (Quality): 51 (worst) ← → 0 (best)</label>
-          <input type="range" id="crfSlider" min="0" max="51" value="23">
-          <div style="text-align: center; font-size: 0.9rem;">
-            Current: <span id="crfValue">23</span>
-          </div>
-        </div>
-        
-        <div class="form-group">
-          <label>Preset (Speed):</label>
-          <select id="presetSelect">
-            <option value="ultrafast">Ultra Fast</option>
-            <option value="superfast">Super Fast</option>
-            <option value="veryfast">Very Fast</option>
-            <option value="faster">Faster</option>
-            <option value="fast">Fast</option>
-            <option value="medium" selected>Medium</option>
-            <option value="slow">Slow</option>
-            <option value="slower">Slower</option>
-            <option value="veryslow">Very Slow</option>
-          </select>
-        </div>
-        
-        <div class="form-group">
-          <label>Audio Options:</label>
-          <div class="advanced-option">
-            <input type="checkbox" id="enableAudio" checked>
-            <label for="enableAudio">Enable Audio</label>
-          </div>
-          <select id="audioCodec">
-            <option value="aac">AAC</option>
-            <option value="mp3">MP3</option>
-            <option value="opus">Opus</option>
-          </select>
-        </div>
-        
-        <div class="form-group">
-          <label>Preview:</label>
-          <div id="advancedPreview" style="font-family: monospace; font-size: 0.8rem; background: var(--secondary); padding: 0.5rem; border-radius: 4px;">
-            Loading...
-          </div>
-        </div>
-      </div>
-
-      <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
-        <button class="btn" id="saveTemplateBtn">Save Template</button>
-        <button class="btn" style="background: #6c757d;" onclick="closeTemplateModal()">Cancel</button>
-      </div>
-    </div>
-  </div>
 
   <script>
     // === MODAL FUNCTIONS ===
@@ -845,93 +670,112 @@
 
     // === LOAD FILES ===
     async function loadFiles() {
-      const res = await fetch('/api/videos');
-      const files = await res.json();
       const container = document.getElementById('filesList');
-      container.innerHTML = '';
-
-      if (files.length > 0) {
-        files.forEach(file => {
-          // ✅ ОПРЕДЕЛЯЕМ, ПОДДЕРЖИВАЕТСЯ ЛИ ФОРМАТ
-          const ext = file.name.split('.').pop().toLowerCase();
-          const supportedFormats = ['mp4', 'webm', 'ogg'];
-          const isSupported = supportedFormats.includes(ext);
-
-          const div = document.createElement('div');
-          div.className = 'file-item';
-          
-          // ✅ ФОРМИРУЕМ HTML С УЧЁТОМ ПОДДЕРЖКИ
-          let fileInfoHtml = `
-            <div class="file-info">
-              <div class="file-name">${file.name}</div>
-              <div class="file-meta">${file.resolution || 'N/A'} | ${file.bitrate || 'N/A'}</div>
-          `;
-          
-          // ✅ ДОБАВЛЯЕМ ПРЕДУПРЕЖДЕНИЕ, ЕСЛИ ФОРМАТ НЕ ПОДДЕРЖИВАЕТСЯ
-          if (!isSupported) {
+      container.innerHTML = '<div class="file-item">Загрузка файлов...</div>';
+      
+      try {
+        // ✅ ИСПРАВЛЕННЫЙ ПУТЬ К API
+        const res = await fetch('/api/videos');
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        
+        const files = await res.json();
+        console.log('[TRANSCODE] Получены файлы:', files); // ✅ Отладка
+        
+        container.innerHTML = '';
+        
+        if (files.length > 0) {
+          files.forEach(file => {
+            // ✅ ОПРЕДЕЛЯЕМ, ПОДДЕРЖИВАЕТСЯ ЛИ ФОРМАТ
+            const ext = file.name.split('.').pop().toLowerCase();
+            const supportedFormats = ['mp4', 'webm', 'ogg'];
+            const isSupported = supportedFormats.includes(ext);
+            
+            const div = document.createElement('div');
+            div.className = 'file-item';
+            
+            // ✅ ФОРМИРУЕМ HTML С УЧЁТОМ ПОДДЕРЖКИ
+            let fileInfoHtml = `
+              <div class="file-info">
+                <div class="file-name">${file.name}</div>
+                <div class="file-meta">${file.resolution || 'N/A'} | ${file.bitrate || 'N/A'}</div>
+            `;
+            
+            // ✅ ДОБАВЛЯЕМ ПРЕДУПРЕЖДЕНИЕ, ЕСЛИ ФОРМАТ НЕ ПОДДЕРЖИВАЕТСЯ
+            if (!isSupported) {
+              fileInfoHtml += `
+                <div class="unsupported-warning">
+                  <i class="fas fa-exclamation-triangle"></i>
+                  Требуется конвертация
+                </div>
+              `;
+            }
+            
             fileInfoHtml += `
-              <div class="unsupported-warning">
-                <i class="fas fa-exclamation-triangle"></i>
-                Требуется конвертация
               </div>
             `;
-          }
-          
-          fileInfoHtml += `
-            </div>
-          `;
-          
-          div.innerHTML = fileInfoHtml + `
-            <div class="file-actions">
-              <!-- ✅ ВЫПАДАЮЩИЙ СПИСОК ШАБЛОНОВ -->
-              <select class="template-selector" data-file="${file.name}" style="padding: 0.25rem; font-size: 0.8rem;">
-                <option value="">Select template...</option>
-              </select>
-              <!-- ✅ КНОПКА БЫСТРОГО ТРАНСКОДИРОВАНИЯ -->
-              <button class="btn btn-sm btn-info quick-transcode-btn" data-file="${file.name}" title="Quick Transcode">
-                <i class="fas fa-bolt"></i>
-              </button>
-            </div>
-          `;
-          container.appendChild(div);
-
-          // === ЗАГРУЖАЕМ ШАБЛОНЫ В СЕЛЕКТОР ===
-          loadTemplatesForSelector(div.querySelector('.template-selector'), file.name);
-
-          // === ОБРАБОТЧИК ИЗМЕНЕНИЯ СЕЛЕКТОРА ===
-          div.querySelector('.template-selector').addEventListener('change', async (e) => {
-            const fileId = e.target.dataset.file;
-            const templateId = e.target.value;
-            if (templateId) {
-              await addToQueue(fileId, templateId);
-              e.target.value = ''; // Сбрасываем селектор
-            }
+            
+            div.innerHTML = fileInfoHtml + `
+              <div class="file-actions">
+                <!-- ✅ ВЫПАДАЮЩИЙ СПИСОК ШАБЛОНОВ -->
+                <select class="template-selector" data-file="${file.name}" style="padding: 0.25rem; font-size: 0.8rem;">
+                  <option value="">Select template...</option>
+                </select>
+                <!-- ✅ КНОПКА БЫСТРОГО ТРАНСКОДИРОВАНИЯ -->
+                <button class="quick-transcode-btn" data-file="${file.name}" title="Quick Transcode">
+                  <i class="fas fa-bolt"></i>
+                </button>
+              </div>
+            `;
+            container.appendChild(div);
+            
+            // === ЗАГРУЖАЕМ ШАБЛОНЫ В СЕЛЕКТОР ===
+            loadTemplatesForSelector(div.querySelector('.template-selector'), file.name);
+            
+            // === ОБРАБОТЧИК ИЗМЕНЕНИЯ СЕЛЕКТОРА ===
+            div.querySelector('.template-selector').addEventListener('change', async (e) => {
+              const fileId = e.target.dataset.file;
+              const templateId = e.target.value;
+              if (templateId) {
+                await addToQueue(fileId, templateId);
+                e.target.value = ''; // Сбрасываем селектор
+              }
+            });
+            
+            // ✅ ОБРАБОТЧИК КНОПКИ БЫСТРОГО ТРАНСКОДИРОВАНИЯ
+            div.querySelector('.quick-transcode-btn').addEventListener('click', async (e) => {
+              e.stopPropagation();
+              const fileId = e.target.closest('.quick-transcode-btn').dataset.file;
+              if (fileId) {
+                await quickTranscode(fileId);
+              }
+            });
           });
-
-          // ✅ ОБРАБОТЧИК КНОПКИ БЫСТРОГО ТРАНСКОДИРОВАНИЯ
-          div.querySelector('.quick-transcode-btn').addEventListener('click', async (e) => {
-            e.stopPropagation();
-            const fileId = e.target.closest('.quick-transcode-btn').dataset.file;
-            if (fileId) {
-              await quickTranscode(fileId);
-            }
-          });
-        });
-      } else {
-        container.innerHTML = '<div class="file-item">No videos found</div>';
+        } else {
+          container.innerHTML = '<div class="file-item">No videos found</div>';
+        }
+      } catch (err) {
+        console.error('[TRANSCODE] Ошибка загрузки файлов:', err);
+        container.innerHTML = `<div class="file-item">Ошибка загрузки файлов: ${err.message}</div>`;
+        showNotification('Ошибка загрузки файлов: ' + err.message, 'error');
       }
     }
 
     // === ЗАГРУЖАЕМ ШАБЛОНЫ В СЕЛЕКТОР ===
     async function loadTemplatesForSelector(selector, fileId) {
-      const res = await apiCall('/api/transcode/templates');
-      if (res.success) {
-        res.templates.forEach(template => {
-          const option = document.createElement('option');
-          option.value = template.id;
-          option.textContent = template.name;
-          selector.appendChild(option);
-        });
+      try {
+        const res = await apiCall('/api/transcode/templates');
+        if (res.success) {
+          res.templates.forEach(template => {
+            const option = document.createElement('option');
+            option.value = template.id;
+            option.textContent = template.name;
+            selector.appendChild(option);
+          });
+        }
+      } catch (err) {
+        console.error('[TRANSCODE] Ошибка загрузки шаблонов:', err);
       }
     }
 
@@ -955,6 +799,7 @@
       }
 
       try {
+        // ✅ ИСПРАВЛЕННЫЙ ПУТЬ К API
         const res = await fetch('/api/transcode/quick-transcode', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1112,8 +957,9 @@
       document.getElementById('addTemplateBtn').addEventListener('click', openTemplateModal);
       document.getElementById('saveTemplateBtn').addEventListener('click', saveTemplate);
       
-      loadTemplates();
+      // ✅ ЗАГРУЖАЕМ ФАЙЛЫ И ОЧЕРЕДЬ
       loadFiles();
+      loadTemplates();
       loadQueue();
 
       // Обновляем очередь каждые 2 секунды
