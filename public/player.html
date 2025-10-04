@@ -1,10 +1,11 @@
-
 <!DOCTYPE html>
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
   <title>SyncWatch Player</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <!-- ✅ ПОДКЛЮЧАЕМ SOCKET.IO ДЛЯ СИНХРОНИЗАЦИИ -->
+  <script src="/socket.io/socket.io.js"></script>
   <style>
     :root {
       --primary: #4a90e2;
@@ -389,7 +390,46 @@
       gap: 0.5rem;
     }
 
-    .video-item, .folder-item-grid { /* ✅ Объединяем стили для видео и папок */
+    /* ✅ НОВОЕ: Стиль для элементов папок в списке видео */
+    .folder-item-grid {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 0.75rem;
+      background: var(--bg-darker);
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      cursor: pointer;
+      transition: background 0.2s ease;
+      position: relative; /* Для drag handle */
+    }
+
+    .folder-item-grid:hover {
+      background: var(--hover-bg);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px var(--shadow);
+    }
+
+    .folder-item-grid i {
+      font-size: 2.5rem; /* Уменьшен размер иконки */
+      margin-bottom: 0.4rem;
+      color: var(--warning); /* Жёлтый для папок */
+    }
+
+    .folder-name {
+      font-size: 0.9rem; /* Уменьшен размер шрифта имени */
+      text-align: center;
+      word-break: break-word;
+      width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+
+    .video-item {
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -401,16 +441,16 @@
       transition: background 0.2s ease;
     }
 
-    .video-item:hover, .folder-item-grid:hover {
+    .video-item:hover {
       background: var(--hover-bg);
     }
 
-    .video-info, .folder-info { /* ✅ Объединяем стили для информации */
+    .video-info {
       flex: 1;
       overflow: hidden;
     }
 
-    .video-title, .folder-name { /* ✅ Объединяем стили для заголовков */
+    .video-title {
       font-size: 0.9rem;
       white-space: nowrap;
       overflow: hidden;
@@ -418,7 +458,7 @@
       color: var(--text);
     }
 
-    .video-meta, .folder-meta { /* ✅ Объединяем стили для метаинформации */
+    .video-meta {
       font-size: 0.7rem;
       color: var(--text-secondary);
       margin-top: 0.25rem;
@@ -439,7 +479,7 @@
       font-size: 0.8rem;
     }
 
-    .play-btn, .folder-enter-btn { /* ✅ Объединяем стили для кнопок */
+    .play-btn {
       background: var(--accent);
       color: white;
       border: none;
@@ -453,7 +493,7 @@
       transition: background 0.2s ease;
     }
 
-    .play-btn:hover, .folder-enter-btn:hover {
+    .play-btn:hover {
       background: #0056b3;
     }
 
@@ -537,88 +577,6 @@
       }
     }
 
-    /* ✅ НОВОЕ: Стили для модального окна перемещения видео */
-    .modal {
-      position: fixed;
-      z-index: 1000;
-      left: 0;
-      top: 0;
-      width: 100%;
-      height: 100%;
-      overflow: auto;
-      background-color: rgba(0,0,0,0.5); /* Полупрозрачный черный */
-      display: none; /* Скрываем по умолчанию */
-      align-items: center;
-      justify-content: center;
-    }
-
-    .modal-content {
-      background-color: var(--bg-darker);
-      margin: auto;
-      padding: 2rem;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      width: 80%;
-      max-width: 500px;
-      box-shadow: 0 4px 12px var(--shadow);
-      position: relative;
-    }
-
-    .close {
-      color: var(--text-secondary);
-      float: right;
-      font-size: 2rem;
-      font-weight: bold;
-      cursor: pointer;
-      position: absolute;
-      top: 1rem;
-      right: 1rem;
-    }
-
-    .close:hover,
-    .close:focus {
-      color: var(--text);
-      text-decoration: none;
-    }
-
-    #moveFolderList {
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-      margin-top: 1rem;
-      max-height: 300px;
-      overflow-y: auto;
-    }
-
-    .move-folder-item {
-      padding: 0.75rem;
-      background: var(--secondary);
-      border-radius: 4px;
-      border: 1px solid var(--border);
-      cursor: pointer;
-      transition: background 0.2s ease;
-    }
-
-    .move-folder-item:hover {
-      background: var(--hover-bg);
-    }
-
-    .move-folder-name {
-      font-size: 0.9rem;
-      color: var(--text);
-    }
-
-    .move-folder-meta {
-      font-size: 0.7rem;
-      color: var(--text-secondary);
-      margin-top: 0.25rem;
-    }
-
-    #moveVideoConfirmBtn, #moveVideoCancelBtn {
-      margin-right: 0.5rem;
-      margin-top: 1rem;
-    }
-
     @media (max-width: 768px) {
       .main-container {
         flex-direction: column;
@@ -638,6 +596,10 @@
       }
 
       .upload-section {
+        padding: 0.75rem;
+      }
+
+      .comments-section {
         padding: 0.75rem;
       }
 
@@ -753,29 +715,13 @@
 
   <div id="notifications"></div>
 
-  <!-- ✅ НОВОЕ: МОДАЛЬНОЕ ОКНО ДЛЯ ПЕРЕМЕЩЕНИЯ ВИДЕО -->
-  <div id="moveVideoModal" class="modal">
-    <div class="modal-content">
-      <span class="close">&times;</span>
-      <h2>Move Video</h2>
-      <p>Select destination folder:</p>
-      <div id="moveFolderList" style="max-height: 300px; overflow-y: auto; margin-bottom: 1rem;">
-        <!-- Список папок будет здесь -->
-      </div>
-      <button id="moveVideoConfirmBtn" class="btn btn-sm btn-info">Move</button>
-      <button id="moveVideoCancelBtn" class="btn btn-sm btn-danger">Cancel</button>
-    </div>
-  </div>
-
-  <!-- ✅ ПОДКЛЮЧАЕМ SOCKET.IO ДЛЯ СИНХРОНИЗАЦИИ -->
-  <script src="/socket.io/socket.io.js"></script>
   <script>
     // === SOCKET CONNECTION ===
-    const socket = io();
+    const socket = io(); // ✅ Теперь io определено благодаря <script src="/socket.io/socket.io.js">
     let joinedRoom = null;
-    let currentVideoFile = null; // ✅ Локальная переменная для текущего видео
+    let currentVideoFile = null;
     let isVideoReady = false; // Флаг готовности видео
-    let lastSeekSent = 0; // ✅ ГЛОБАЛЬНАЯ переменная для предотвращения зацикливания seek
+    let lastSeekSent = 0; // Для предотвращения зацикливания seek
     let userName = localStorage.getItem('userName') || `User${Math.floor(Math.random()*10000)}`;
 
     // === URL PARAMS ===
@@ -795,6 +741,7 @@
           window.location.href = '/select-room.html';
         } else {
           joinedRoom = roomId;
+          userName = res.room.name;
           // ✅ После присоединения к комнате, загружаем видео из корневой папки
           updateVideoBreadcrumb();
           loadAndRenderVideoListForPath(''); 
@@ -804,7 +751,7 @@
 
     // === DOM LOADED ===
     window.addEventListener('DOMContentLoaded', () => {
-      // === ЗАПОМИНАЕМ КОМНУ ПРИ ЗАГРУЗКЕ СТРАНИЦЫ ===
+      // === ЗАПОМИНАЕМ КОМНАТУ ПРИ ЗАГРУЗКЕ СТРАНИЦЫ ===
       if (roomId) {
         localStorage.setItem('lastRoomId', roomId);
       }
@@ -825,9 +772,10 @@
     const leaveRoomBtn = document.getElementById('leaveRoomBtn');
     const usersList = document.getElementById('usersList');
     const videoBreadcrumb = document.getElementById('videoBreadcrumb'); // ✅ Элемент для хлебных крошек
+    const manageVideosLink = document.getElementById('manageVideosLink'); // ✅ Элемент для ссылки File Manager
 
     // === MANAGE VIDEOS LINK WITH ROOM REMEMBER ===
-    document.getElementById('manageVideosLink').addEventListener('click', () => {
+    manageVideosLink.addEventListener('click', () => {
       if (roomId) {
         localStorage.setItem('lastRoomId', roomId);
         window.location.href = `/files?room=${roomId}`;
@@ -964,14 +912,11 @@
     });
 
     // === ПРОСТОЙ ФУНКЦИОНАЛ ПЕРЕМАТЫВАНИЯ ===
-    // let lastSeekSent = 0; // <-- УДАЛЕНО: используем ГЛОБАЛЬНУЮ переменную
     video.addEventListener('seeked', () => {
       if (isVideoReady) {
         const now = Date.now();
-        // Используем ГЛОБАЛЬНУЮ переменную lastSeekSent
         if (now - lastSeekSent > 500) {
           socket.emit('video-command', { type: 'seek', time: video.currentTime });
-          // Обновляем ГЛОБАЛЬНУЮ переменную
           lastSeekSent = now;
         }
       }
@@ -995,15 +940,9 @@
           }
         } else if (data.type === 'seek' && typeof data.time === 'number') {
           if (Math.abs(video.currentTime - data.time) > 0.5) {
-            // Избегаем зацикливания: не устанавливаем, если последнее действие - seek
-            const now = Date.now();
-            // Используем ГЛОБАЛЬНУЮ переменную lastSeekSent
-            if (now - lastSeekSent > 1000) { // 1 секунда
-              video.currentTime = data.time;
-              console.log(`SyncWatch: Received seek command to ${data.time}s`);
-              // Обновляем ГЛОБАЛЬНУЮ переменную
-              lastSeekSent = now;
-            }
+            lastSeekSent = Date.now();
+            video.currentTime = data.time;
+            console.log(`SyncWatch: Received seek command to ${data.time}s`);
           }
         }
       }
@@ -1086,12 +1025,9 @@
              if (Math.abs(video.currentTime - state.currentTime) > 0.5) {
                  // Избегаем зацикливания: не устанавливаем, если последнее действие - seek
                  const now = Date.now();
-                 // Используем ГЛОБАЛЬНУЮ переменную lastSeekSent
                  if (now - lastSeekSent > 1000) { // 1 секунда
                      video.currentTime = state.currentTime;
                      console.log(`SyncWatch: Syncing time to ${state.currentTime}s`);
-                     // Обновляем ГЛОБАЛЬНУЮ переменную
-                     lastSeekSent = now;
                  }
              }
           }
@@ -1210,8 +1146,8 @@
              const contentsAtPath = findContents(structData.structure, path);
 
              // 3. ✅ НЕ ФИЛЬТРУЕМ содержимое, передаём ВСЁ (и файлы, и папки)
-             // const videoFiles = contentsAtPath.filter(item => item.type === 'file'); // <-- УДАЛИТЬ
-             const itemsToRender = contentsAtPath; // <-- ИСПОЛЬЗОВАТЬ ВСЁ СОДЕРЖИМОЕ
+             // const videoFiles = contentsAtPath.filter(item => item.type === 'file'); // <-- УДАЛЕНО
+             const itemsToRender = contentsAtPath; // <-- ИСПОЛЬЗУЕМ ВСЁ СОДЕРЖИМОЕ
 
              // 4. Получаем метаданные для каждого файла (как в старом /api/videos)
              // Так как у нас нет эндпоинта для метаданных по путям, симулируем
@@ -1300,14 +1236,10 @@
         if (item.type === 'folder') {
           // ✅ ОТРИСОВКА ПАПКИ
           div.className = 'folder-item-grid';
-          div.dataset.path = item.path; // ✅ Сохраняем полный путь
+          div.dataset.path = item.path; // ✅ Сохраняем полный путь папки
           div.innerHTML = `
             <i class="fas fa-folder"></i>
-            <div class="folder-info">
-              <strong class="folder-name">${item.name}</strong><br>
-              <small class="folder-meta">Folder</small>
-            </div>
-            <i class="fas fa-arrow-circle-right folder-enter-btn"></i>
+            <div class="folder-name">${item.name}</div>
           `;
           div.addEventListener('click', () => {
             // ✅ Переходим внутрь папки
@@ -1325,7 +1257,7 @@
           const isSupported = supportedFormats.includes(ext);
 
           div.className = 'video-item';
-          div.dataset.path = item.name; // ✅ Сохраняем ПОЛНЫЙ путь
+          div.dataset.path = item.name; // ✅ Сохраняем ПОЛНЫЙ путь файла
 
           // ✅ ФОРМИРУЕМ HTML С УЧЁТОМ ПОДДЕРЖКИ
           let videoInfoHtml = `
@@ -1370,251 +1302,10 @@
             socket.emit('select-video', item.name);
             // currentVideoFile обновится через room-state
           });
-
-          // ✅ НОВОЕ: ДОБАВЛЯЕМ КНОПКУ "Move"
-          const moveBtn = document.createElement('button');
-          moveBtn.className = 'action-btn move-btn';
-          moveBtn.title = 'Move Video';
-          moveBtn.innerHTML = '<i class="fas fa-exchange-alt"></i>';
-          moveBtn.addEventListener('click', (e) => {
-            e.stopPropagation(); // Предотвращаем срабатывание клика на div
-            openMoveVideoModal(item.name); // Открываем модальное окно с путём к видео
-          });
-          div.querySelector('.video-info').parentNode.insertBefore(moveBtn, div.querySelector('.preview-icon'));
-
-          // ✅ НОВОЕ: ДОБАВЛЯЕМ КНОПКУ "Delete"
-          const deleteBtn = document.createElement('button');
-          deleteBtn.className = 'action-btn delete-btn';
-          deleteBtn.title = 'Delete Video';
-          deleteBtn.innerHTML = '<i class="fas fa-trash"></i>';
-          deleteBtn.addEventListener('click', (e) => {
-            e.stopPropagation(); // Предотвращаем срабатывание клика на div
-            if (confirm(`Удалить видео "${fileName}"?`)) {
-              fetch('/api/delete-video', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ filename: item.name }) // Отправляем ПОЛНЫЙ путь
-              })
-              .then(res => res.json())
-              .then(data => {
-                if (data.success) {
-                  showNotification(`Video deleted: ${fileName}`, 'success');
-                  // После удаления обновляем список видео
-                  loadAndRenderVideoListForPath(currentPlayerPath); // Обновляем текущую папку
-                } else {
-                  showNotification('Delete failed: ' + data.error, 'error');
-                }
-              });
-            }
-          });
-          div.querySelector('.video-info').parentNode.insertBefore(deleteBtn, div.querySelector('.preview-icon'));
-
-          // ✅ НОВОЕ: ДОБАВЛЯЕМ КНОПКУ "Rename"
-          const renameBtn = document.createElement('button');
-          renameBtn.className = 'action-btn rename-btn';
-          renameBtn.title = 'Rename Video';
-          renameBtn.innerHTML = '<i class="fas fa-edit"></i>';
-          renameBtn.addEventListener('click', (e) => {
-            e.stopPropagation(); // Предотвращаем срабатывание клика на div
-            const oldName = item.name; // ПОЛНЫЙ путь
-            const input = document.createElement('input');
-            input.type = 'text';
-            input.value = fileName; // Отображаем только имя файла
-            input.className = 'rename-input';
-            div.querySelector('.video-info').innerHTML = '';
-            div.querySelector('.video-info').appendChild(input);
-            input.focus();
-
-            const saveRename = () => {
-              const newName = input.value.trim();
-              if (newName && newName !== fileName) { // Сравниваем с именем файла, а не с полным путём
-                // Формируем новый полный путь
-                const newFullPath = oldName.split('/').slice(0, -1).concat(newName).join('/');
-                fetch('/api/rename-video', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ oldName: oldName, newName: newFullPath }) // Отправляем ПОЛНЫЕ пути
-                })
-                .then(res => res.json())
-                .then(data => {
-                  if (data.success) {
-                    showNotification(`Video renamed: ${fileName} → ${newName}`, 'success');
-                    // После переименования обновляем список видео
-                    loadAndRenderVideoListForPath(currentPlayerPath); // Обновляем текущую папку
-                  } else {
-                    showNotification('Rename failed: ' + data.error, 'error');
-                    // Возвращаем старое имя
-                    loadAndRenderVideoListForPath(currentPlayerPath); // Обновляем текущую папку
-                  }
-                });
-              } else {
-                // Отмена
-                loadAndRenderVideoListForPath(currentPlayerPath); // Обновляем текущую папку
-              }
-            };
-
-            input.addEventListener('keypress', (e) => {
-              if (e.key === 'Enter') saveRename();
-            });
-
-            input.addEventListener('blur', saveRename);
-          });
-          div.querySelector('.video-info').parentNode.insertBefore(renameBtn, div.querySelector('.preview-icon'));
         }
         videoList.appendChild(div);
       });
     }
-
-    // === НОВОЕ: ФУНКЦИИ ДЛЯ МОДАЛЬНОГО ОКНА ПЕРЕМЕЩЕНИЯ ===
-
-    // Глобальные переменные для модального окна
-    let videoToMove = null; // Путь к видео, которое нужно переместить
-    let targetFolderForMove = null; // Путь к целевой папке
-
-    // Открыть модальное окно для перемещения видео
-    function openMoveVideoModal(videoPath) {
-      videoToMove = videoPath;
-      targetFolderForMove = null; // Сбрасываем целевую папку
-      document.getElementById('moveVideoModal').style.display = 'flex';
-      loadAndRenderMoveFolderList(); // Загружаем список папок
-    }
-
-    // Закрыть модальное окно для перемещения видео
-    function closeMoveVideoModal() {
-      document.getElementById('moveVideoModal').style.display = 'none';
-      videoToMove = null;
-      targetFolderForMove = null;
-    }
-
-    // Загрузить и отрисовать список папок для перемещения
-    async function loadAndRenderMoveFolderList() {
-      const container = document.getElementById('moveFolderList');
-      container.innerHTML = '<div class="move-folder-item">Loading folders...</div>';
-
-      try {
-        // Загружаем структуру папок
-        const res = await fetch('/api/files/list');
-        const data = await res.json();
-        if (!data.success) throw new Error(data.error || 'Failed to load structure');
-
-        // Рекурсивно собираем все папки
-        const getAllFolders = (items) => {
-          let folders = [];
-          items.forEach(item => {
-            if (item.type === 'folder') {
-              folders.push(item);
-              if (item.children && item.children.length > 0) {
-                folders = folders.concat(getAllFolders(item.children));
-              }
-            }
-          });
-          return folders;
-        };
-
-        const allFolders = getAllFolders(data.structure);
-
-        container.innerHTML = '';
-
-        if (allFolders.length === 0) {
-          container.innerHTML = '<div class="move-folder-item">No folders found</div>';
-          return;
-        }
-
-        // Добавляем корневую папку ("Home")
-        const homeItem = document.createElement('div');
-        homeItem.className = 'move-folder-item';
-        homeItem.dataset.path = ''; // Путь к корневой папке - пустая строка
-        homeItem.innerHTML = `
-          <div class="move-folder-info">
-            <strong class="move-folder-name">Home (Root)</strong><br>
-            <small class="move-folder-meta">Main folder</small>
-          </div>
-        `;
-        homeItem.addEventListener('click', () => {
-          // Выделяем папку
-          document.querySelectorAll('.move-folder-item').forEach(el => el.style.background = 'var(--secondary)');
-          homeItem.style.background = 'var(--hover-bg)';
-          targetFolderForMove = ''; // Целевая папка - корень
-        });
-        container.appendChild(homeItem);
-
-        allFolders.forEach(folder => {
-          const div = document.createElement('div');
-          div.className = 'move-folder-item';
-          div.dataset.path = folder.path; // Сохраняем полный путь
-          div.innerHTML = `
-            <div class="move-folder-info">
-              <strong class="move-folder-name">${folder.name}</strong><br>
-              <small class="move-folder-meta">${folder.path}</small>
-            </div>
-          `;
-          div.addEventListener('click', () => {
-            // Выделяем папку
-            document.querySelectorAll('.move-folder-item').forEach(el => el.style.background = 'var(--secondary)');
-            div.style.background = 'var(--hover-bg)';
-            targetFolderForMove = folder.path; // Устанавливаем целевую папку
-          });
-          container.appendChild(div);
-        });
-
-        // По умолчанию выделяем корневую папку
-        homeItem.style.background = 'var(--hover-bg)';
-        targetFolderForMove = ''; // Целевая папка по умолчанию - корень
-
-      } catch (err) {
-        console.error('[MOVE] Ошибка загрузки списка папок:', err);
-        showNotification('Failed to load folder list: ' + err.message, 'error');
-        container.innerHTML = '<div class="move-folder-item">Error loading folders</div>';
-      }
-    }
-
-    // Переместить видео
-    async function moveVideo() {
-      if (!videoToMove || targetFolderForMove === null) {
-        showNotification('Please select a video and a destination folder', 'error');
-        return;
-      }
-
-      try {
-        const res = await fetch('/api/files/move', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sourcePath: videoToMove,
-            destPath: targetFolderForMove
-          })
-        });
-        const data = await res.json();
-
-        if (data.success) {
-          showNotification(`Video moved to ${targetFolderForMove || 'Home'}`, 'success');
-          closeMoveVideoModal();
-          // Обновляем список видео в текущей папке
-          loadAndRenderVideoListForPath(currentPlayerPath);
-        } else {
-          showNotification('Move failed: ' + (data.error || 'Unknown error'), 'error');
-        }
-      } catch (err) {
-        console.error('[MOVE] Ошибка перемещения видео:', err);
-        showNotification('Move failed: ' + err.message, 'error');
-      }
-    }
-
-    // === НОВОЕ: НАСТРОЙКА ОБРАБОТЧИКОВ СОБЫТИЙ ДЛЯ МОДАЛЬНОГО ОКНА ===
-    window.addEventListener('DOMContentLoaded', () => {
-      // === ЗАКРЫТИЕ МОДАЛЬНОГО ОКНА ===
-      document.querySelector('#moveVideoModal .close').addEventListener('click', closeMoveVideoModal);
-      document.getElementById('moveVideoCancelBtn').addEventListener('click', closeMoveVideoModal);
-      document.getElementById('moveVideoConfirmBtn').addEventListener('click', moveVideo);
-
-      // Закрытие модального окна при клике вне его
-      window.addEventListener('click', (e) => {
-        const modal = document.getElementById('moveVideoModal');
-        if (e.target === modal) {
-          closeMoveVideoModal();
-        }
-      });
-    });
 
   </script>
 </body>
