@@ -34,6 +34,25 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
+// ✅ Middleware для логирования HTTP-запросов
+function logRequests(req, res, next) {
+  const clientIP = req.ip || req.connection.remoteAddress;
+  const cleanIP = clientIP.replace(/^::ffff:/, '');
+  const method = req.method;
+  const url = req.url;
+
+  // Для API маршрутов, не связанных с видео, можно логировать сразу
+  if (url.startsWith('/api/') && !url.startsWith('/api/videos') && !url.startsWith('/videos/')) {
+    console.log(`[HTTP] IP: ${cleanIP} | Method: ${method} | URL: ${url} | SocketID: N/A`);
+  }
+  // Для /api/videos и /upload логирование будет чуть позже, внутри обработчиков, чтобы учесть контекст
+  // Но базовое логирование запроса происходит здесь
+  console.log(`[HTTP] IP: ${cleanIP} | Method: ${method} | URL: ${url} | SocketID: N/A`);
+  next();
+}
+
+// Применяем middleware для логирования
+app.use(logRequests);
 app.use(express.json());
 app.use(express.static('public'));
 app.use('/videos', express.static(VIDEO_FOLDER));
@@ -46,6 +65,24 @@ function getRoomList() { return roomsData.getRoomList(); }
 // ✅ РАСШИРЕННЫЙ СПИСОК ВИДЕОФОРМАТОВ
 const VIDEO_EXTENSIONS = /\.(mp4|webm|ogg|avi|mov|wmv|flv|mkv|mpg|mpeg|3gp|3g2|ts|mts|m2ts|vob|f4v|f4p|f4a|f4b|mp3|wav|aac|flac|wma|m4a|asf|rm|rmvb|vcd|svcd|dvd|yuv|y4m)$/i;
 
+// ✅ Функция проверки доступа только с localhost
+function isLocalhostOnly(req, res, next) {
+  const clientIP = req.ip || req.connection.remoteAddress;
+  const cleanIP = clientIP.replace(/^::ffff:/, '');
+
+  if (cleanIP !== '127.0.0.1' && cleanIP !== '::1') {
+    return res.status(403).json({ success: false, error: 'Доступ запрещён' });
+  }
+  next();
+}
+
+// ✅ Функция логирования для клиентских обращений
+function logClientRequest(clientIP, socketId, action, details = '') {
+  const cleanIP = clientIP.replace(/^::ffff:/, '');
+  const id = socketId || 'N/A';
+  console.log(`[CLIENT] IP: ${cleanIP} | SocketID: ${id} | Action: ${action} | Details: ${details}`);
+}
+
 // Получить список видеофайлов
 function getVideoFiles() {
   try {
@@ -56,56 +93,89 @@ function getVideoFiles() {
   }
 }
 
-// Получить информацию о видео
-function getVideoInfo(file, callback) {
-  ffmpeg.ffprobe(path.join(VIDEO_FOLDER, file), (err, metadata) => {
-    if (!err) {
-      const videoStream = metadata.streams.find(stream => stream.codec_type === 'video');
-      if (videoStream) {
-        callback({
-          resolution: `${videoStream.width}x${videoStream.height}`,
-          bitrate: videoStream.bit_rate || 'N/A'
-        });
-      } else {
-        callback({ resolution: 'N/A', bitrate: 'N/A' });
-      }
-    } else {
-      callback({ resolution: 'N/A', bitrate: 'N/A' });
+// ✅ Получить информацию о видео (обновлённая логика)
+function getVideoInfo(file) {
+  return new Promise((resolve, reject) => {
+    const filePath = path.join(VIDEO_FOLDER, file);
+    // Проверяем, существует ли файл перед вызовом ffprobe
+    if (!fs.existsSync(filePath)) {
+      console.warn(`[FFPROBE] Файл не существует: ${filePath}`);
+      resolve({ resolution: 'N/A', bitrate: 'N/A' });
+      return;
     }
-  });
-}
 
-// API: получить список видео
-app.get('/api/videos', (req, res) => {
-  const files = getVideoFiles();
-  const videos = [];
-  if (files.length === 0) return res.json([]);
+    ffmpeg.ffprobe(filePath, (err, metadata) => {
+      if (err) {
+        // Логируем ошибку ffprobe
+        console.warn(`[FFPROBE] Ошибка для ${file}:`, err.message);
+        // Всё равно возвращаем N/A, чтобы не ломать цепочку
+        resolve({ resolution: 'N/A', bitrate: 'N/A' });
+        return;
+      }
 
-  let processed = 0;
-
-  files.forEach(file => {
-    getVideoInfo(file, info => {
-      // ✅ ИСПРАВЛЕНО: правильно определяем поддерживаемые форматы
-      const ext = file.split('.').pop().toLowerCase();
-      const supportedFormats = ['mp4', 'webm', 'ogg'];
-      const isSupported = supportedFormats.includes(ext);
-      
-      videos.push({ 
-        name: file, 
-        ...info,
-        isSupported
-      });
-      processed++;
-      if (processed === files.length) {
-        res.json(videos);
+      try {
+        const videoStream = metadata.streams.find(stream => stream.codec_type === 'video');
+        if (videoStream) {
+          resolve({
+            resolution: `${videoStream.width || 'N/A'}x${videoStream.height || 'N/A'}`,
+            bitrate: videoStream.bit_rate || 'N/A'
+          });
+        } else {
+          console.warn(`[FFPROBE] Нет видеопотока в ${file}`);
+          resolve({ resolution: 'N/A', bitrate: 'N/A' });
+        }
+      } catch (parseErr) {
+        console.error(`[FFPROBE] Ошибка парсинга метаданных для ${file}:`, parseErr);
+        resolve({ resolution: 'N/A', bitrate: 'N/A' });
       }
     });
   });
+}
+
+
+// API: получить список видео (обновлённая логика с Promise.all)
+// УБРАНО isLocalhostOnly для /api/videos, чтобы player.html работал
+app.get('/api/videos', async (req, res) => {
+  const clientIP = req.ip || req.connection.remoteAddress;
+  logClientRequest(clientIP, 'N/A', 'GET /api/videos', 'Fetching video list');
+
+  try {
+    const files = getVideoFiles();
+    if (files.length === 0) {
+      console.log(`[API] В папке ${VIDEO_FOLDER} нет видеофайлов.`);
+      return res.json([]);
+    }
+
+    console.log(`[API] Найдено ${files.length} видеофайлов. Получаем метаданные...`);
+
+    // Создаём массив промисов для каждого файла
+    const promises = files.map(async (file) => {
+      const info = await getVideoInfo(file);
+      const ext = file.split('.').pop().toLowerCase();
+      const supportedFormats = ['mp4', 'webm', 'ogg'];
+      const isSupported = supportedFormats.includes(ext);
+      return { name: file, ...info, isSupported };
+    });
+
+    // Ждём выполнения всех промисов
+    const videos = await Promise.all(promises);
+
+    console.log(`[API] Метаданные получены для ${videos.length} файлов.`);
+    res.json(videos);
+  } catch (error) {
+    console.error('[API] Ошибка при получении списка видео:', error);
+    // Возвращаем пустой массив в случае критической ошибки
+    res.status(500).json([]);
+  }
 });
 
+
 // API: проверить качество
-app.get('/api/check-quality/:file/:quality', (req, res) => {
+app.get('/api/check-quality/:file/:quality', isLocalhostOnly, (req, res) => {
   const { file, quality } = req.params;
+  const clientIP = req.ip || req.connection.remoteAddress;
+  logClientRequest(clientIP, 'N/A', 'GET /api/check-quality', `File: ${file}, Quality: ${quality}`);
+
   const ext = path.extname(file);
   const name = path.basename(file, ext);
   const qualityFile = `${name}_${quality}${ext}`;
@@ -121,6 +191,9 @@ app.get('/api/check-quality/:file/:quality', (req, res) => {
 // API: загрузка видео
 // --- UPLOAD WITH ROOM BROADCAST ---
 app.post('/upload', upload.single('video'), (req, res) => {
+  const clientIP = req.ip || req.connection.remoteAddress;
+  logClientRequest(clientIP, 'N/A', 'POST /upload', `File: ${req.file ? req.file.filename : 'N/A'}`);
+
   if (req.file) {
     // Найти все комнаты, где есть пользователи (можно оптимизировать под roomId из запроса, если потребуется)
     Object.keys(rooms).forEach(roomId => {
@@ -135,9 +208,11 @@ app.post('/upload', upload.single('video'), (req, res) => {
 });
 
 // ✅ API: удаление видео
-app.post('/api/delete-video', (req, res) => {
+app.post('/api/delete-video', isLocalhostOnly, (req, res) => {
   const { filename } = req.body;
   const clientIP = req.ip || req.connection.remoteAddress;
+  logClientRequest(clientIP, 'N/A', 'POST /api/delete-video', `Filename: ${filename}`);
+
   const cleanIP = clientIP.replace(/^::ffff:/, '');
 
   if (cleanIP !== '127.0.0.1' && cleanIP !== '::1') {
@@ -164,9 +239,11 @@ app.post('/api/delete-video', (req, res) => {
 });
 
 // ✅ API: переименование видео
-app.post('/api/rename-video', (req, res) => {
+app.post('/api/rename-video', isLocalhostOnly, (req, res) => {
   const { oldName, newName } = req.body;
   const clientIP = req.ip || req.connection.remoteAddress;
+  logClientRequest(clientIP, 'N/A', 'POST /api/rename-video', `Old: ${oldName}, New: ${newName}`);
+
   const cleanIP = clientIP.replace(/^::ffff:/, '');
 
   if (cleanIP !== '127.0.0.1' && cleanIP !== '::1') {
@@ -202,8 +279,10 @@ app.post('/api/rename-video', (req, res) => {
 });
 
 // ✅ Админ-панель (только с localhost)
-app.get('/admin', (req, res) => {
+app.get('/admin', isLocalhostOnly, (req, res) => {
   const clientIP = req.ip || req.connection.remoteAddress;
+  logClientRequest(clientIP, 'N/A', 'GET /admin', '');
+
   const cleanIP = clientIP.replace(/^::ffff:/, '');
   if (cleanIP === '127.0.0.1' || cleanIP === '::1') {
     res.sendFile(path.join(__dirname, 'public', 'admin.html'));
@@ -213,8 +292,10 @@ app.get('/admin', (req, res) => {
 });
 
 // ✅ API: получить текущие настройки
-app.get('/api/config', (req, res) => {
+app.get('/api/config', isLocalhostOnly, (req, res) => {
   const clientIP = req.ip || req.connection.remoteAddress;
+  logClientRequest(clientIP, 'N/A', 'GET /api/config', '');
+
   const cleanIP = clientIP.replace(/^::ffff:/, '');
 
   if (cleanIP !== '127.0.0.1' && cleanIP !== '::1') {
@@ -229,9 +310,11 @@ app.get('/api/config', (req, res) => {
 });
 
 // ✅ API: установить папку с видео
-app.post('/api/set-video-folder', (req, res) => {
+app.post('/api/set-video-folder', isLocalhostOnly, (req, res) => {
   const { folder } = req.body;
   const clientIP = req.ip || req.connection.remoteAddress;
+  logClientRequest(clientIP, 'N/A', 'POST /api/set-video-folder', `Folder: ${folder}`);
+
   const cleanIP = clientIP.replace(/^::ffff:/, '');
 
   if (cleanIP !== '127.0.0.1' && cleanIP !== '::1') {
@@ -282,9 +365,11 @@ app.post('/api/set-video-folder', (req, res) => {
 });
 
 // ✅ API: установить порт сервера
-app.post('/api/set-port', (req, res) => {
+app.post('/api/set-port', isLocalhostOnly, (req, res) => {
   const { port } = req.body;
   const clientIP = req.ip || req.connection.remoteAddress;
+  logClientRequest(clientIP, 'N/A', 'POST /api/set-port', `Port: ${port}`);
+
   const cleanIP = clientIP.replace(/^::ffff:/, '');
 
   if (cleanIP !== '127.0.0.1' && cleanIP !== '::1') {
@@ -391,13 +476,10 @@ function saveTranscodeQueue(queue) {
 }
 
 // API: получить шаблоны
-app.get('/api/transcode/templates', (req, res) => {
+// УБРАНО isLocalhostOnly для /api/transcode/templates, чтобы player.html мог получить шаблоны
+app.get('/api/transcode/templates', (req, res) => { // <-- УБРАНО isLocalhostOnly
   const clientIP = req.ip || req.connection.remoteAddress;
-  const cleanIP = clientIP.replace(/^::ffff:/, '');
-
-  if (cleanIP !== '127.0.0.1' && cleanIP !== '::1') {
-    return res.status(403).json({ success: false, error: 'Access denied' });
-  }
+  logClientRequest(clientIP, 'N/A', 'GET /api/transcode/templates', '');
 
   const templates = loadTranscodeTemplates();
   console.log(`[TRANSCODE] Отправлено ${templates.length} шаблонов`);
@@ -405,22 +487,18 @@ app.get('/api/transcode/templates', (req, res) => {
 });
 
 // API: сохранить шаблон
-app.post('/api/transcode/save-template', (req, res) => {
-  const clientIP = req.ip || req.connection.remoteAddress;
-  const cleanIP = clientIP.replace(/^::ffff:/, '');
-
-  if (cleanIP !== '127.0.0.1' && cleanIP !== '::1') {
-    return res.status(403).json({ success: false, error: 'Access denied' });
-  }
-
+app.post('/api/transcode/save-template', isLocalhostOnly, (req, res) => {
   const { name, description, command } = req.body;
+  const clientIP = req.ip || req.connection.remoteAddress;
+  logClientRequest(clientIP, 'N/A', 'POST /api/transcode/save-template', `Name: ${name}`);
+
   if (!name || !command) {
     return res.status(400).json({ success: false, error: 'Missing required fields' });
   }
 
   const templates = loadTranscodeTemplates();
   const id = 'tmpl_' + Math.random().toString(36).substr(2, 8);
-  
+
   const newTemplate = {
     id,
     name,
@@ -428,7 +506,7 @@ app.post('/api/transcode/save-template', (req, res) => {
     command,
     createdAt: new Date().toISOString()
   };
-  
+
   templates.push(newTemplate);
 
   if (saveTranscodeTemplates(templates)) {
@@ -440,15 +518,11 @@ app.post('/api/transcode/save-template', (req, res) => {
 });
 
 // API: удалить шаблон
-app.post('/api/transcode/delete-template', (req, res) => {
-  const clientIP = req.ip || req.connection.remoteAddress;
-  const cleanIP = clientIP.replace(/^::ffff:/, '');
-
-  if (cleanIP !== '127.0.0.1' && cleanIP !== '::1') {
-    return res.status(403).json({ success: false, error: 'Access denied' });
-  }
-
+app.post('/api/transcode/delete-template', isLocalhostOnly, (req, res) => {
   const { id } = req.body;
+  const clientIP = req.ip || req.connection.remoteAddress;
+  logClientRequest(clientIP, 'N/A', 'POST /api/transcode/delete-template', `ID: ${id}`);
+
   if (!id) {
     return res.status(400).json({ success: false, error: 'Missing template ID' });
   }
@@ -470,13 +544,10 @@ app.post('/api/transcode/delete-template', (req, res) => {
 });
 
 // API: получить очередь
-app.get('/api/transcode/queue', (req, res) => {
+// УБРАНО isLocalhostOnly для /api/transcode/queue, чтобы player.html мог получить очередь
+app.get('/api/transcode/queue', (req, res) => { // <-- УБРАНО isLocalhostOnly
   const clientIP = req.ip || req.connection.remoteAddress;
-  const cleanIP = clientIP.replace(/^::ffff:/, '');
-
-  if (cleanIP !== '127.0.0.1' && cleanIP !== '::1') {
-    return res.status(403).json({ success: false, error: 'Access denied' });
-  }
+  logClientRequest(clientIP, 'N/A', 'GET /api/transcode/queue', '');
 
   const queue = loadTranscodeQueue();
   const templates = loadTranscodeTemplates();
@@ -495,15 +566,11 @@ app.get('/api/transcode/queue', (req, res) => {
 });
 
 // API: добавить в очередь
-app.post('/api/transcode/add-to-queue', (req, res) => {
-  const clientIP = req.ip || req.connection.remoteAddress;
-  const cleanIP = clientIP.replace(/^::ffff:/, '');
-
-  if (cleanIP !== '127.0.0.1' && cleanIP !== '::1') {
-    return res.status(403).json({ success: false, error: 'Access denied' });
-  }
-
+app.post('/api/transcode/add-to-queue', isLocalhostOnly, (req, res) => {
   const { fileId, templateId } = req.body;
+  const clientIP = req.ip || req.connection.remoteAddress;
+  logClientRequest(clientIP, 'N/A', 'POST /api/transcode/add-to-queue', `File: ${fileId}, TemplateID: ${templateId}`);
+
   if (!fileId || !templateId) {
     return res.status(400).json({ success: false, error: 'Missing required fields' });
   }
@@ -516,22 +583,23 @@ app.post('/api/transcode/add-to-queue', (req, res) => {
 
   let queue = loadTranscodeQueue();
   const id = 'job_' + Math.random().toString(36).substr(2, 8);
-  
+
   const newItem = {
     id,
     fileId,
     templateId,
     status: 'pending',
     progress: 0,
+    isCancelled: false, // <-- Добавлен флаг отмены
     createdAt: new Date().toISOString()
   };
-  
+
   queue.push(newItem);
 
   if (saveTranscodeQueue(queue)) {
     console.log(`[TRANSCODE] Добавлен в очередь: ${fileId} с шаблоном ${template.name} (${id})`);
     res.json({ success: true, id, item: newItem });
-    
+
     // Запускаем обработку очереди
     processTranscodeQueue();
   } else {
@@ -539,16 +607,69 @@ app.post('/api/transcode/add-to-queue', (req, res) => {
   }
 });
 
-// === БЫСТРОЕ ТРАНСКОДИРОВАНИЕ ===
-app.post('/api/transcode/quick-transcode', (req, res) => {
+// === API: отменить задание в очереди (обновлённая версия с удалением) ===
+app.post('/api/transcode/cancel-job', isLocalhostOnly, (req, res) => {
+  const { jobId } = req.body;
   const clientIP = req.ip || req.connection.remoteAddress;
-  const cleanIP = clientIP.replace(/^::ffff:/, '');
+  logClientRequest(clientIP, 'N/A', 'POST /api/transcode/cancel-job', `JobID: ${jobId}`);
 
-  if (cleanIP !== '127.0.0.1' && cleanIP !== '::1') {
-    return res.status(403).json({ success: false, error: 'Доступ запрещён' });
+  if (!jobId) {
+    return res.status(400).json({ success: false, error: 'Missing job ID' });
   }
 
+  let queue = loadTranscodeQueue();
+  const jobIndex = queue.findIndex(item => item.id === jobId);
+
+  if (jobIndex === -1) {
+    // Проверяем, возможно, задание уже было удалено
+    return res.status(400).json({ success: false, error: 'Job not found (may have been removed)' });
+  }
+
+  const job = queue[jobIndex];
+
+  // Проверяем, можно ли отменить задание
+  // pending - можно отменить и удалить
+  // processing - можно отменить (processTranscodeQueue проверит isCancelled и убьёт ffmpeg, затем удалит)
+  // completed/error/cancelled - нельзя отменить
+  if (job.status === 'completed' || job.status === 'error' || job.status === 'cancelled') {
+    return res.status(400).json({ success: false, error: 'Job cannot be cancelled (already finished)' });
+  }
+
+  // Отмечаем задание как отменённое
+  job.isCancelled = true; // <-- Устанавливаем флаг отмены
+
+  // Если задание ещё не началось, сразу удаляем его
+  if (job.status === 'pending') {
+    queue.splice(jobIndex, 1); // Удаляем элемент из массива
+    if (saveTranscodeQueue(queue)) {
+      console.log(`[TRANSCODE] Задание отменено и удалено из очереди: ${jobId} (${job.fileId})`);
+      res.json({ success: true, message: 'Job cancelled and removed' });
+      // Перезапускаем очередь, на случай, если отменили текущее задание
+      processTranscodeQueue();
+    } else {
+      res.status(500).json({ success: false, error: 'Failed to update queue' });
+    }
+    return;
+  }
+
+  // Если статус 'processing', статус изменится на 'cancelled' в processTranscodeQueue,
+  // и задание будет удалено там же после остановки ffmpeg
+  // Обновим очередь, чтобы флаг isCancelled был сохранён
+  if (saveTranscodeQueue(queue)) {
+    console.log(`[TRANSCODE] Задание отмечено для отмены: ${jobId} (${job.fileId})`);
+    res.json({ success: true, message: 'Job marked for cancellation' });
+    // processTranscodeQueue() будет проверять isCancelled и удалит его позже
+  } else {
+    res.status(500).json({ success: false, error: 'Failed to update queue' });
+  }
+});
+
+// === БЫСТРОЕ ТРАНСКОДИРОВАНИЕ (обновлённая версия с NVENC и AAC) ===
+app.post('/api/transcode/quick-transcode', isLocalhostOnly, (req, res) => {
   const { filename } = req.body;
+  const clientIP = req.ip || req.connection.remoteAddress;
+  logClientRequest(clientIP, 'N/A', 'POST /api/transcode/quick-transcode', `Filename: ${filename}`);
+
   if (!filename || typeof filename !== 'string') {
     return res.status(400).json({ success: false, error: 'Неверное имя файла' });
   }
@@ -556,7 +677,7 @@ app.post('/api/transcode/quick-transcode', (req, res) => {
   const inputFile = path.join(VIDEO_FOLDER, filename);
   const ext = path.extname(filename).toLowerCase();
   const name = path.basename(filename, ext);
-  const outputFile = path.join(VIDEO_FOLDER, `${name}.mp4`);
+  const outputFile = path.join(VIDEO_FOLDER, `${name}.mp4`); // Всегда .mp4
 
   // ✅ Проверяем, существует ли исходный файл
   if (!fs.existsSync(inputFile)) {
@@ -568,25 +689,15 @@ app.post('/api/transcode/quick-transcode', (req, res) => {
     return res.status(400).json({ success: false, error: 'Выходной файл уже существует' });
   }
 
-  console.log(`[TRANSCODE] Начало быстрого транскодирования: ${filename} → ${name}.mp4`);
+  console.log(`[TRANSCODE] Начало быстрого транскодирования (NVENC+AAC): ${filename} → ${name}.mp4`);
 
-  // ✅ Если файл уже .mp4 — делаем копию
-  if (ext === '.mp4') {
-    try {
-      fs.copyFileSync(inputFile, outputFile);
-      console.log(`[TRANSCODE] Создана копия: ${filename} → ${name}.mp4`);
-      return res.json({ success: true, output: `${name}.mp4` });
-    } catch (err) {
-      console.error(`[TRANSCODE] Ошибка копирования: ${filename}`, err);
-      return res.status(500).json({ success: false, error: 'Ошибка копирования файла' });
-    }
-  }
-
-  // ✅ Для других форматов — используем ffmpeg -c copy
+  // --- ИСПОЛЬЗУЕМ NVENC И AAC ---
   const command = ffmpeg(inputFile)
     .output(outputFile)
-    .videoCodec('copy')
-    .audioCodec('copy')
+    .videoCodec('h264_nvenc') // <-- Используем NVENC
+    .audioCodec('aac')        // <-- Перекодируем аудио в AAC
+    .outputOption('-preset', 'llhq') // <-- Устанавливаем пресет для NVENC
+    // .outputOption('-b:a', '128k') // <-- Опционально: битрейт аудио
     .on('start', (cmd) => {
       console.log(`[TRANSCODE] Запущена команда: ${cmd}`);
     })
@@ -601,13 +712,13 @@ app.post('/api/transcode/quick-transcode', (req, res) => {
     })
     .on('error', (err) => {
       console.error(`[TRANSCODE] Ошибка быстрого транскодирования: ${filename}`, err);
-      
-      // ✅ FALLBACK: если -c copy не работает — используем обычное кодирование
-      console.log(`[TRANSCODE] Fallback: обычное кодирование для ${filename}`);
+
+      // --- FALLBACK: если NVENC не работает ---
+      console.log(`[TRANSCODE] Fallback: стандартное кодирование CPU для ${filename}`);
       const fallbackCommand = ffmpeg(inputFile)
         .output(outputFile)
-        .videoCodec('libx264')
-        .audioCodec('aac')
+        .videoCodec('libx264') // <-- CPU кодирование
+        .audioCodec('aac')     // <-- Всё ещё AAC
         .on('start', (cmd) => {
           console.log(`[TRANSCODE] Запущена fallback команда: ${cmd}`);
         })
@@ -631,100 +742,198 @@ app.post('/api/transcode/quick-transcode', (req, res) => {
   command.run();
 });
 
-// === TRANSCODE PROCESSOR ===
+// === TRANSCODE PROCESSOR (обновлённая версия с поддержкой отмены и удаления) ===
 async function processTranscodeQueue() {
   const queue = loadTranscodeQueue();
-  const templates = loadTranscodeTemplates();
-  
-  // Находим первый ожидающий элемент
-  const pendingItem = queue.find(item => item.status === 'pending');
+  // Находим первый *не отменённый* ожидающий элемент
+  const pendingItem = queue.find(item => item.status === 'pending' && !item.isCancelled); // <-- Добавлена проверка isCancelled
   if (!pendingItem) {
-    console.log('[TRANSCODE] Очередь пуста, ожидание...');
+    console.log('[TRANSCODE] Очередь пуста или все задания отменены/обработаны, ожидание...');
     return;
   }
 
-  // Обновляем статус
+  console.log(`[TRANSCODE] Обработка задания: ${pendingItem.id} (${pendingItem.fileId})`); // Лог для отладки
+
+  // Проверяем, не отменено ли задание в процессе выполнения (например, если оно было отменено сразу после запуска)
+  // Загружаем очередь снова, на случай, если другой процесс её изменил (например, удалил)
+  const freshQueue = loadTranscodeQueue();
+  const freshItem = freshQueue.find(item => item.id === pendingItem.id);
+  if (freshItem && freshItem.isCancelled) {
+    console.log(`[TRANSCODE] Задание ${pendingItem.id} было отменено до начала обработки.`);
+    // Обновляем статус в оригинальной очереди и сохраняем
+    const itemInOriginalQueue = queue.find(item => item.id === pendingItem.id);
+    if (itemInOriginalQueue) {
+      itemInOriginalQueue.status = 'cancelled'; // <-- Новый статус
+      itemInOriginalQueue.completedAt = new Date().toISOString();
+      saveTranscodeQueue(queue);
+    }
+    // Запускаем следующий
+    setTimeout(() => {
+      processTranscodeQueue();
+    }, 1000);
+    return;
+  }
+
+  // Обновляем статус на 'processing'
   pendingItem.status = 'processing';
   pendingItem.startedAt = new Date().toISOString();
   saveTranscodeQueue(queue);
 
+  const templates = loadTranscodeTemplates();
   try {
     const template = templates.find(t => t.id === pendingItem.templateId);
     if (!template) throw new Error('Template not found');
 
     const inputFile = path.join(VIDEO_FOLDER, pendingItem.fileId);
-    const outputFile = path.join(VIDEO_FOLDER, 
-      pendingItem.fileId.replace(/\.[^/.]+$/, "") + "_" + 
+    const outputFile = path.join(VIDEO_FOLDER,
+      pendingItem.fileId.replace(/\.[^/.]+$/, "") + "_" +
       template.name.toLowerCase().replace(/\s+/g, '_') + ".mp4");
 
     console.log(`[TRANSCODE] Начало конвертации: ${pendingItem.fileId} → ${outputFile}`);
 
-    // Запускаем ffmpeg
+    // --- КРИТИЧЕСКИЙ УЧАСТОК: Запуск ffmpeg ---
+    // Необходимо отслеживать, отменено ли задание *во время* выполнения ffmpeg
+    // fluent-ffmpeg позволяет остановить процесс через .kill()
+    let ffmpegProcess = null;
+
+    // Функция для проверки отмены и удаления (может быть вызвана периодически)
+    const checkCancellationAndRemove = async () => {
+      const queueDuringProcess = loadTranscodeQueue();
+      const itemDuringProcess = queueDuringProcess.find(item => item.id === pendingItem.id);
+
+      // Если задание больше не существует, останавливаем ffmpeg
+      if (!itemDuringProcess) {
+        console.log(`[TRANSCODE] Задание ${pendingItem.id} удалено во время обработки, останавливаем ffmpeg...`);
+        if (ffmpegProcess) {
+          ffmpegProcess.kill('SIGKILL');
+        }
+        // Запускаем следующий
+        setTimeout(() => {
+          processTranscodeQueue();
+        }, 1000);
+        return true; // Удалено
+      }
+
+      // Если задание отменено, останавливаем ffmpeg и удаляем
+      if (itemDuringProcess.isCancelled) {
+        console.log(`[TRANSCODE] Задание ${pendingItem.id} отменено во время обработки, останавливаем ffmpeg и удаляем...`);
+        if (ffmpegProcess) {
+          ffmpegProcess.kill('SIGKILL');
+        }
+        // Удаляем задание из очереди
+        const queueToRemove = loadTranscodeQueue();
+        const indexToRemove = queueToRemove.findIndex(item => item.id === pendingItem.id);
+        if (indexToRemove > -1) {
+          queueToRemove.splice(indexToRemove, 1);
+          if (saveTranscodeQueue(queueToRemove)) {
+            console.log(`[TRANSCODE] Задание ${pendingItem.id} удалено из очереди после отмены.`);
+          } else {
+            console.error(`[TRANSCODE] Ошибка удаления задания ${pendingItem.id} из очереди после отмены.`);
+          }
+        }
+        // Запускаем следующий
+        setTimeout(() => {
+          processTranscodeQueue();
+        }, 1000);
+        return true; // Отменено и удалено
+      }
+      return false; // Не отменено и не удалено
+    };
+
     const command = ffmpeg(inputFile)
       .output(outputFile)
+      .on('start', (cmd) => {
+        console.log(`[TRANSCODE] FFmpeg запущен для ${pendingItem.fileId}: ${cmd}`);
+        // Запускаем проверку отмены и удаления каждые 2 секунды
+        const cancelCheckInterval = setInterval(async () => {
+          if (await checkCancellationAndRemove()) {
+            clearInterval(cancelCheckInterval);
+          }
+        }, 2000);
+
+        command.on('end', () => {
+          clearInterval(cancelCheckInterval); // Останавливаем проверку при завершении
+          // Проверяем, не было ли задание удалено до завершения
+          const queueAfterEnd = loadTranscodeQueue();
+          const itemAfterEnd = queueAfterEnd.find(item => item.id === pendingItem.id);
+          if (!itemAfterEnd) {
+            console.log(`[TRANSCODE] Задание ${pendingItem.fileId} завершено, но было удалено из очереди.`);
+            // Запускаем следующий
+            setTimeout(() => {
+              processTranscodeQueue();
+            }, 1000);
+            return;
+          }
+
+          // Завершено успешно
+          const itemInOriginalQueue = queue.find(item => item.id === pendingItem.id);
+          if (itemInOriginalQueue) {
+            itemInOriginalQueue.status = 'completed';
+            itemInOriginalQueue.completedAt = new Date().toISOString();
+            saveTranscodeQueue(queue);
+            console.log(`[TRANSCODE] Завершена конвертация: ${pendingItem.fileId}`);
+          }
+          // Запускаем следующий
+          setTimeout(() => {
+            processTranscodeQueue();
+          }, 1000);
+        });
+
+        command.on('error', (err) => {
+          clearInterval(cancelCheckInterval); // Останавливаем проверку при ошибке
+          // Проверяем, не было ли задание удалено до ошибки
+          const queueAfterError = loadTranscodeQueue();
+          const itemAfterError = queueAfterError.find(item => item.id === pendingItem.id);
+          if (!itemAfterError) {
+            console.log(`[TRANSCODE] Задание ${pendingItem.fileId} завершено с ошибкой, но было удалено из очереди.`);
+            // Запускаем следующий
+            setTimeout(() => {
+              processTranscodeQueue();
+            }, 1000);
+            return;
+          }
+
+          // Ошибка выполнения ffmpeg
+          const itemInOriginalQueue = queue.find(item => item.id === pendingItem.id);
+          if (itemInOriginalQueue) {
+            itemInOriginalQueue.status = 'error';
+            itemInOriginalQueue.error = err.message;
+            itemInOriginalQueue.completedAt = new Date().toISOString();
+            saveTranscodeQueue(queue);
+            console.error(`[TRANSCODE] Ошибка конвертации: ${pendingItem.fileId}`, err);
+          }
+          // Запускаем следующий
+          setTimeout(() => {
+            processTranscodeQueue();
+          }, 1000);
+        });
+      })
       .on('progress', (progress) => {
         // Обновляем прогресс
-        if (progress.percent) {
-          pendingItem.progress = progress.percent;
-          saveTranscodeQueue(queue);
-          console.log(`[TRANSCODE] Прогресс: ${pendingItem.fileId} - ${Math.round(progress.percent)}%`);
+        const itemInOriginalQueue = queue.find(item => item.id === pendingItem.id);
+        if (itemInOriginalQueue && !itemInOriginalQueue.isCancelled) { // Обновляем только если не отменено
+          if (progress.percent) {
+            itemInOriginalQueue.progress = progress.percent;
+            saveTranscodeQueue(queue);
+            console.log(`[TRANSCODE] Прогресс: ${pendingItem.fileId} - ${Math.round(progress.percent)}%`);
+          }
         }
-      })
-      .on('end', () => {
-        // Завершено
-        pendingItem.status = 'completed';
-        pendingItem.completedAt = new Date().toISOString();
-        saveTranscodeQueue(queue);
-        console.log(`[TRANSCODE] Завершена конвертация: ${pendingItem.fileId}`);
-        
-        // Запускаем следующий
-        setTimeout(() => {
-          processTranscodeQueue();
-        }, 1000);
-      })
-      .on('error', (err) => {
-        // Ошибка
-        pendingItem.status = 'error';
-        pendingItem.error = err.message;
-        pendingItem.completedAt = new Date().toISOString();
-        saveTranscodeQueue(queue);
-        console.error(`[TRANSCODE] Ошибка конвертации: ${pendingItem.fileId}`, err);
-        
-        // Запускаем следующий
-        setTimeout(() => {
-          processTranscodeQueue();
-        }, 1000);
       });
 
-    // Применяем команду из шаблона
-    if (template.command.includes('-vf')) {
-      const vfMatch = template.command.match(/-vf\s+([^ ]+)/);
-      if (vfMatch) command.videoFilters(vfMatch[1]);
-    }
-    
-    if (template.command.includes('-c:v')) {
-      const codecMatch = template.command.match(/-c:v\s+([^ ]+)/);
-      if (codecMatch) command.videoCodec(codecMatch[1]);
-    }
-    
-    if (template.command.includes('-crf')) {
-      const crfMatch = template.command.match(/-crf\s+(\d+)/);
-      if (crfMatch) command.outputOptions('-crf', crfMatch[1]);
-    }
-    
-    if (template.command.includes('-preset')) {
-      const presetMatch = template.command.match(/-preset\s+([^ ]+)/);
-      if (presetMatch) command.outputOptions('-preset', presetMatch[1]);
-    }
-
     command.run();
+    // Сохраняем ссылку на command для возможного .kill() (не всегда работает напрямую)
+    // ffmpegProcess = command; // Это не даст доступ к внутреннему child_process в большинстве версий
+
   } catch (err) {
-    pendingItem.status = 'error';
-    pendingItem.error = err.message;
-    pendingItem.completedAt = new Date().toISOString();
-    saveTranscodeQueue(queue);
-    console.error(`[TRANSCODE] Ошибка обработки очереди:`, err);
-    
+    // Обработка ошибки на уровне try/catch
+    const itemInOriginalQueue = queue.find(item => item.id === pendingItem.id);
+    if (itemInOriginalQueue) {
+      itemInOriginalQueue.status = 'error';
+      itemInOriginalQueue.error = err.message;
+      itemInOriginalQueue.completedAt = new Date().toISOString();
+      saveTranscodeQueue(queue);
+    }
+    console.error(`[TRANSCODE] Ошибка обработки очереди (внешняя):`, err);
     // Запускаем следующий
     setTimeout(() => {
       processTranscodeQueue();
@@ -733,8 +942,10 @@ async function processTranscodeQueue() {
 }
 
 // === TRANSCODE PAGE ===
-app.get('/transcode', (req, res) => {
+app.get('/transcode', isLocalhostOnly, (req, res) => {
   const clientIP = req.ip || req.connection.remoteAddress;
+  logClientRequest(clientIP, 'N/A', 'GET /transcode', '');
+
   const cleanIP = clientIP.replace(/^::ffff:/, '');
 
   if (cleanIP !== '127.0.0.1' && cleanIP !== '::1') {
@@ -771,34 +982,235 @@ if (!fs.existsSync(TRANSCODE_QUEUE_FILE)) {
   console.log(`[TRANSCODE] Создан файл очереди: ${TRANSCODE_QUEUE_FILE}`);
 }
 
+// === НОВОЕ: API ДЛЯ РАБОТЫ С ПАПКАМИ ===
+
+// ✅ ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ДЛЯ РАБОТЫ С ФАЙЛОВОЙ СИСТЕМОЙ ===
+
+// ✅ Функция для получения относительного пути от VIDEO_FOLDER
+function getRelativePath(fullPath) {
+  return path.relative(VIDEO_FOLDER, fullPath).split(path.sep).join('/'); // Всегда используем '/' для путей API
+}
+
+// ✅ Функция для получения абсолютного пути
+function getAbsolutePath(relativePath) {
+  // Предотвращаем Directory Traversal
+  const normalizedPath = path.normalize(relativePath).replace(/^(\.\.(\/|\\|$))+/, '');
+  return path.join(VIDEO_FOLDER, normalizedPath);
+}
+
+// ✅ Функция для рекурсивного создания директории С .empty
+function ensureDirWithEmpty(dirPath) {
+  if (!fs.existsSync(dirPath)) {
+    fs.mkdirSync(dirPath, { recursive: true });
+    console.log(`[FILES] Создана папка: ${dirPath}`);
+    // ✅ Создаём пустышку в новой папке
+    createEmptyFile(dirPath);
+  }
+}
+
+// ✅ Функция для создания файла .empty
+function createEmptyFile(dirPath) {
+  const emptyFilePath = path.join(dirPath, '.empty');
+  try {
+    fs.writeFileSync(emptyFilePath, ''); // Создаём пустой файл
+    console.log(`[FILES] Создан файл-пустышка: ${emptyFilePath}`);
+  } catch (err) {
+    console.error(`[FILES] Ошибка создания файла-пустышки в ${dirPath}:`, err);
+  }
+}
+
+// ✅ Функция для получения структуры папок и файлов (рекурсивно)
+function getDirectoryStructure(dir, basePath = '') {
+  const result = [];
+  try {
+    const items = fs.readdirSync(dir);
+    items.forEach(item => {
+      // ✅ Игнорируем файлы-пустышки
+      if (item === '.empty') return;
+
+      const fullPath = path.join(dir, item);
+      const relativePath = path.join(basePath, item).split(path.sep).join('/'); // Всегда используем '/' для путей API
+      const stat = fs.statSync(fullPath);
+
+      if (stat.isDirectory()) {
+        result.push({
+          name: item,
+          type: 'folder',
+          path: relativePath,
+          children: getDirectoryStructure(fullPath, relativePath) // Рекурсивный вызов
+        });
+      } else if (VIDEO_EXTENSIONS.test(item)) { // Используем существующую константу VIDEO_EXTENSIONS
+        result.push({
+          name: item,
+          type: 'file',
+          path: relativePath
+        });
+      }
+    });
+  } catch (err) {
+    console.error(`Ошибка чтения директории ${dir}:`, err);
+  }
+  return result;
+}
+
+// === НОВЫЕ API ДЛЯ РАБОТЫ С ПАПКАМИ ===
+
+// API: получить структуру папок и файлов
+// УБРАНО isLocalhostOnly для /api/files/list, чтобы player.html мог получить структуру
+app.get('/api/files/list', (req, res) => { // <-- УБРАНО isLocalhostOnly
+  const clientIP = req.ip || req.connection.remoteAddress;
+  logClientRequest(clientIP, 'N/A', 'GET /api/files/list', '');
+  try {
+    const structure = getDirectoryStructure(VIDEO_FOLDER);
+    res.json({ success: true, structure });
+  } catch (err) {
+    console.error('[FILES] Ошибка получения структуры:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// API: создать папку
+app.post('/api/files/create-folder', isLocalhostOnly, (req, res) => {
+  const { folderPath } = req.body; // folderPath - относительный путь от VIDEO_FOLDER
+  const clientIP = req.ip || req.connection.remoteAddress;
+  logClientRequest(clientIP, 'N/A', 'POST /api/files/create-folder', `Path: ${folderPath}`);
+
+  if (!folderPath || typeof folderPath !== 'string') {
+    return res.status(400).json({ success: false, error: 'Неверный путь папки' });
+  }
+
+  const fullPath = getAbsolutePath(folderPath);
+  const parentDir = path.dirname(fullPath);
+
+  // Проверяем, что родительская директория существует
+  if (!fs.existsSync(parentDir)) {
+    return res.status(400).json({ success: false, error: 'Родительская папка не существует' });
+  }
+
+  try {
+    ensureDirWithEmpty(fullPath); // ✅ Используем обновлённую функцию
+    console.log(`[FILES] Папка создана: ${fullPath}`);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[FILES] Ошибка создания папки:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// API: удалить папку (и всё её содержимое)
+app.post('/api/files/delete-folder', isLocalhostOnly, (req, res) => {
+  const { folderPath } = req.body;
+  const clientIP = req.ip || req.connection.remoteAddress;
+  logClientRequest(clientIP, 'N/A', 'POST /api/files/delete-folder', `Path: ${folderPath}`);
+
+  if (!folderPath || typeof folderPath !== 'string') {
+    return res.status(400).json({ success: false, error: 'Неверный путь папки' });
+  }
+
+  const fullPath = getAbsolutePath(folderPath);
+
+  // Проверяем, что путь находится внутри VIDEO_FOLDER
+  if (!fullPath.startsWith(VIDEO_FOLDER)) {
+    return res.status(400).json({ success: false, error: 'Нельзя удалить папку вне базовой директории' });
+  }
+
+  // Проверяем, что это действительно папка
+  if (!fs.existsSync(fullPath) || !fs.statSync(fullPath).isDirectory()) {
+    return res.status(400).json({ success: false, error: 'Путь не является папкой' });
+  }
+
+  try {
+    fs.rmSync(fullPath, { recursive: true, force: true });
+    console.log(`[FILES] Папка удалена: ${fullPath}`);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[FILES] Ошибка удаления папки:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// === МОДИФИЦИРОВАННЫЙ UPLOAD API ДЛЯ ПОДДЕРЖКИ ПАПОК ===
+
+// Настройка multer для загрузки с сохранением оригинальной структуры папок
+const folderAwareStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    // Получаем относительный путь папки из заголовка или параметра запроса
+    let relativeFolderPath = req.headers['x-folder-path'] || req.body.folderPath || '';
+    // Нормализуем путь, чтобы предотвратить Directory Traversal
+    relativeFolderPath = path.normalize(relativeFolderPath).replace(/^(\.\.(\/|\\|$))+/, '');
+    const absoluteFolderPath = path.join(VIDEO_FOLDER, relativeFolderPath);
+    // Создаем папку, если её нет
+    ensureDirWithEmpty(absoluteFolderPath); // ✅ Используем обновлённую функцию
+    cb(null, absoluteFolderPath);
+  },
+  filename: (req, file, cb) => {
+    cb(null, file.originalname);
+  }
+});
+
+const folderAwareUpload = multer({ storage: folderAwareStorage });
+
+// API: загрузка видео с поддержкой папок
+app.post('/api/upload/to-folder', folderAwareUpload.single('video'), (req, res) => {
+  const clientIP = req.ip || req.connection.remoteAddress;
+  const folderPath = req.headers['x-folder-path'] || req.body.folderPath || '';
+  logClientRequest(clientIP, 'N/A', 'POST /api/upload/to-folder', `File: ${req.file ? req.file.filename : 'N/A'}, Folder: ${folderPath}`);
+
+  if (req.file) {
+    const relativeFilePath = path.join(folderPath, req.file.filename).split(path.sep).join('/'); // Всегда используем '/' для путей API
+    res.json({ success: true, file: req.file.filename, path: relativeFilePath });
+    // Оповещение комнат не требуется, так как это File Manager
+  } else {
+    res.status(400).json({ success: false, error: 'Файл не загружен' });
+  }
+});
+
+// ✅ НОВОЕ: МАРШРУТ ДЛЯ ФАЙЛА-ПУСТЫШКИ ===
+// Перенаправляет в корневую папку видео
+app.get('/.empty', (req, res) => {
+  const clientIP = req.ip || req.connection.remoteAddress;
+  logClientRequest(clientIP, 'N/A', 'GET /.empty', 'Redirecting to root video folder');
+  res.redirect('/files'); // Перенаправляем на страницу управления файлами в корне
+});
+
 // ✅ ГЛАВНАЯ СТРАНИЦА - РЕДИРЕКТ НА SELECT-ROOM
 app.get('/', (req, res) => {
+  const clientIP = req.ip || req.connection.remoteAddress;
+  logClientRequest(clientIP, 'N/A', 'GET /', '');
   res.redirect('/select-room.html');
 });
 
 // ✅ Страница выбора комнаты
 app.get('/select-room.html', (req, res) => {
+  const clientIP = req.ip || req.connection.remoteAddress;
+  logClientRequest(clientIP, 'N/A', 'GET /select-room.html', '');
   res.sendFile(path.join(__dirname, 'public', 'select-room.html'));
 });
 
 // ✅ Страница плеера
 app.get('/player.html', (req, res) => {
+  const clientIP = req.ip || req.connection.remoteAddress;
+  logClientRequest(clientIP, 'N/A', 'GET /player.html', '');
   res.sendFile(path.join(__dirname, 'public', 'player.html'));
 });
 
 // ✅ Страница управления файлами - БЕЗ РЕДИРЕКТА
-app.get('/files', (req, res) => {
+app.get('/files', isLocalhostOnly, (req, res) => {
+  const clientIP = req.ip || req.connection.remoteAddress;
+  logClientRequest(clientIP, 'N/A', 'GET /files', '');
   res.sendFile(path.join(__dirname, 'public', 'files.html'));
 });
 
 // Сокеты
 io.on('connection', (socket) => {
-  console.log('[SOCKET] User connected:', socket.id);
+  const clientIP = socket.request.connection.remoteAddress;
+  console.log(`[SOCKET] User connected: ${socket.id} from IP: ${clientIP}`);
   let joinedRoom = null;
   let userName = `User${Math.floor(Math.random()*10000)}`;
 
   // --- ROOM EVENTS ---
   socket.on('create-room', ({ name }, cb) => {
+    logClientRequest(clientIP, socket.id, 'SOCKET create-room', `Name: ${name}`);
     const id = 'room_' + Math.random().toString(36).substr(2, 8);
     rooms[id] = {
       name: name || id,
@@ -827,11 +1239,16 @@ io.on('connection', (socket) => {
   });
 
   socket.on('get-rooms', (cb) => {
+    logClientRequest(clientIP, socket.id, 'SOCKET get-rooms', '');
     cb && cb(getRoomList());
   });
 
   socket.on('join-room', ({ roomId, name }, cb) => {
-    if (!rooms[roomId]) return cb && cb({ error: 'Room not found' });
+    logClientRequest(clientIP, socket.id, 'SOCKET join-room', `RoomID: ${roomId}, Name: ${name}`);
+    if (!rooms[roomId]) {
+      cb && cb({ error: 'Room not found' });
+      return;
+    }
     if (joinedRoom) socket.leave(joinedRoom);
     joinedRoom = roomId;
     userName = name || userName;
@@ -862,6 +1279,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('leave-room', (cb) => {
+    logClientRequest(clientIP, socket.id, 'SOCKET leave-room', `RoomID: ${joinedRoom}`);
     if (joinedRoom && rooms[joinedRoom]) {
       delete rooms[joinedRoom].users[socket.id];
       roomsData.setRooms(rooms);
@@ -876,6 +1294,7 @@ io.on('connection', (socket) => {
 
   // --- УДАЛЕНИЕ КОМНАТЫ ---
   socket.on('delete-room', ({ roomId }, cb) => {
+    logClientRequest(clientIP, socket.id, 'SOCKET delete-room', `RoomID: ${roomId}`);
     if (rooms[roomId]) {
       delete rooms[roomId];
       roomsData.setRooms(rooms);
@@ -889,6 +1308,7 @@ io.on('connection', (socket) => {
   // --- ROOM-AWARE EVENTS ---
   socket.on('ping', () => {
     if (joinedRoom && rooms[joinedRoom] && rooms[joinedRoom].users[socket.id]) {
+      logClientRequest(clientIP, socket.id, 'SOCKET ping', `RoomID: ${joinedRoom}`);
       const start = Date.now();
       socket.emit('pong', start);
     }
@@ -896,6 +1316,7 @@ io.on('connection', (socket) => {
 
   socket.on('pong-response', (start) => {
     if (joinedRoom && rooms[joinedRoom] && rooms[joinedRoom].users[socket.id]) {
+      logClientRequest(clientIP, socket.id, 'SOCKET pong-response', `RoomID: ${joinedRoom}`);
       const latency = Date.now() - start;
       rooms[joinedRoom].users[socket.id].ping = latency;
       io.to(joinedRoom).emit('room-state', rooms[joinedRoom]);
@@ -904,6 +1325,7 @@ io.on('connection', (socket) => {
 
   socket.on('buffer-update', (data) => {
     if (joinedRoom && rooms[joinedRoom] && rooms[joinedRoom].users[socket.id]) {
+      logClientRequest(clientIP, socket.id, 'SOCKET buffer-update', `RoomID: ${joinedRoom}, Position: ${data.position}, Status: ${data.status}`);
       rooms[joinedRoom].users[socket.id].buffer = data.buffer;
       rooms[joinedRoom].users[socket.id].position = data.position;
       rooms[joinedRoom].users[socket.id].status = data.status;
@@ -925,6 +1347,7 @@ io.on('connection', (socket) => {
 
   socket.on('video-command', (data) => {
     if (joinedRoom) {
+      logClientRequest(clientIP, socket.id, 'SOCKET video-command', `RoomID: ${joinedRoom}, Type: ${data.type}, Time: ${data.time}, Volume: ${data.volume}, Muted: ${data.muted}, Rate: ${data.rate}`);
       socket.to(joinedRoom).emit('video-command', data);
       // ✅ ОБНОВЛЯЕМ ГЛОБАЛЬНОЕ СОСТОЯНИЕ КОМНАТЫ
       if (data.type === 'play') {
@@ -952,11 +1375,13 @@ io.on('connection', (socket) => {
   });
 
   socket.on('select-video', (filename) => {
+    // УБРАНО: rooms[joinedRoom].state.currentTime = 0;
     if (joinedRoom && rooms[joinedRoom]) {
+      logClientRequest(clientIP, socket.id, 'SOCKET select-video', `RoomID: ${joinedRoom}, Filename: ${filename}`);
       rooms[joinedRoom].currentVideo = filename;
       rooms[joinedRoom].state.currentVideo = filename;
-      rooms[joinedRoom].state.currentTime = 0;
-      rooms[joinedRoom].state.isPlaying = false;
+      // УБРАНО: rooms[joinedRoom].state.currentTime = 0; // <-- УДАЛЕНО
+      rooms[joinedRoom].state.isPlaying = false; // <-- ОСТАВЛЕНО: чтобы остановить воспроизведение
       rooms[joinedRoom].state.updatedAt = new Date().toISOString();
       roomsData.setRooms(rooms);
       io.to(joinedRoom).emit('video-updated', filename);
@@ -965,6 +1390,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('set-name', (name) => {
+    logClientRequest(clientIP, socket.id, 'SOCKET set-name', `Name: ${name}`);
     userName = name;
     if (joinedRoom && rooms[joinedRoom] && rooms[joinedRoom].users[socket.id]) {
       rooms[joinedRoom].users[socket.id].name = name;
@@ -976,6 +1402,7 @@ io.on('connection', (socket) => {
   // ✅ НОВОЕ: ОБНОВЛЕНИЕ ГЛОБАЛЬНОГО СОСТОЯНИЯ КОМНАТЫ
   socket.on('update-room-state', (stateUpdates) => {
     if (joinedRoom && rooms[joinedRoom]) {
+      logClientRequest(clientIP, socket.id, 'SOCKET update-room-state', `RoomID: ${joinedRoom}, Updates: ${JSON.stringify(stateUpdates)}`);
       rooms[joinedRoom].state = {
         ...rooms[joinedRoom].state,
         ...stateUpdates,
@@ -990,6 +1417,7 @@ io.on('connection', (socket) => {
   // ✅ НОВОЕ: ОБНОВЛЕНИЕ СОСТОЯНИЯ ПОЛЬЗОВАТЕЛЯ
   socket.on('update-user-state', (stateUpdates) => {
     if (joinedRoom && rooms[joinedRoom] && rooms[joinedRoom].users[socket.id]) {
+      logClientRequest(clientIP, socket.id, 'SOCKET update-user-state', `RoomID: ${joinedRoom}, Updates: ${JSON.stringify(stateUpdates)}`);
       rooms[joinedRoom].users[socket.id].userState = {
         ...rooms[joinedRoom].users[socket.id].userState,
         ...stateUpdates,
@@ -1002,6 +1430,7 @@ io.on('connection', (socket) => {
 
   // ✅ НОВОЕ: КИК ПОЛЬЗОВАТЕЛЯ
   socket.on('kick-user', ({ userId, roomId }, cb) => {
+    logClientRequest(clientIP, socket.id, 'SOCKET kick-user', `RoomID: ${roomId}, KickedUserID: ${userId}`);
     if (rooms[roomId] && rooms[roomId].users[userId]) {
       // Отправляем пользователю команду на выход
       io.to(userId).emit('kicked-from-room', { message: 'You have been kicked from the room' });
@@ -1024,6 +1453,7 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     if (joinedRoom && rooms[joinedRoom]) {
+      logClientRequest(clientIP, socket.id, 'SOCKET disconnect', `RoomID: ${joinedRoom}`);
       delete rooms[joinedRoom].users[socket.id];
       roomsData.setRooms(rooms);
       // ✅ ИСПРАВЛЕНО: используем joinedRoom вместо roomId
@@ -1031,7 +1461,7 @@ io.on('connection', (socket) => {
       io.emit('room-list', getRoomList());
     }
     joinedRoom = null; // ✅ Сброс joinedRoom
-    console.log('[SOCKET] User disconnected:', socket.id);
+    console.log(`[SOCKET] User disconnected: ${socket.id} from IP: ${clientIP}`);
   });
 });
 

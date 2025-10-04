@@ -22,6 +22,7 @@
       --warning: #ffc107;
       --danger: #dc3545;
       --info: #17a2b8;
+      --cancelled: #6c757d; /* Серый для отменённых */
     }
 
     * {
@@ -383,6 +384,12 @@
       color: white;
     }
 
+    /* ✅ НОВОЕ: Стиль для отменённого статуса */
+    .status-cancelled {
+      background: var(--cancelled);
+      color: white;
+    }
+
     #notifications {
       position: fixed;
       top: 20px;
@@ -462,13 +469,13 @@
             <circle cx="50" cy="50" r="48" fill="url(#logoGradient)" />
 
             <!-- Буква S — ровно по центру -->
-            <text 
-              x="50" 
-              y="50" 
-              font-family="Arial, sans-serif" 
-              font-size="40" 
-              fill="white" 
-              text-anchor="middle" 
+            <text
+              x="50"
+              y="50"
+              font-family="Arial, sans-serif"
+              font-size="40"
+              fill="white"
+              text-anchor="middle"
               dominant-baseline="middle"
               alignment-baseline="middle"
               style="paint-order: stroke; stroke: #000; stroke-width: 1px;"
@@ -526,7 +533,7 @@
     // === MODAL FUNCTIONS ===
     function openTemplateModal() {
       document.getElementById('templateModal').style.display = 'flex';
-      
+
       // Сброс значений
       document.getElementById('templateNameSimple').value = '';
       document.getElementById('templateDescAdvanced').value = '';
@@ -534,7 +541,7 @@
       document.getElementById('crfSlider').value = 23;
       document.getElementById('crfValue').textContent = '23';
       document.getElementById('presetSelect').value = 'medium';
-      
+
       // Показываем простой режим по умолчанию
       switchMode('simple');
       updateSimplePreview();
@@ -554,7 +561,7 @@
           btn.classList.add('active');
         }
       });
-      
+
       // Показываем нужный контент
       document.getElementById('simpleMode').classList.toggle('active', mode === 'simple');
       document.getElementById('advancedMode').classList.toggle('active', mode === 'advanced');
@@ -567,10 +574,10 @@
       const presets = ['ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium', 'slow', 'slower', 'veryslow'];
       const presetIndex = Math.round((100 - sliderValue) / 12.5); // 0-100 → 0-8
       const preset = presets[Math.min(presets.length - 1, Math.max(0, presetIndex))];
-      
+
       const preview = `-c:v libx264 -crf ${crf} -preset ${preset} output.mp4`;
       document.getElementById('simplePreview').textContent = preview;
-      
+
       // Расчёт времени (примерный)
       calculateEstimatedTime(sliderValue);
     }
@@ -584,28 +591,28 @@
       const preset = document.getElementById('presetSelect').value;
       const enableAudio = document.getElementById('enableAudio').checked;
       const audioCodec = document.getElementById('audioCodec').value;
-      
+
       let filters = [];
       if (useResolution) {
-        if (resolutionSelect === 'custom' && customWidth && customHeight) {
+        if (resolutionSelect.value === 'custom' && customWidth && customHeight) {
           filters.push(`scale=${customWidth}:${customHeight}`);
-        } else if (resolutionSelect !== 'custom') {
+        } else if (resolutionSelect.value !== 'custom') {
           filters.push(`scale=${resolutionSelect}`);
         }
       }
-      
+
       let command = '';
       if (filters.length > 0) {
         command += `-vf ${filters.join(',')} `;
       }
       command += `-c:v libx264 -crf ${crf} -preset ${preset}`;
-      
+
       if (enableAudio) {
         command += ` -c:a ${audioCodec}`;
       }
-      
+
       command += ' output.mp4';
-      
+
       document.getElementById('advancedPreview').textContent = command;
     }
 
@@ -614,34 +621,59 @@
       // Примерный расчёт: 0-100 → 1-10 минут на 1ГБ
       const timePerGB = 1 + ((100 - sliderValue) * 0.09); // 1-10 минут
       const estimatedMinutes = Math.round(timePerGB);
-      
-      document.getElementById('estimatedTime').innerHTML = 
+
+      document.getElementById('estimatedTime').innerHTML =
         `Estimated time: ~${estimatedMinutes} min per GB`;
     }
 
-    // === API CALLS ===
-    async function apiCall(url, options = {}) {
+    // === API CALLS (обновлённая версия, теперь принимает метод)===
+    async function apiCall(url, method = 'POST', data = null) {
       try {
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          ...options
-        });
+        const config = {
+          method: method,
+          headers: { 'Content-Type': 'application/json' }
+        };
+
+        if (data && (method === 'POST' || method === 'PUT' || method === 'DELETE')) {
+          config.body = JSON.stringify(data);
+        }
+
+        const res = await fetch(url, config);
+
+        // Проверяем, что ответ успешный
+        if (!res.ok) {
+          // Пытаемся получить текст ошибки, если JSON не валиден
+          let errorText;
+          try {
+            const errorJson = await res.json();
+            errorText = errorJson.error || 'Unknown server error';
+          } catch (e) {
+            // Если не JSON, то просто текст
+            errorText = await res.text();
+          }
+          throw new Error(`HTTP ${res.status}: ${errorText}`);
+        }
+
         return await res.json();
       } catch (err) {
         console.error('API Error:', err);
+        // Показываем уведомление об ошибке API
+        showNotification('API Error: ' + err.message, 'error');
         return { success: false, error: err.message };
       }
     }
 
     // === LOAD TEMPLATES ===
     async function loadTemplates() {
-      const res = await apiCall('/api/transcode/templates');
+      // Вызываем с методом GET и без данных
+      const res = await apiCall('/api/transcode/templates', 'GET');
       const container = document.getElementById('templatesList');
+      if (!container) return;
       container.innerHTML = '';
 
-      if (res.success && res.templates.length > 0) {
+      if (res.success && res.templates && res.templates.length > 0) { // Добавляем проверку res.templates
         res.templates.forEach(template => {
+          // ... (ваш существующий код для отображения элемента шаблона)
           const div = document.createElement('div');
           div.className = 'template-item';
           div.innerHTML = `
@@ -664,44 +696,47 @@
           container.appendChild(div);
         });
       } else {
-        container.innerHTML = '<div class="template-item">No templates found</div>';
+        container.innerHTML = '<div class="template-item">No templates found or failed to load</div>';
       }
     }
 
     // === LOAD FILES ===
     async function loadFiles() {
       const container = document.getElementById('filesList');
+      if (!container) {
+         console.error('[TRANSCODE] Element #filesList not found!');
+         return;
+      }
       container.innerHTML = '<div class="file-item">Загрузка файлов...</div>';
-      
+
       try {
-        // ✅ ИСПРАВЛЕННЫЙ ПУТЬ К API
         const res = await fetch('/api/videos');
         if (!res.ok) {
           throw new Error(`HTTP error! status: ${res.status}`);
         }
-        
+
         const files = await res.json();
-        console.log('[TRANSCODE] Получены файлы:', files); // ✅ Отладка
-        
+        console.log('[TRANSCODE] Получены файлы:', files);
+
         container.innerHTML = '';
-        
+
         if (files.length > 0) {
           files.forEach(file => {
             // ✅ ОПРЕДЕЛЯЕМ, ПОДДЕРЖИВАЕТСЯ ЛИ ФОРМАТ
             const ext = file.name.split('.').pop().toLowerCase();
             const supportedFormats = ['mp4', 'webm', 'ogg'];
             const isSupported = supportedFormats.includes(ext);
-            
+
             const div = document.createElement('div');
             div.className = 'file-item';
-            
+
             // ✅ ФОРМИРУЕМ HTML С УЧЁТОМ ПОДДЕРЖКИ
             let fileInfoHtml = `
               <div class="file-info">
                 <div class="file-name">${file.name}</div>
                 <div class="file-meta">${file.resolution || 'N/A'} | ${file.bitrate || 'N/A'}</div>
             `;
-            
+
             // ✅ ДОБАВЛЯЕМ ПРЕДУПРЕЖДЕНИЕ, ЕСЛИ ФОРМАТ НЕ ПОДДЕРЖИВАЕТСЯ
             if (!isSupported) {
               fileInfoHtml += `
@@ -711,11 +746,11 @@
                 </div>
               `;
             }
-            
+
             fileInfoHtml += `
               </div>
             `;
-            
+
             div.innerHTML = fileInfoHtml + `
               <div class="file-actions">
                 <!-- ✅ ВЫПАДАЮЩИЙ СПИСОК ШАБЛОНОВ -->
@@ -729,43 +764,52 @@
               </div>
             `;
             container.appendChild(div);
-            
+
             // === ЗАГРУЖАЕМ ШАБЛОНЫ В СЕЛЕКТОР ===
             loadTemplatesForSelector(div.querySelector('.template-selector'), file.name);
-            
+
             // === ОБРАБОТЧИК ИЗМЕНЕНИЯ СЕЛЕКТОРА ===
-            div.querySelector('.template-selector').addEventListener('change', async (e) => {
-              const fileId = e.target.dataset.file;
-              const templateId = e.target.value;
-              if (templateId) {
-                await addToQueue(fileId, templateId);
-                e.target.value = ''; // Сбрасываем селектор
-              }
-            });
-            
+            const selector = div.querySelector('.template-selector');
+            if (selector) {
+              selector.addEventListener('change', async (e) => {
+                const fileId = e.target.dataset.file;
+                const templateId = e.target.value;
+                if (templateId) {
+                  await addToQueue(fileId, templateId);
+                  e.target.value = ''; // Сбрасываем селектор
+                }
+              });
+            }
+
             // ✅ ОБРАБОТЧИК КНОПКИ БЫСТРОГО ТРАНСКОДИРОВАНИЯ
-            div.querySelector('.quick-transcode-btn').addEventListener('click', async (e) => {
-              e.stopPropagation();
-              const fileId = e.target.closest('.quick-transcode-btn').dataset.file;
-              if (fileId) {
-                await quickTranscode(fileId);
-              }
-            });
+            const quickBtn = div.querySelector('.quick-transcode-btn');
+            if (quickBtn) {
+              quickBtn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const fileId = e.target.closest('.quick-transcode-btn').dataset.file;
+                if (fileId) {
+                  await quickTranscode(fileId);
+                }
+              });
+            }
           });
         } else {
           container.innerHTML = '<div class="file-item">No videos found</div>';
         }
       } catch (err) {
         console.error('[TRANSCODE] Ошибка загрузки файлов:', err);
-        container.innerHTML = `<div class="file-item">Ошибка загрузки файлов: ${err.message}</div>`;
+        if (container) { // Проверяем, существует ли контейнер снова
+          container.innerHTML = `<div class="file-item">Ошибка загрузки файлов: ${err.message}</div>`;
+        }
         showNotification('Ошибка загрузки файлов: ' + err.message, 'error');
       }
     }
 
     // === ЗАГРУЖАЕМ ШАБЛОНЫ В СЕЛЕКТОР ===
     async function loadTemplatesForSelector(selector, fileId) {
+      if (!selector) return;
       try {
-        const res = await apiCall('/api/transcode/templates');
+        const res = await apiCall('/api/transcode/templates', 'GET'); // GET для шаблонов
         if (res.success) {
           res.templates.forEach(template => {
             const option = document.createElement('option');
@@ -781,14 +825,13 @@
 
     // === ДОБАВИТЬ В ОЧЕРЕДЬ ===
     async function addToQueue(fileId, templateId) {
-      const res = await apiCall('/api/transcode/add-to-queue', {
-        body: JSON.stringify({ fileId, templateId })
-      });
+      const res = await apiCall('/api/transcode/add-to-queue', 'POST', { fileId, templateId }); // Указываем метод и данные
       if (res.success) {
         showNotification(`Added to queue: ${fileId}`, 'success');
         loadQueue();
       } else {
-        showNotification('Failed to add to queue: ' + res.error, 'error');
+        // Ошибка уже показывается в apiCall
+        // showNotification('Failed to add to queue: ' + res.error, 'error'); // Можно убрать, если apiCall показывает
       }
     }
 
@@ -799,7 +842,6 @@
       }
 
       try {
-        // ✅ ИСПРАВЛЕННЫЙ ПУТЬ К API
         const res = await fetch('/api/transcode/quick-transcode', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -820,16 +862,31 @@
       }
     }
 
-    // === LOAD QUEUE ===
+    // === LOAD QUEUE (обновлённая версия с кнопкой Cancel) ===
     async function loadQueue() {
-      const res = await apiCall('/api/transcode/queue');
+      const res = await apiCall('/api/transcode/queue', 'GET'); // Убедитесь, что GET
       const container = document.getElementById('queueList');
+      if (!container) return;
       container.innerHTML = '';
 
-      if (res.success && res.queue.length > 0) {
+      if (res.success && res.queue && res.queue.length > 0) {
         res.queue.forEach(item => {
           const div = document.createElement('div');
           div.className = 'queue-item';
+
+          // Определяем отображаемый статус и цвет
+          let statusClass = 'status-' + item.status;
+          let statusText = item.status;
+          let isCancellable = false;
+          if (item.status === 'pending' || (item.status === 'processing' && !item.isCancelled)) {
+              isCancellable = true;
+          }
+          if (item.isCancelled) {
+              statusClass = 'status-cancelled'; // Добавим класс для отменённых
+              statusText = 'cancelled';
+              isCancellable = false; // Уже отменено
+          }
+
           div.innerHTML = `
             <div class="queue-header">
               <div>
@@ -837,17 +894,47 @@
                 <div class="queue-template">${item.templateName || 'Unknown'}</div>
               </div>
               <div>
-                <span class="status-badge status-${item.status}">${item.status}</span>
+                <span class="status-badge ${statusClass}">${statusText}</span>
+                ${isCancellable ? `<button class="btn btn-sm btn-danger cancel-job-btn" data-job-id="${item.id}">Cancel</button>` : ''}
               </div>
             </div>
-            ${item.progress ? `
+            ${item.progress && !item.isCancelled ? `
               <div class="progress-bar">
                 <div class="progress-bar-fill" style="width: ${item.progress}%"></div>
               </div>
               <div style="font-size: 0.8rem; text-align: center;">${Math.round(item.progress)}%</div>
             ` : ''}
+            ${item.error && item.status === 'error' ? `<div style="color: var(--danger); font-size: 0.8rem; margin-top: 0.25rem;">Error: ${item.error}</div>` : ''}
           `;
           container.appendChild(div);
+
+          // Добавляем обработчик для кнопки отмены, если она существует
+          const cancelBtn = div.querySelector('.cancel-job-btn');
+          if (cancelBtn) {
+              cancelBtn.addEventListener('click', async (e) => {
+                  e.stopPropagation(); // Предотвращаем срабатывание других обработчиков на div
+                  const jobId = cancelBtn.dataset.jobId;
+                  if (confirm(`Cancel job ${jobId}?`)) {
+                      try {
+                          const cancelRes = await fetch('/api/transcode/cancel-job', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ jobId: jobId })
+                          });
+                          const cancelData = await cancelRes.json();
+                          if (cancelData.success) {
+                              showNotification(`Job ${jobId} cancelled`, 'success');
+                              loadQueue(); // Обновляем список очереди
+                          } else {
+                              showNotification('Cancel failed: ' + (cancelData.error || 'Unknown error'), 'error');
+                          }
+                      } catch (err) {
+                          console.error('Error cancelling job:', err);
+                          showNotification('Cancel failed: ' + err.message, 'error');
+                      }
+                  }
+              });
+          }
         });
       } else {
         container.innerHTML = '<div class="queue-item">Queue is empty</div>';
@@ -862,50 +949,61 @@
     // === DELETE TEMPLATE ===
     async function deleteTemplate(templateId) {
       if (confirm('Delete this template?')) {
-        const res = await apiCall('/api/transcode/delete-template', {
-          body: JSON.stringify({ id: templateId })
-        });
+        const res = await apiCall('/api/transcode/delete-template', 'POST', { id: templateId }); // Указываем метод и данные
         if (res.success) {
           showNotification('Template deleted', 'success');
           loadTemplates();
         } else {
-          showNotification('Failed to delete template: ' + res.error, 'error');
+          // Ошибка уже показывается в apiCall
+          // showNotification('Failed to delete template: ' + res.error, 'error');
         }
       }
     }
 
     // === SAVE TEMPLATE ===
-    document.getElementById('saveTemplateBtn').addEventListener('click', async () => {
-      const activeMode = document.querySelector('.mode-btn.active').dataset.mode;
-      let name, description, command;
-      
-      if (activeMode === 'simple') {
-        name = document.getElementById('templateNameSimple').value.trim();
-        description = 'Simple template with quality/speed slider';
-        command = document.getElementById('simplePreview').textContent;
-      } else {
-        name = document.getElementById('templateNameAdvanced').value.trim();
-        description = document.getElementById('templateDescAdvanced').value.trim();
-        command = document.getElementById('advancedPreview').textContent;
+    function saveTemplate() {
+      const activeModeBtn = document.querySelector('.mode-btn.active');
+      if (!activeModeBtn) {
+        showNotification('Mode not selected', 'error');
+        return;
       }
-      
+      const activeMode = activeModeBtn.dataset.mode;
+
+      let name, description, command;
+
+      if (activeMode === 'simple') {
+        const nameInput = document.getElementById('templateNameSimple');
+        const previewText = document.getElementById('simplePreview').textContent;
+        name = nameInput ? nameInput.value.trim() : '';
+        description = 'Simple template with quality/speed slider';
+        command = previewText;
+      } else {
+        const nameInput = document.getElementById('templateNameAdvanced');
+        const descInput = document.getElementById('templateDescAdvanced');
+        const previewText = document.getElementById('advancedPreview').textContent;
+        name = nameInput ? nameInput.value.trim() : '';
+        description = descInput ? descInput.value.trim() : '';
+        command = previewText;
+      }
+
       if (!name || !command) {
         showNotification('Please fill all required fields', 'error');
         return;
       }
-      
-      const res = await apiCall('/api/transcode/save-template', {
-        body: JSON.stringify({ name, description, command })
+
+      // Вызываем с методом POST и данными
+      apiCall('/api/transcode/save-template', 'POST', { name, description, command }).then(res => {
+        if (res.success) {
+          showNotification(`Template saved: ${name}`, 'success');
+          closeTemplateModal();
+          loadTemplates();
+        } else {
+          // Ошибка уже показывается в apiCall
+          // showNotification('Failed to save template: ' + res.error, 'error'); // Можно убрать
+        }
       });
-      
-      if (res.success) {
-        showNotification(`Template saved: ${name}`, 'success');
-        closeTemplateModal();
-        loadTemplates();
-      } else {
-        showNotification('Failed to save template: ' + res.error, 'error');
-      }
-    });
+    }
+
 
     // === NOTIFICATIONS ===
     function showNotification(message, type) {
@@ -921,42 +1019,82 @@
 
     // === INIT ===
     window.addEventListener('DOMContentLoaded', () => {
-      document.getElementById('addTemplateBtn').addEventListener('click', openTemplateModal);
-      
+      // === ADD TEMPLATE BUTTON ===
+      const addTemplateBtn = document.getElementById('addTemplateBtn');
+      if (addTemplateBtn) {
+        addTemplateBtn.addEventListener('click', openTemplateModal);
+      } else {
+        console.warn('[TRANSCODE] #addTemplateBtn not found');
+      }
+
       // === MODE SWITCHING ===
       document.querySelectorAll('.mode-btn').forEach(btn => {
         btn.addEventListener('click', () => {
           switchMode(btn.dataset.mode);
         });
       });
-      
-      // === SLIDERS ===
-      document.getElementById('qualitySpeedSlider').addEventListener('input', updateSimplePreview);
-      document.getElementById('crfSlider').addEventListener('input', (e) => {
-        document.getElementById('crfValue').textContent = e.target.value;
-        updateAdvancedPreview();
-      });
-      
-      // === RESOLUTION SELECT ===
-      document.getElementById('resolutionSelect').addEventListener('change', (e) => {
-        const customDiv = document.getElementById('customResolution');
-        customDiv.style.display = e.target.value === 'custom' ? 'block' : 'none';
-        updateAdvancedPreview();
-      });
 
-      document.getElementById('customWidth').addEventListener('input', updateAdvancedPreview);
-      document.getElementById('customHeight').addEventListener('input', updateAdvancedPreview);
-      
+      // === SLIDERS ===
+      const qualitySlider = document.getElementById('qualitySpeedSlider');
+      if (qualitySlider) {
+        qualitySlider.addEventListener('input', updateSimplePreview);
+      }
+
+      const crfSlider = document.getElementById('crfSlider');
+      if (crfSlider) {
+        crfSlider.addEventListener('input', (e) => {
+          document.getElementById('crfValue').textContent = e.target.value;
+          updateAdvancedPreview();
+        });
+      }
+
+      // === RESOLUTION SELECT ===
+      const resSelect = document.getElementById('resolutionSelect');
+      if (resSelect) {
+        resSelect.addEventListener('change', (e) => {
+          const customDiv = document.getElementById('customResolution');
+          if (customDiv) {
+            customDiv.style.display = e.target.value === 'custom' ? 'block' : 'none';
+          }
+          updateAdvancedPreview();
+        });
+      }
+
+      const customWidth = document.getElementById('customWidth');
+      if (customWidth) {
+        customWidth.addEventListener('input', updateAdvancedPreview);
+      }
+      const customHeight = document.getElementById('customHeight');
+      if (customHeight) {
+        customHeight.addEventListener('input', updateAdvancedPreview);
+      }
+
       // === CHECKBOXES & SELECTS ===
-      document.getElementById('useResolution').addEventListener('change', updateAdvancedPreview);
-      document.getElementById('presetSelect').addEventListener('change', updateAdvancedPreview);
-      document.getElementById('enableAudio').addEventListener('change', updateAdvancedPreview);
-      document.getElementById('audioCodec').addEventListener('change', updateAdvancedPreview);
-      
-      // === BUTTONS ===
-      document.getElementById('addTemplateBtn').addEventListener('click', openTemplateModal);
-      document.getElementById('saveTemplateBtn').addEventListener('click', saveTemplate);
-      
+      const useResCheck = document.getElementById('useResolution');
+      if (useResCheck) {
+        useResCheck.addEventListener('change', updateAdvancedPreview);
+      }
+      const presetSelect = document.getElementById('presetSelect');
+      if (presetSelect) {
+        presetSelect.addEventListener('change', updateAdvancedPreview);
+      }
+      const audioCheck = document.getElementById('enableAudio');
+      if (audioCheck) {
+        audioCheck.addEventListener('change', updateAdvancedPreview);
+      }
+      const audioCodec = document.getElementById('audioCodec');
+      if (audioCodec) {
+        audioCodec.addEventListener('change', updateAdvancedPreview);
+      }
+
+      // === SAVE TEMPLATE BUTTON (проверка перед добавлением обработчика) ===
+      const saveTemplateBtn = document.getElementById('saveTemplateBtn');
+      if (saveTemplateBtn) {
+        saveTemplateBtn.addEventListener('click', saveTemplate);
+      } else {
+        console.warn('[TRANSCODE] #saveTemplateBtn not found');
+      }
+
       // ✅ ЗАГРУЖАЕМ ФАЙЛЫ И ОЧЕРЕДЬ
       loadFiles();
       loadTemplates();

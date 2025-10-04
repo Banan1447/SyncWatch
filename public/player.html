@@ -1,8 +1,7 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SyncWatch Player</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <style>
@@ -19,7 +18,10 @@
       --hover-bg: #1e1e1e;
       --progress-bg: #2c2c2c;
       --progress-fill: #007bff;
-      --warning-color: #ff6b6b;
+      --success: #28a745;
+      --warning: #ffc107;
+      --danger: #dc3545;
+      --info: #17a2b8;
     }
 
     * {
@@ -282,6 +284,7 @@
       border-radius: 3px;
       overflow: hidden;
       margin-top: 0.5rem;
+      display: none; /* Скрываем по умолчанию */
     }
 
     .progress-bar-fill {
@@ -339,10 +342,40 @@
       text-decoration: none;
       font-size: 0.9rem;
       font-weight: normal;
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      transition: all 0.2s ease;
     }
 
     .manage-videos-link:hover {
+      background: rgba(0, 123, 255, 0.1);
+      color: #fff;
+      text-decoration: none;
+    }
+
+    /* ✅ НОВОЕ: Стиль для хлебных крошек */
+    .breadcrumb {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.9rem;
+    }
+
+    .breadcrumb span {
+      cursor: pointer;
+      color: var(--accent);
+    }
+
+    .breadcrumb span:hover {
       text-decoration: underline;
+    }
+
+    .breadcrumb .separator {
+      color: var(--text-secondary);
+      cursor: default;
     }
 
     #videoList {
@@ -351,7 +384,7 @@
       gap: 0.5rem;
     }
 
-    .video-item {
+    .video-item, .folder-item-grid { /* ✅ Объединяем стили для видео и папок */
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -363,16 +396,16 @@
       transition: background 0.2s ease;
     }
 
-    .video-item:hover {
+    .video-item:hover, .folder-item-grid:hover {
       background: var(--hover-bg);
     }
 
-    .video-info {
+    .video-info, .folder-info { /* ✅ Объединяем стили для информации */
       flex: 1;
       overflow: hidden;
     }
 
-    .video-title {
+    .video-title, .folder-name { /* ✅ Объединяем стили для заголовков */
       font-size: 0.9rem;
       white-space: nowrap;
       overflow: hidden;
@@ -380,15 +413,15 @@
       color: var(--text);
     }
 
-    .video-meta {
+    .video-meta, .folder-meta { /* ✅ Объединяем стили для метаинформации */
       font-size: 0.7rem;
       color: var(--text-secondary);
       margin-top: 0.25rem;
     }
 
-    /* ✅ НОВЫЙ СТИЛЬ ДЛЯ НЕПОДДЕРЖИВАЕМЫХ ФАЙЛОВ */
+    /* ✅ НОВОЕ: ПРЕДУПРЕЖДЕНИЕ ДЛЯ НЕПОДДЕРЖИВАЕМЫХ ФАЙЛОВ */
     .unsupported-warning {
-      color: var(--warning-color); /* Красный цвет */
+      color: var(--warning); /* Жёлтый цвет */
       font-size: 0.7rem;
       font-weight: 500;
       margin-top: 0.25rem;
@@ -401,7 +434,7 @@
       font-size: 0.8rem;
     }
 
-    .play-btn {
+    .play-btn, .folder-enter-btn { /* ✅ Объединяем стили для кнопок */
       background: var(--accent);
       color: white;
       border: none;
@@ -415,7 +448,7 @@
       transition: background 0.2s ease;
     }
 
-    .play-btn:hover {
+    .play-btn:hover, .folder-enter-btn:hover {
       background: #0056b3;
     }
 
@@ -617,6 +650,10 @@
         Videos
         <a href="javascript:void(0)" class="manage-videos-link" id="manageVideosLink">Manage Videos</a>
       </h3>
+      <!-- ✅ НОВОЕ: Хлебные крошки для навигации по папкам -->
+      <div class="breadcrumb" id="videoBreadcrumb">
+        <!-- Хлебные крошки будут здесь -->
+      </div>
       <div id="videoList"></div>
 
       <!-- Список пользователей -->
@@ -629,14 +666,16 @@
 
   <div id="notifications"></div>
 
+  <!-- ✅ ПОДКЛЮЧАЕМ SOCKET.IO ДЛЯ СИНХРОНИЗАЦИИ -->
   <script src="/socket.io/socket.io.js"></script>
   <script>
     // === SOCKET CONNECTION ===
     const socket = io();
     let joinedRoom = null;
-    let currentVideoFile = null;
-    let isVideoReady = false;
-    let currentUserIsHost = false;
+    let currentVideoFile = null; // ✅ Локальная переменная для текущего видео
+    let isVideoReady = false; // Флаг готовности видео
+    let lastSeekSent = 0; // Для предотвращения зацикливания seek
+    let userName = localStorage.getItem('userName') || `User${Math.floor(Math.random()*10000)}`;
 
     // === URL PARAMS ===
     const urlParams = new URLSearchParams(window.location.search);
@@ -655,6 +694,10 @@
           window.location.href = '/select-room.html';
         } else {
           joinedRoom = roomId;
+          userName = res.room.name;
+          // ✅ После присоединения к комнате, загружаем видео из корневой папки
+          updateVideoBreadcrumb();
+          loadAndRenderVideoListForPath(''); 
         }
       });
     }
@@ -681,6 +724,7 @@
     const qualityDropdown = document.getElementById('qualityDropdown');
     const leaveRoomBtn = document.getElementById('leaveRoomBtn');
     const usersList = document.getElementById('usersList');
+    const videoBreadcrumb = document.getElementById('videoBreadcrumb'); // ✅ Элемент для хлебных крошек
 
     // === MANAGE VIDEOS LINK WITH ROOM REMEMBER ===
     document.getElementById('manageVideosLink').addEventListener('click', () => {
@@ -746,92 +790,6 @@
       });
     });
 
-    // === ROOM-AWARE VIDEO LIST ===
-    let roomState = null;
-    function renderRoomVideoList() {
-      if (!roomState) return;
-      videoList.innerHTML = '';
-      fetch('/api/videos')
-        .then(res => res.json())
-        .then(videos => {
-          videos.forEach(video => {
-            // ✅ ОПРЕДЕЛЯЕМ, ПОДДЕРЖИВАЕТСЯ ЛИ ФОРМАТ
-            const ext = video.name.split('.').pop().toLowerCase();
-            const supportedFormats = ['mp4', 'webm', 'ogg'];
-            const isSupported = supportedFormats.includes(ext);
-
-            const div = document.createElement('div');
-            div.className = 'video-item';
-            
-            // ✅ ФОРМИРУЕМ HTML С УЧЁТОМ ПОДДЕРЖКИ
-            let videoInfoHtml = `
-              <div class="video-info">
-                <strong class="video-title">${video.name}</strong><br>
-                <small class="video-meta">${video.resolution || 'N/A'} | ${video.bitrate || 'N/A'}</small>
-            `;
-            
-            // ✅ ДОБАВЛЯЕМ ПРЕДУПРЕЖДЕНИЕ, ЕСЛИ ФОРМАТ НЕ ПОДДЕРЖИВАЕТСЯ
-            if (!isSupported) {
-              videoInfoHtml += `
-                <div class="unsupported-warning">
-                  <i class="fas fa-exclamation-triangle"></i>
-                  Требуется конвертация
-                </div>
-              `;
-            }
-            
-            videoInfoHtml += `
-              </div>
-            `;
-            
-            div.innerHTML = videoInfoHtml + `
-              <i class="fas fa-play-circle preview-icon"></i>
-            `;
-            
-            div.addEventListener('click', () => {
-              if (!isSupported) {
-                if (!confirm('Этот формат видео может не воспроизводиться в браузере. Продолжить?')) {
-                  return;
-                }
-              }
-              socket.emit('select-video', video.name);
-              currentVideoFile = video.name;
-            });
-            videoList.appendChild(div);
-          });
-        });
-    }
-
-    // === USERS LIST ===
-    function renderUsersList() {
-      if (!roomState || !roomState.users) return;
-      usersList.innerHTML = '';
-
-      Object.keys(roomState.users).forEach(userId => {
-        const user = roomState.users[userId];
-        const div = document.createElement('div');
-        div.className = 'user-item';
-        div.innerHTML = `
-          <div class="user-name">${user.name}</div>
-          <button class="kick-btn" data-id="${userId}"><i class="fas fa-times"></i></button>
-        `;
-        usersList.appendChild(div);
-
-        // === KICK USER ===
-        div.querySelector('.kick-btn').addEventListener('click', () => {
-          if (confirm(`Kick user "${user.name}" from room?`)) {
-            socket.emit('kick-user', { userId, roomId }, res => {
-              if (res && res.success) {
-                showNotification(`User kicked: ${user.name}`, 'success');
-              } else {
-                showNotification('Kick failed: ' + (res?.error || 'Unknown error'), 'error');
-              }
-            });
-          }
-        });
-      });
-    }
-
     // === UPLOAD VIDEO ===
     uploadBtn.addEventListener('click', () => {
       uploadInput.click();
@@ -864,7 +822,8 @@
               showNotification(`Video uploaded: ${data.file}`, 'success');
               progressBar.style.display = 'none';
               progressBarFill.style.width = '0';
-              // После загрузки не обновляем список локально, а ждём событие video-updated/room-state
+              // После загрузки обновляем список видео
+              loadAndRenderVideoListForPath(currentPlayerPath); // Обновляем текущую папку
             } else {
               showNotification('Upload failed', 'error');
               progressBar.style.display = 'none';
@@ -878,22 +837,6 @@
         xhr.open('POST', '/upload');
         xhr.send(formData);
       }
-    });
-
-    // === ROOM STATE ===
-    socket.on('room-state', (state) => {
-      roomState = state;
-      // Видео
-      if (state.currentVideo) {
-        video.src = `/videos/${state.currentVideo}`;
-        statusEl.innerHTML = `Video loaded: ${state.currentVideo}`;
-        currentVideoFile = state.currentVideo;
-        isVideoReady = false;
-      }
-      // Пользователи
-      document.getElementById('onlineCount').textContent = Object.keys(state.users).length;
-      renderRoomVideoList();
-      renderUsersList();
     });
 
     // === LEAVE ROOM ===
@@ -921,7 +864,6 @@
     });
 
     // === ПРОСТОЙ ФУНКЦИОНАЛ ПЕРЕМАТЫВАНИЯ ===
-    let lastSeekSent = 0;
     video.addEventListener('seeked', () => {
       if (isVideoReady) {
         const now = Date.now();
@@ -952,6 +894,7 @@
           if (Math.abs(video.currentTime - data.time) > 0.5) {
             lastSeekSent = Date.now();
             video.currentTime = data.time;
+            console.log(`SyncWatch: Received seek command to ${data.time}s`);
           }
         }
       }
@@ -997,11 +940,330 @@
 
     // === НОВОЕ: ВИДЕО ОБНОВЛЕНО ===
     socket.on('video-updated', (filename) => {
+      console.log(`SyncWatch: Video updated event received: ${filename}`);
+      // ✅ Обновляем src видео сразу
       video.src = `/videos/${filename}`;
-      statusEl.innerHTML = `Video loaded: ${filename}`;
-      currentVideoFile = filename;
-      isVideoReady = false;
+      statusEl.innerHTML = `Video loaded: ${filename.split('/').pop()}`; // Отображаем только имя
+      currentVideoFile = filename; // ✅ Обновляем локальную переменную
+      isVideoReady = false; // ✅ Сбрасываем флаг готовности
+      // ✅ Обновляем выделение в списке видео
+      highlightSelectedVideo(filename);
+      // ✅ Обновляем список видео в текущей папке
+      loadAndRenderVideoListForPath(currentPlayerPath);
     });
+
+    // === ГЛОБАЛЬНОЕ СОСТОЯНИЕ КОМНАТЫ ===
+    let roomState = null;
+    socket.on('room-state', (state) => {
+      roomState = state;
+      console.log('[PLAYER] Received room state:', state); // ✅ Отладка
+      // Видео
+      if (state.currentVideo) {
+        // ✅ Проверяем, изменилось ли видео
+        if (currentVideoFile !== state.currentVideo) {
+          // ✅ Если видео изменилось, обновляем src
+          video.src = `/videos/${state.currentVideo}`;
+          statusEl.innerHTML = `Video loaded: ${state.currentVideo.split('/').pop()}`; // Отображаем только имя
+          currentVideoFile = state.currentVideo; // ✅ Обновляем локальную переменную
+          isVideoReady = false; // ✅ Сбрасываем флаг готовности
+          // ✅ НЕ устанавливаем currentTime при смене видео, браузер сам сбросит на 0
+          console.log(`[PLAYER] Video src changed to: ${state.currentVideo}`);
+        } else {
+          // ✅ Если видео НЕ изменилось, но пришло обновление состояния
+          // Можем обновить currentTime, но только если видео готово
+          if (isVideoReady && video.readyState >= 1) { // >= 1 означает, что duration известна
+             // Проверяем, отличается ли текущее время в плеере от времени в состоянии комнаты
+             // Это нужно, чтобы не перескакивать, если пользователь сам перематывает
+             // Но для простоты, можно обновить, если разница > 0.5 секунды (как в seek)
+             if (Math.abs(video.currentTime - state.currentTime) > 0.5) {
+                 // Избегаем зацикливания: не устанавливаем, если последнее действие - seek
+                 const now = Date.now();
+                 if (now - lastSeekSent > 1000) { // 1 секунда
+                     video.currentTime = state.currentTime;
+                     console.log(`SyncWatch: Syncing time to ${state.currentTime}s`);
+                 }
+             }
+          }
+        }
+        // ✅ Обновляем выделение в списке видео
+        highlightSelectedVideo(state.currentVideo);
+      }
+      // Пользователи
+      document.getElementById('onlineCount').textContent = Object.keys(state.users).length;
+      renderUsersList();
+      // ✅ Обновляем список видео в текущей папке
+      loadAndRenderVideoListForPath(currentPlayerPath);
+    });
+
+    // === USERS LIST ===
+    function renderUsersList() {
+      if (!roomState || !roomState.users) return;
+      usersList.innerHTML = '';
+
+      Object.keys(roomState.users).forEach(userId => {
+        const user = roomState.users[userId];
+        const div = document.createElement('div');
+        div.className = 'user-item';
+        div.innerHTML = `
+          <div class="user-name">${user.name}</div>
+          <button class="kick-btn" data-id="${userId}"><i class="fas fa-times"></i></button>
+        `;
+        usersList.appendChild(div);
+
+        // === KICK USER ===
+        div.querySelector('.kick-btn').addEventListener('click', () => {
+          if (confirm(`Kick user "${user.name}" from room?`)) {
+            socket.emit('kick-user', { userId, roomId }, res => {
+              if (res && res.success) {
+                showNotification(`User kicked: ${user.name}`, 'success');
+              } else {
+                showNotification('Kick failed: ' + (res?.error || 'Unknown error'), 'error');
+              }
+            });
+          }
+        });
+      });
+    }
+
+    // === ЛОГИКА НАВИГАЦИИ ПО ПАПКАМ В ПЛЕЕРЕ ===
+    let currentPlayerPath = ''; // Текущий путь в плеере
+
+    // Функция для навигации к папке
+    async function navigatePlayerToFolder(folderPath) {
+        currentPlayerPath = folderPath;
+        updateVideoBreadcrumb();
+        await loadAndRenderVideoListForPath(folderPath);
+    }
+
+    // Функция для обновления хлебных крошек
+    function updateVideoBreadcrumb() {
+      videoBreadcrumb.innerHTML = ''; // Очищаем
+
+      const homeSpan = document.createElement('span');
+      homeSpan.style.cursor = 'pointer';
+      homeSpan.style.color = 'var(--accent)';
+      homeSpan.textContent = 'Home';
+      homeSpan.addEventListener('click', () => navigatePlayerToFolder(''));
+      videoBreadcrumb.appendChild(homeSpan);
+
+      if (currentPlayerPath === '') return;
+
+      const parts = currentPlayerPath.split('/'); // Используем '/' для путей API
+      let pathSoFar = '';
+
+      parts.forEach((part, index) => {
+        const separator = document.createElement('span');
+        separator.className = 'separator';
+        separator.textContent = ' / ';
+        separator.style.margin = '0 0.25rem';
+        videoBreadcrumb.appendChild(separator);
+
+        pathSoFar = pathSoFar ? pathSoFar + '/' + part : part;
+
+        const partSpan = document.createElement('span');
+        partSpan.style.cursor = 'pointer';
+        partSpan.style.color = 'var(--accent)';
+        partSpan.textContent = part;
+        partSpan.addEventListener('click', () => navigatePlayerToFolder(pathSoFar));
+        videoBreadcrumb.appendChild(partSpan);
+      });
+    }
+
+    // === ЗАГРУЗКА И ОТРИСОВКА СПИСКА ВИДЕО И ПАПОК ИЗ КОНКРЕТНОЙ ПАПКИ ===
+    async function loadAndRenderVideoListForPath(path) {
+        // Нам нужен новый API эндпоинт на сервере, который отдает содержимое конкретной папки
+        // Пока что симулируем это, загружая всю структуру и фильтруя
+        // В реальном приложении лучше сделать отдельный эндпоинт, например `/api/files/list?path=...`
+
+        try {
+             // 1. Загружаем структуру папок (новый эндпоинт)
+             const structRes = await fetch('/api/files/list');
+             const structData = await structRes.json();
+             if (!structData.success) throw new Error(structData.error || 'Failed to load structure');
+
+             // 2. Находим содержимое нужной папки
+             const findContents = (items, targetPath) => {
+               if (targetPath === '') return items;
+               for (const item of items) {
+                 if (item.type === 'folder' && item.path === targetPath) {
+                   return item.children || [];
+                 }
+                 if (item.type === 'folder' && item.children) {
+                   const found = findContents(item.children, targetPath);
+                   if (found) return found;
+                 }
+               }
+               return []; // Если не найдено, возвращаем пустой массив
+             };
+
+             const contentsAtPath = findContents(structData.structure, path);
+
+             // 3. ✅ НЕ ФИЛЬТРУЕМ содержимое, передаём ВСЁ (и файлы, и папки)
+             // const videoFiles = contentsAtPath.filter(item => item.type === 'file'); // <-- УДАЛЕНО
+             const itemsToRender = contentsAtPath; // <-- ИСПОЛЬЗУЕМ ВСЁ СОДЕРЖИМОЕ
+
+             // 4. Получаем метаданные для каждого файла (как в старом /api/videos)
+             // Так как у нас нет эндпоинта для метаданных по путям, симулируем
+             // В реальности, серверный /api/videos должен уметь фильтровать или быть другим
+
+             // Для простоты, предположим, что у нас есть эндпоинт, который может отдать
+             // информацию о файлах по списку путей. Пока используем старый /api/videos
+             // и фильтруем на клиенте. Это не эффективно, но быстро для MVP.
+
+             // Получаем ВСЕ видео (старый способ)
+             const allVideosRes = await fetch('/api/videos');
+             const allVideosData = await allVideosRes.json();
+
+             // Фильтруем те, которые находятся в нужной папке
+             const videosInFolder = allVideosData.filter(videoObj => {
+                 // videoObj.name содержит имя файла, например `subfolder/video.mp4`.
+                 // Нам нужно проверить, начинается ли путь с `currentPlayerPath`
+                 // и что уровень вложенности на 1 больше.
+                 const videoPath = videoObj.name; // Этот путь относительный от VIDEO_FOLDER
+                 if (path === '') {
+                     // Корневая папка: путь не должен содержать '/'
+                     return !videoPath.includes('/');
+                 } else {
+                     // Проверяем, что путь файла начинается с `path + '/'`
+                     return videoPath.startsWith(path + '/');
+                 }
+             });
+
+             console.log(`[PLAYER] Загружено ${videosInFolder.length} видео из папки: ${path || 'Root'}`);
+             // ✅ Передаём ВСЁ содержимое папки в renderVideoListItems
+             renderVideoListItems(itemsToRender, videosInFolder); // <-- ОБНОВЛЕНО: передаём и содержимое, и метаданные
+
+        } catch (err) {
+             console.error('[PLAYER] Ошибка загрузки списка видео из папки:', err);
+             showNotification('Failed to load video list: ' + err.message, 'error');
+             videoList.innerHTML = '<div class="video-item">Error loading videos</div>';
+        }
+    }
+
+    // === МГНОВЕННОЕ ВЫДЕЛЕНИЕ ВИДЕО ===
+    function highlightSelectedVideo(videoPath) {
+        // Убираем выделение со всех элементов
+        document.querySelectorAll('.video-item, .folder-item-grid').forEach(item => {
+            item.style.border = '1px solid var(--border)'; // Сброс стиля
+        });
+
+        // Находим элемент с data-path, равным videoPath, и выделяем его
+        const selectedItem = document.querySelector(`.video-item[data-path="${videoPath}"], .folder-item-grid[data-path="${videoPath}"]`);
+        if (selectedItem) {
+            selectedItem.style.border = '2px solid var(--primary)'; // Пример выделения
+        }
+    }
+
+    // === ОТРИСОВКА СПИСКА ВИДЕО И ПАПОК (обновлённая версия с поддержкой путей, папок и мгновенного выделения) ===
+    function renderVideoListItems(contents, videoMetadata = []) { // <-- Добавлен videoMetadata
+      videoList.innerHTML = ''; // Очищаем текущий список
+
+      // ✅ ВСЕГДА ДОБАВЛЯЕМ ССЫЛКУ НА ".." (HOME) В НАЧАЛО СПИСКА
+      const homeItem = document.createElement('div');
+      homeItem.className = 'video-item';
+      homeItem.innerHTML = `
+        <i class="fas fa-home"></i>
+        <div class="video-info">
+          <div class="video-title">..</div> <!-- Или 'Home' -->
+          <div class="video-meta">Go to parent/root folder</div>
+        </div>
+        <i class="fas fa-arrow-circle-up preview-icon"></i>
+      `;
+      homeItem.addEventListener('click', () => {
+        if (currentPlayerPath === '') {
+          console.log('[PLAYER] Already at root folder');
+        } else {
+          const parentPath = currentPlayerPath.split('/').slice(0, -1).join('/');
+          navigatePlayerToFolder(parentPath);
+        }
+      });
+      videoList.appendChild(homeItem);
+
+      if (contents.length === 0) {
+        videoList.innerHTML += '<div class="video-item" style="justify-content: center; opacity: 0.7;"><i class="fas fa-info-circle"></i><span>Folder is empty</span></div>';
+        return;
+      }
+
+      contents.forEach(item => {
+        const div = document.createElement('div');
+        if (item.type === 'folder') {
+          // ✅ ОТРИСОВКА ПАПКИ
+          div.className = 'folder-item-grid';
+          div.dataset.path = item.path; // ✅ Сохраняем ПОЛНЫЙ путь папки
+          div.innerHTML = `
+            <i class="fas fa-folder"></i>
+            <div class="folder-info">
+              <strong class="folder-name">${item.name}</strong><br> <!-- Отображаем имя папки -->
+              <small class="folder-meta">Folder</small>
+            </div>
+            <i class="fas fa-arrow-circle-right folder-enter-btn"></i>
+          `;
+          div.addEventListener('click', () => {
+            // ✅ Переходим внутрь папки
+            navigatePlayerToFolder(item.path);
+          });
+        } else {
+          // ✅ ОТРИСОВКА ФАЙЛА
+          // `item.name` теперь может быть `subfolder/video.mp4`
+          // Извлекаем только имя файла для отображения
+          const fileName = item.name.split('/').pop(); // Получаем последнюю часть пути
+
+          // ✅ ОПРЕДЕЛЯЕМ, ПОДДЕРЖИВАЕТСЯ ЛИ ФОРМАТ (по расширению имени файла)
+          const ext = fileName.split('.').pop().toLowerCase();
+          const supportedFormats = ['mp4', 'webm', 'ogg'];
+          const isSupported = supportedFormats.includes(ext);
+
+          div.className = 'video-item';
+          div.dataset.path = item.name; // ✅ Сохраняем ПОЛНЫЙ путь файла
+
+          // ✅ ФОРМИРУЕМ HTML С УЧЁТОМ ПОДДЕРЖКИ
+          let videoInfoHtml = `
+            <div class="video-info">
+              <strong class="video-title">${fileName}</strong><br> <!-- Отображаем только имя файла -->
+              <small class="video-meta">${item.resolution || 'N/A'} | ${item.bitrate || 'N/A'}</small>
+          `;
+
+          // ✅ ДОБАВЛЯЕМ ПРЕДУПРЕЖДЕНИЕ, ЕСЛИ ФОРМАТ НЕ ПОДДЕРЖИВАЕТСЯ
+          if (!isSupported) {
+            videoInfoHtml += `
+              <div class="unsupported-warning">
+                <i class="fas fa-exclamation-triangle"></i>
+                Требуется конвертация
+              </div>
+            `;
+          }
+
+          videoInfoHtml += `
+            </div>
+          `;
+
+          div.innerHTML = videoInfoHtml + `
+            <i class="fas fa-play-circle preview-icon"></i>
+          `;
+          
+          div.addEventListener('click', () => {
+            if (!isSupported) {
+              if (!confirm(`Формат видео "${fileName}" может не воспроизводиться в браузере. Продолжить?`)) {
+                return;
+              }
+            }
+            // ✅ МГНОВЕННОЕ ВЫДЕЛЕНИЕ: обновляем UI сразу
+            highlightSelectedVideo(item.name); // ✅ Выделяем кликнутый элемент
+            // ✅ Устанавливаем video.src сразу
+            video.src = `/videos/${item.name}`;
+            statusEl.innerHTML = `Video loaded: ${fileName}`; // Отображаем только имя
+            currentVideoFile = item.name; // ✅ Обновляем локальную переменную
+            isVideoReady = false; // ✅ Сбрасываем флаг готовности
+
+            // ✅ Отправляем на сервер ПОЛНЫЙ путь
+            socket.emit('select-video', item.name);
+            // currentVideoFile обновится через room-state
+          });
+        }
+        videoList.appendChild(div);
+      });
+    }
+
   </script>
 </body>
 </html>

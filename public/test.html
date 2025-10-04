@@ -1,0 +1,941 @@
+<!-- public/test.html -->
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>SyncWatch Test Page</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <style>
+    :root {
+      --primary: #4a90e2;
+      --secondary: #343a40;
+      --accent: #007bff;
+      --bg-dark: #121212;
+      --bg-darker: #0d0d0d;
+      --text: #ffffff;
+      --text-secondary: #cccccc;
+      --border: #333333;
+      --shadow: rgba(0, 0, 0, 0.5);
+      --hover-bg: #1e1e1e;
+      --progress-bg: #2c2c2c;
+      --progress-fill: #007bff;
+      --success: #28a745;
+      --warning: #ffc107;
+      --danger: #dc3545;
+      --info: #17a2b8;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    body {
+      background: var(--bg-dark);
+      color: var(--text);
+      line-height: 1.6;
+      transition: background 0.3s ease;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 2rem;
+      background: var(--bg-darker);
+      border-bottom: 1px solid var(--border);
+      box-shadow: 0 2px 10px var(--shadow);
+    }
+
+    .logo-container {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      cursor: pointer;
+      transition: opacity 0.2s ease;
+    }
+
+    .logo-container:hover {
+      opacity: 0.8;
+    }
+
+    .logo-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #4a90e2, #8e44ad);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: bold;
+      position: relative;
+    }
+
+    .logo-svg {
+      width: 80%;
+      height: 80%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .logo-svg svg {
+      width: 100%;
+      height: 100%;
+    }
+
+    .header h1 {
+      font-size: 1.8rem;
+      font-weight: 600;
+      color: var(--primary);
+    }
+
+    .manage-links {
+      display: flex;
+      gap: 1rem;
+    }
+
+    .manage-link {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 500;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      transition: all 0.2s ease;
+    }
+
+    .manage-link:hover {
+      background: rgba(0, 123, 255, 0.1);
+      color: #fff;
+    }
+
+    .main-container {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      padding: 1rem 2rem;
+      min-height: calc(100vh - 180px);
+    }
+
+    .panel {
+      background: var(--bg-darker);
+      border-radius: 8px;
+      box-shadow: 0 4px 12px var(--shadow);
+      padding: 1rem;
+    }
+
+    .panel h2 {
+      margin-bottom: 1rem;
+      font-size: 1.3rem;
+      color: var(--primary);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .btn {
+      padding: 0.5rem 1rem;
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: background 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .btn:hover {
+      background: #0056b3;
+    }
+
+    .btn-sm {
+      padding: 0.25rem 0.5rem;
+      font-size: 0.8rem;
+    }
+
+    .btn-danger {
+      background: var(--danger);
+    }
+
+    .btn-danger:hover {
+      background: #c82333;
+    }
+
+    .btn-info {
+      background: var(--info);
+    }
+
+    .btn-info:hover {
+      background: #138496;
+    }
+
+    .form-group {
+      margin-bottom: 1rem;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 0.5rem;
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      width: 100%;
+      padding: 0.75rem;
+      border: 1px solid var(--border);
+      background: var(--secondary);
+      color: var(--text);
+      border-radius: 4px;
+      font-size: 0.9rem;
+    }
+
+    .test-section {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      padding: 1rem;
+      background: var(--secondary);
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      margin-bottom: 1rem;
+    }
+
+    .test-section h3 {
+      margin-bottom: 0.5rem;
+      font-size: 1.1rem;
+      color: var(--primary);
+    }
+
+    .test-result {
+      padding: 0.5rem;
+      background: var(--bg-darker);
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+      margin-top: 0.5rem;
+      white-space: pre-wrap;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .test-result.success {
+      color: var(--success);
+      border-left: 4px solid var(--success);
+    }
+
+    .test-result.error {
+      color: var(--danger);
+      border-left: 4px solid var(--danger);
+    }
+
+    .test-result.warning {
+      color: var(--warning);
+      border-left: 4px solid var(--warning);
+    }
+
+    .sync-test-container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+
+    .video-player {
+      width: 100%;
+      background: var(--bg-dark);
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+
+    .sync-stats {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      padding: 1rem;
+      background: var(--bg-dark);
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+
+    .stat-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.25rem 0;
+    }
+
+    .stat-value {
+      font-weight: bold;
+    }
+
+    .sync-controls {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 1rem;
+    }
+
+    #notifications {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 1000;
+      max-width: 300px;
+    }
+
+    .notification {
+      padding: 1rem;
+      margin-bottom: 0.5rem;
+      background: var(--secondary);
+      border-left: 4px solid var(--accent);
+      border-radius: 4px;
+      box-shadow: 0 4px 12px var(--shadow);
+      animation: slideIn 0.3s ease-out;
+    }
+
+    @keyframes slideIn {
+      from {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .main-container {
+        flex-direction: column;
+      }
+
+      .header, .controls {
+        padding: 1rem;
+      }
+
+      .video-container {
+        aspect-ratio: 16 / 9;
+      }
+
+      .quality-menu {
+        top: 5px;
+        right: 5px;
+      }
+
+      .upload-section {
+        padding: 0.75rem;
+      }
+
+      .comments-section {
+        padding: 0.75rem;
+      }
+
+      .right-panel {
+        padding: 0.75rem;
+      }
+      
+      .manage-links {
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+
+      .sync-test-container {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo-container" onclick="window.location.href='/select-room.html'">
+      <div class="logo-icon">
+        <div class="logo-svg">
+          <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#4a90e2" />
+                <stop offset="100%" stop-color="#8e44ad" />
+              </linearGradient>
+            </defs>
+
+            <circle cx="50" cy="50" r="48" fill="url(#logoGradient)" />
+
+            <text 
+              x="50" 
+              y="50" 
+              font-family="Arial, sans-serif" 
+              font-size="40" 
+              fill="white" 
+              text-anchor="middle" 
+              dominant-baseline="middle"
+              alignment-baseline="middle"
+              style="paint-order: stroke; stroke: #000; stroke-width: 1px;"
+            >
+              S
+            </text>
+          </svg>
+        </div>
+      </div>
+      <h1>SyncWatch</h1>
+    </div>
+    <div class="manage-links">
+      <a href="/select-room.html" class="manage-link">Select Room</a>
+      <a href="/transcode" class="manage-link">Transcoder</a>
+      <a href="/files" class="manage-link">File Manager</a>
+    </div>
+  </div>
+
+  <div class="main-container">
+    <div class="panel">
+      <h2>SyncWatch Test Page</h2>
+      
+      <!-- 16. Video Sync Test Section -->
+      <div class="test-section">
+        <h3>16. Video Sync Test</h3>
+        <p>Тестирование синхронизации видео между несколькими плеерами</p>
+        
+        <div class="form-group">
+          <label for="syncVideoInput">Выберите тестовое видео:</label>
+          <input type="file" id="syncVideoInput" accept="video/*" class="btn">
+          <button class="btn" id="loadSelectedVideoBtn">
+            <i class="fas fa-upload"></i> Загрузить выбранное видео
+          </button>
+        </div>
+        
+        <div class="sync-test-container">
+          <div>
+            <h4>Плеер 1 (Master)</h4>
+            <video id="video1" class="video-player" controls>
+              Your browser does not support the video tag.
+            </video>
+          </div>
+          <div>
+            <h4>Плеер 2 (Slave)</h4>
+            <video id="video2" class="video-player" controls>
+              Your browser does not support the video tag.
+            </video>
+          </div>
+        </div>
+
+        <div class="sync-stats">
+          <h4>Статистика синхронизации</h4>
+          <div class="stat-item">
+            <span>Разница времени:</span>
+            <span id="timeDiff" class="stat-value">0.000s</span>
+          </div>
+          <div class="stat-item">
+            <span>Статус:</span>
+            <span id="syncStatus" class="stat-value">Не синхронизировано</span>
+          </div>
+          <div class="stat-item">
+            <span>Плеер 1 время:</span>
+            <span id="time1" class="stat-value">0.000s</span>
+          </div>
+          <div class="stat-item">
+            <span>Плеер 2 время:</span>
+            <span id="time2" class="stat-value">0.000s</span>
+          </div>
+          <div class="stat-item">
+            <span>Состояние плеера 1:</span>
+            <span id="state1" class="stat-value">Остановлен</span>
+          </div>
+          <div class="stat-item">
+            <span>Состояние плеера 2:</span>
+            <span id="state2" class="stat-value">Остановлен</span>
+          </div>
+        </div>
+
+        <div class="sync-controls">
+          <button class="btn" id="startSyncTestBtn">
+            <i class="fas fa-play"></i> Начать тест синхронизации
+          </button>
+          <button class="btn" id="stopSyncTestBtn">
+            <i class="fas fa-stop"></i> Остановить тест
+          </button>
+          <button class="btn btn-info" id="forceSyncBtn">
+            <i class="fas fa-sync"></i> Принудительная синхронизация
+          </button>
+        </div>
+
+        <div class="test-result" id="syncTestResult">Тестовое видео не загружено</div>
+      </div>
+
+      <!-- 1. API: Get Video List -->
+      <div class="test-section">
+        <h3>1. API: Get Video List</h3>
+        <button class="btn" id="testGetVideosBtn"><i class="fas fa-list"></i> Test</button>
+        <div class="test-result" id="testGetVideosResult">Not tested yet</div>
+      </div>
+
+      <!-- 2. API: Get Rooms -->
+      <div class="test-section">
+        <h3>2. API: Get Rooms</h3>
+        <button class="btn" id="testGetRoomsBtn"><i class="fas fa-door-open"></i> Test</button>
+        <div class="test-result" id="testGetRoomsResult">Not tested yet</div>
+      </div>
+
+      <!-- 3. API: Create Room -->
+      <div class="test-section">
+        <h3>3. API: Create Room</h3>
+        <button class="btn" id="testCreateRoomBtn"><i class="fas fa-plus-circle"></i> Test</button>
+        <div class="test-result" id="testCreateRoomResult">Not tested yet</div>
+      </div>
+
+      <!-- 4. API: Join Room -->
+      <div class="test-section">
+        <h3>4. API: Join Room</h3>
+        <button class="btn" id="testJoinRoomBtn"><i class="fas fa-sign-in-alt"></i> Test</button>
+        <div class="test-result" id="testJoinRoomResult">Not tested yet</div>
+      </div>
+
+      <!-- 5. API: Leave Room -->
+      <div class="test-section">
+        <h3>5. API: Leave Room</h3>
+        <button class="btn" id="testLeaveRoomBtn"><i class="fas fa-sign-out-alt"></i> Test</button>
+        <div class="test-result" id="testLeaveRoomResult">Not tested yet</div>
+      </div>
+
+      <!-- 6. API: Delete Room -->
+      <div class="test-section">
+        <h3>6. API: Delete Room</h3>
+        <button class="btn" id="testDeleteRoomBtn"><i class="fas fa-trash-alt"></i> Test</button>
+        <div class="test-result" id="testDeleteRoomResult">Not tested yet</div>
+      </div>
+
+      <!-- 7. API: Upload Video -->
+      <div class="test-section">
+        <h3>7. API: Upload Video</h3>
+        <input type="file" id="testUploadInput" accept="video/*" style="display:none;">
+        <button class="btn" id="testUploadBtn"><i class="fas fa-upload"></i> Select & Upload</button>
+        <div class="test-result" id="testUploadResult">Not tested yet</div>
+      </div>
+
+      <!-- 8. API: Delete Video -->
+      <div class="test-section">
+        <h3>8. API: Delete Video</h3>
+        <button class="btn" id="testDeleteVideoBtn"><i class="fas fa-trash-alt"></i> Test</button>
+        <div class="test-result" id="testDeleteVideoResult">Not tested yet</div>
+      </div>
+
+      <!-- 9. API: Rename Video -->
+      <div class="test-section">
+        <h3>9. API: Rename Video</h3>
+        <button class="btn" id="testRenameVideoBtn"><i class="fas fa-edit"></i> Test</button>
+        <div class="test-result" id="testRenameVideoResult">Not tested yet</div>
+      </div>
+
+      <!-- 10. API: Transcode Queue -->
+      <div class="test-section">
+        <h3>10. API: Transcode Queue</h3>
+        <button class="btn" id="testTranscodeQueueBtn"><i class="fas fa-tasks"></i> Test</button>
+        <div class="test-result" id="testTranscodeQueueResult">Not tested yet</div>
+      </div>
+
+      <!-- 11. API: Transcode Templates -->
+      <div class="test-section">
+        <h3>11. API: Transcode Templates</h3>
+        <button class="btn" id="testTranscodeTemplatesBtn"><i class="fas fa-file-code"></i> Test</button>
+        <div class="test-result" id="testTranscodeTemplatesResult">Not tested yet</div>
+      </div>
+
+      <!-- 12. API: Quick Transcode -->
+      <div class="test-section">
+        <h3>12. API: Quick Transcode</h3>
+        <button class="btn" id="testQuickTranscodeBtn"><i class="fas fa-bolt"></i> Test</button>
+        <div class="test-result" id="testQuickTranscodeResult">Not tested yet</div>
+      </div>
+
+      <!-- 13. API: File Structure -->
+      <div class="test-section">
+        <h3>13. API: File Structure</h3>
+        <button class="btn" id="testFileStructureBtn"><i class="fas fa-folder-tree"></i> Test</button>
+        <div class="test-result" id="testFileStructureResult">Not tested yet</div>
+      </div>
+
+      <!-- 14. API: Create Folder -->
+      <div class="test-section">
+        <h3>14. API: Create Folder</h3>
+        <button class="btn" id="testCreateFolderBtn"><i class="fas fa-folder-plus"></i> Test</button>
+        <div class="test-result" id="testCreateFolderResult">Not tested yet</div>
+      </div>
+
+      <!-- 15. API: Delete Folder -->
+      <div class="test-section">
+        <h3>15. API: Delete Folder</h3>
+        <button class="btn" id="testDeleteFolderBtn"><i class="fas fa-folder-minus"></i> Test</button>
+        <div class="test-result" id="testDeleteFolderResult">Not tested yet</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="notifications"></div>
+
+  <script>
+    // === VIDEO SYNC TEST FUNCTIONS ===
+    let syncTestInterval = null;
+    let testVideoLoaded = false;
+    let currentVideoObjectURL = null;
+
+    function loadSelectedVideo() {
+        const fileInput = document.getElementById('syncVideoInput');
+        const file = fileInput.files[0];
+        
+        if (!file) {
+            showNotification('Пожалуйста, сначала выберите видео файл', 'error');
+            return;
+        }
+        
+        if (currentVideoObjectURL) {
+            URL.revokeObjectURL(currentVideoObjectURL);
+        }
+        
+        currentVideoObjectURL = URL.createObjectURL(file);
+        
+        const video1 = document.getElementById('video1');
+        const video2 = document.getElementById('video2');
+        
+        video1.src = currentVideoObjectURL;
+        video2.src = currentVideoObjectURL;
+        
+        Promise.all([
+            new Promise(resolve => video1.addEventListener('loadedmetadata', resolve, { once: true })),
+            new Promise(resolve => video2.addEventListener('loadedmetadata', resolve, { once: true }))
+        ]).then(() => {
+            testVideoLoaded = true;
+            document.getElementById('syncTestResult').textContent = `Тестовое видео загружено: ${file.name}`;
+            document.getElementById('syncTestResult').className = 'test-result success';
+            showNotification(`Видео "${file.name}" успешно загружено для тестирования`, 'success');
+        }).catch(error => {
+            document.getElementById('syncTestResult').textContent = `Ошибка загрузки видео: ${error.message}`;
+            document.getElementById('syncTestResult').className = 'test-result error';
+            showNotification(`Ошибка загрузки видео: ${error.message}`, 'error');
+        });
+    }
+
+    function updateSyncStats() {
+      const video1 = document.getElementById('video1');
+      const video2 = document.getElementById('video2');
+      
+      const time1 = video1.currentTime || 0;
+      const time2 = video2.currentTime || 0;
+      const timeDiff = Math.abs(time1 - time2);
+      
+      document.getElementById('time1').textContent = time1.toFixed(3) + 's';
+      document.getElementById('time2').textContent = time2.toFixed(3) + 's';
+      document.getElementById('timeDiff').textContent = timeDiff.toFixed(3) + 's';
+      
+      const state1 = getVideoState(video1);
+      const state2 = getVideoState(video2);
+      document.getElementById('state1').textContent = state1;
+      document.getElementById('state2').textContent = state2;
+      
+      let syncStatus = 'Не синхронизировано';
+      let statusClass = 'error';
+      
+      if (timeDiff < 0.1) {
+        syncStatus = 'Идеальная синхронизация';
+        statusClass = 'success';
+      } else if (timeDiff < 0.5) {
+        syncStatus = 'Хорошая синхронизация';
+        statusClass = 'success';
+      } else if (timeDiff < 1.0) {
+        syncStatus = 'Приемлемая синхронизация';
+        statusClass = 'warning';
+      } else {
+        syncStatus = 'Плохая синхронизация';
+        statusClass = 'error';
+      }
+      
+      document.getElementById('syncStatus').textContent = syncStatus;
+      document.getElementById('syncStatus').className = `stat-value ${statusClass}`;
+    }
+
+    function getVideoState(video) {
+      if (video.paused) {
+        return video.ended ? 'Завершено' : 'Пауза';
+      } else {
+        return 'Воспроизведение';
+      }
+    }
+
+    function startSyncTest() {
+      const video1 = document.getElementById('video1');
+      const video2 = document.getElementById('video2');
+      
+      if (!testVideoLoaded) {
+        showNotification('Сначала загрузите тестовое видео', 'error');
+        return;
+      }
+      
+      const startTime = 0;
+      video1.currentTime = startTime;
+      video2.currentTime = startTime;
+      
+      video1.play().catch(e => console.error('Video1 play error:', e));
+      video2.play().catch(e => console.error('Video2 play error:', e));
+      
+      syncTestInterval = setInterval(updateSyncStats, 100);
+      
+      document.getElementById('syncTestResult').textContent = 'Тест синхронизации запущен';
+      document.getElementById('syncTestResult').className = 'test-result success';
+      
+      showNotification('Тест синхронизации запущен', 'success');
+    }
+
+    function stopSyncTest() {
+      const video1 = document.getElementById('video1');
+      const video2 = document.getElementById('video2');
+      
+      video1.pause();
+      video2.pause();
+      
+      if (syncTestInterval) {
+        clearInterval(syncTestInterval);
+        syncTestInterval = null;
+      }
+      
+      updateSyncStats();
+      document.getElementById('syncTestResult').textContent = 'Тест синхронизации остановлен';
+      document.getElementById('syncTestResult').className = 'test-result';
+      
+      showNotification('Тест синхронизации остановлен', 'info');
+    }
+
+    function forceSync() {
+      const video1 = document.getElementById('video1');
+      const video2 = document.getElementById('video2');
+      
+      const syncTime = video1.currentTime;
+      video2.currentTime = syncTime;
+      
+      if (!video1.paused) {
+        video2.play().catch(e => console.error('Force sync play error:', e));
+      } else {
+        video2.pause();
+      }
+      
+      updateSyncStats();
+      showNotification('Принудительная синхронизация выполнена', 'success');
+    }
+
+    window.addEventListener('beforeunload', () => {
+        if (currentVideoObjectURL) {
+            URL.revokeObjectURL(currentVideoObjectURL);
+        }
+    });
+
+    // === TEST FUNCTIONS ===
+    async function testApi(endpoint, method = 'GET', data = null, testName = '') {
+      const resultEl = document.getElementById(`test${testName}Result`);
+      try {
+        const config = {
+          method: method,
+          headers: { 'Content-Type': 'application/json' }
+        };
+
+        if (data && (method === 'POST' || method === 'PUT' || method === 'DELETE')) {
+          config.body = JSON.stringify(data);
+        }
+
+        const res = await fetch(endpoint, config);
+        const dataRes = await res.json();
+
+        if (dataRes.success) {
+          resultEl.textContent = `Success: ${JSON.stringify(dataRes)}`;
+          resultEl.className = 'test-result success';
+        } else {
+          throw new Error(dataRes.error || 'Unknown error');
+        }
+      } catch (err) {
+        resultEl.textContent = `Error: ${err.message}`;
+        resultEl.className = 'test-result error';
+      }
+    }
+
+    // === DOM LOADED ===
+    window.addEventListener('DOMContentLoaded', () => {
+      // Video Sync Test Handlers
+      document.getElementById('loadSelectedVideoBtn').addEventListener('click', loadSelectedVideo);
+      document.getElementById('startSyncTestBtn').addEventListener('click', startSyncTest);
+      document.getElementById('stopSyncTestBtn').addEventListener('click', stopSyncTest);
+      document.getElementById('forceSyncBtn').addEventListener('click', forceSync);
+
+      // 1. API: Get Video List
+      document.getElementById('testGetVideosBtn').addEventListener('click', () => {
+        testApi('/api/videos', 'GET', null, 'GetVideos');
+      });
+
+      // 2. API: Get Rooms
+      document.getElementById('testGetRoomsBtn').addEventListener('click', () => {
+        testApi('/api/rooms', 'GET', null, 'GetRooms');
+      });
+
+      // 3. API: Create Room
+      document.getElementById('testCreateRoomBtn').addEventListener('click', () => {
+        testApi('/api/rooms', 'POST', { name: 'Test Room' }, 'CreateRoom');
+      });
+
+      // 4. API: Join Room
+      document.getElementById('testJoinRoomBtn').addEventListener('click', async () => {
+        const res = await fetch('/api/rooms');
+        const data = await res.json();
+        if (data.success && data.rooms.length > 0) {
+          const roomId = data.rooms[0].id;
+          testApi('/api/join-room', 'POST', { roomId, name: 'Tester' }, 'JoinRoom');
+        } else {
+          document.getElementById('testJoinRoomResult').textContent = 'Error: No rooms found';
+          document.getElementById('testJoinRoomResult').className = 'test-result error';
+        }
+      });
+
+      // 5. API: Leave Room
+      document.getElementById('testLeaveRoomBtn').addEventListener('click', () => {
+        testApi('/api/leave-room', 'POST', {}, 'LeaveRoom');
+      });
+
+      // 6. API: Delete Room
+      document.getElementById('testDeleteRoomBtn').addEventListener('click', async () => {
+        const res = await fetch('/api/rooms');
+        const data = await res.json();
+        if (data.success && data.rooms.length > 0) {
+          const roomId = data.rooms[0].id;
+          testApi('/api/delete-room', 'POST', { roomId }, 'DeleteRoom');
+        } else {
+          document.getElementById('testDeleteRoomResult').textContent = 'Error: No rooms found';
+          document.getElementById('testDeleteRoomResult').className = 'test-result error';
+        }
+      });
+
+      // 7. API: Upload Video
+      document.getElementById('testUploadBtn').addEventListener('click', () => {
+        document.getElementById('testUploadInput').click();
+      });
+
+      document.getElementById('testUploadInput').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          const formData = new FormData();
+          formData.append('video', file);
+
+          const xhr = new XMLHttpRequest();
+          xhr.addEventListener('load', () => {
+            if (xhr.status === 200) {
+              const data = JSON.parse(xhr.responseText);
+              if (data.success) {
+                document.getElementById('testUploadResult').textContent = `Success: ${data.file}`;
+                document.getElementById('testUploadResult').className = 'test-result success';
+              } else {
+                document.getElementById('testUploadResult').textContent = `Error: ${data.error}`;
+                document.getElementById('testUploadResult').className = 'test-result error';
+              }
+            } else {
+              document.getElementById('testUploadResult').textContent = `Error: HTTP ${xhr.status}`;
+              document.getElementById('testUploadResult').className = 'test-result error';
+            }
+          });
+          xhr.open('POST', '/upload');
+          xhr.send(formData);
+        }
+      });
+
+      // 8. API: Delete Video
+      document.getElementById('testDeleteVideoBtn').addEventListener('click', async () => {
+        const res = await fetch('/api/videos');
+        const data = await res.json();
+        if (data.length > 0) {
+          const filename = data[0].name;
+          testApi('/api/delete-video', 'POST', { filename }, 'DeleteVideo');
+        } else {
+          document.getElementById('testDeleteVideoResult').textContent = 'Error: No videos found';
+          document.getElementById('testDeleteVideoResult').className = 'test-result error';
+        }
+      });
+
+      // 9. API: Rename Video
+      document.getElementById('testRenameVideoBtn').addEventListener('click', async () => {
+        const res = await fetch('/api/videos');
+        const data = await res.json();
+        if (data.length > 0) {
+          const oldName = data[0].name;
+          const newName = oldName.replace(/\.[^/.]+$/, "") + "_renamed.mp4";
+          testApi('/api/rename-video', 'POST', { oldName, newName }, 'RenameVideo');
+        } else {
+          document.getElementById('testRenameVideoResult').textContent = 'Error: No videos found';
+          document.getElementById('testRenameVideoResult').className = 'test-result error';
+        }
+      });
+
+      // 10. API: Transcode Queue
+      document.getElementById('testTranscodeQueueBtn').addEventListener('click', () => {
+        testApi('/api/transcode/queue', 'GET', null, 'TranscodeQueue');
+      });
+
+      // 11. API: Transcode Templates
+      document.getElementById('testTranscodeTemplatesBtn').addEventListener('click', () => {
+        testApi('/api/transcode/templates', 'GET', null, 'TranscodeTemplates');
+      });
+
+      // 12. API: Quick Transcode
+      document.getElementById('testQuickTranscodeBtn').addEventListener('click', async () => {
+        const res = await fetch('/api/videos');
+        const data = await res.json();
+        if (data.length > 0) {
+          const filename = data[0].name;
+          testApi('/api/transcode/quick-transcode', 'POST', { filename }, 'QuickTranscode');
+        } else {
+          document.getElementById('testQuickTranscodeResult').textContent = 'Error: No videos found';
+          document.getElementById('testQuickTranscodeResult').className = 'test-result error';
+        }
+      });
+
+      // 13. API: File Structure
+      document.getElementById('testFileStructureBtn').addEventListener('click', () => {
+        testApi('/api/files/list', 'GET', null, 'FileStructure');
+      });
+
+      // 14. API: Create Folder
+      document.getElementById('testCreateFolderBtn').addEventListener('click', () => {
+        const folderPath = 'test_folder_' + Math.random().toString(36).substr(2, 8);
+        testApi('/api/files/create-folder', 'POST', { folderPath }, 'CreateFolder');
+      });
+
+      // 15. API: Delete Folder
+      document.getElementById('testDeleteFolderBtn').addEventListener('click', async () => {
+        const folderPath = 'test_folder_to_delete_' + Math.random().toString(36).substr(2, 8);
+        const createRes = await fetch('/api/files/create-folder', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ folderPath })
+        });
+        const createData = await createRes.json();
+        if (createData.success) {
+          testApi('/api/files/delete-folder', 'POST', { folderPath }, 'DeleteFolder');
+        } else {
+          document.getElementById('testDeleteFolderResult').textContent = `Error creating folder: ${createData.error}`;
+          document.getElementById('testDeleteFolderResult').className = 'test-result error';
+        }
+      });
+    });
+
+    // === NOTIFICATION FUNCTION ===
+    function showNotification(message, type) {
+      const notification = document.createElement('div');
+      notification.className = `notification ${type}`;
+      notification.textContent = message;
+      document.getElementById('notifications').appendChild(notification);
+
+      setTimeout(() => {
+        notification.remove();
+      }, 3000);
+    }
+  </script>
+</body>
+</html>
