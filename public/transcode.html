@@ -240,21 +240,45 @@
       border-radius: 4px;
       border: 1px solid var(--border);
       margin-bottom: 0.5rem;
+      transition: background 0.2s ease;
+    }
+
+    .file-item:hover {
+      background: var(--hover-bg);
     }
 
     .file-info {
       flex: 1;
+      overflow: hidden;
     }
 
     .file-name {
       font-size: 0.9rem;
       color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .file-meta {
       font-size: 0.7rem;
       color: var(--text-secondary);
       margin-top: 0.25rem;
+    }
+
+    /* ✅ НОВОЕ: ПРЕДУПРЕЖДЕНИЕ ДЛЯ НЕПОДДЕРЖИВАЕМЫХ ФАЙЛОВ */
+    .unsupported-warning {
+      color: var(--warning); /* Жёлтый цвет */
+      font-size: 0.7rem;
+      font-weight: 500;
+      margin-top: 0.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+
+    .unsupported-warning i {
+      font-size: 0.8rem;
     }
 
     .queue-item {
@@ -465,6 +489,7 @@
     <div class="logo-container" onclick="window.location.href='/select-room.html'">
       <div class="logo-icon">
         <div class="logo-svg">
+          <!-- ✅ РОВНЫЙ SVG-ЛОГОТИП -->
           <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
             <!-- Градиент -->
             <defs>
@@ -786,99 +811,36 @@
 
     // === LOAD TEMPLATES ===
     async function loadTemplates() {
-      try {
-        const res = await fetch('/api/transcode/templates');
-        const data = await res.json();
-        
-        console.log('[TRANSCODE] Получены шаблоны:', data); // ✅ Отладка
-        
-        const container = document.getElementById('templatesList');
-        container.innerHTML = '';
-        
-        if (data.success && data.templates && data.templates.length > 0) {
-          data.templates.forEach(template => {
-            const div = document.createElement('div');
-            div.className = 'template-item';
-            div.innerHTML = `
-              <div class="template-header">
-                <div class="template-name">${template.name}</div>
-                <div style="display: flex; gap: 0.5rem;">
-                  <button class="btn btn-sm" onclick="applyTemplate('${template.id}')">
-                    <i class="fas fa-play"></i> Apply
-                  </button>
-                  <button class="btn btn-sm btn-danger" onclick="deleteTemplate('${template.id}')">
-                    <i class="fas fa-trash"></i>
-                  </button>
-                </div>
-              </div>
-              <div class="template-desc">${template.description || 'N/A'}</div>
-              <div class="template-desc" style="font-family: monospace; font-size: 0.7rem; margin-top: 0.5rem;">
-                ${template.command}
-              </div>
-            `;
-            container.appendChild(div);
-          });
-        } else {
-          container.innerHTML = '<div class="template-item">No templates found</div>';
-        }
-      } catch (err) {
-        console.error('[TRANSCODE] Ошибка загрузки шаблонов:', err);
-        const container = document.getElementById('templatesList');
-        container.innerHTML = '<div class="template-item">Error loading templates</div>';
-      }
-    }
+      const res = await apiCall('/api/transcode/templates');
+      const container = document.getElementById('templatesList');
+      container.innerHTML = '';
 
-    // === SAVE TEMPLATE ===
-    async function saveTemplate() {
-      const activeMode = document.querySelector('.mode-btn.active').dataset.mode;
-      let name, description, command;
-      
-      if (activeMode === 'simple') {
-        name = document.getElementById('templateNameSimple').value.trim();
-        description = 'Simple template with quality/speed slider';
-        command = document.getElementById('simplePreview').textContent;
-      } else {
-        name = document.getElementById('templateNameAdvanced').value.trim();
-        description = document.getElementById('templateDescAdvanced').value.trim();
-        command = document.getElementById('advancedPreview').textContent;
-      }
-      
-      if (!name || !command) {
-        showNotification('Please fill all required fields', 'error');
-        return;
-      }
-      
-      const res = await apiCall('/api/transcode/save-template', {
-        body: JSON.stringify({ name, description, command })
-      });
-      
-      if (res.success) {
-        showNotification(`Template saved: ${name}`, 'success');
-        closeTemplateModal();
-        loadTemplates(); // ✅ Обновляем список шаблонов
-      } else {
-        showNotification('Failed to save template: ' + res.error, 'error');
-      }
-    }
-
-    // === DELETE TEMPLATE ===
-    async function deleteTemplate(templateId) {
-      if (confirm('Delete this template?')) {
-        const res = await apiCall('/api/transcode/delete-template', {
-          body: JSON.stringify({ id: templateId })
+      if (res.success && res.templates.length > 0) {
+        res.templates.forEach(template => {
+          const div = document.createElement('div');
+          div.className = 'template-item';
+          div.innerHTML = `
+            <div class="template-header">
+              <div class="template-name">${template.name}</div>
+              <div style="display: flex; gap: 0.5rem;">
+                <button class="btn btn-sm" onclick="applyTemplate('${template.id}')">
+                  <i class="fas fa-play"></i> Apply
+                </button>
+                <button class="btn btn-sm btn-danger" onclick="deleteTemplate('${template.id}')">
+                  <i class="fas fa-trash"></i>
+                </button>
+              </div>
+            </div>
+            <div class="template-desc">${template.description || 'N/A'}</div>
+            <div class="template-desc" style="font-family: monospace; font-size: 0.7rem; margin-top: 0.5rem;">
+              ${template.command}
+            </div>
+          `;
+          container.appendChild(div);
         });
-        if (res.success) {
-          showNotification(`Template deleted`, 'success');
-          loadTemplates(); // ✅ Обновляем список шаблонов
-        } else {
-          showNotification('Delete failed: ' + res.error, 'error');
-        }
+      } else {
+        container.innerHTML = '<div class="template-item">No templates found</div>';
       }
-    }
-
-    // === APPLY TEMPLATE ===
-    async function applyTemplate(templateId) {
-      showNotification('Select files to apply this template', 'success');
     }
 
     // === LOAD FILES ===
@@ -890,26 +852,46 @@
 
       if (files.length > 0) {
         files.forEach(file => {
+          // ✅ ОПРЕДЕЛЯЕМ, ПОДДЕРЖИВАЕТСЯ ЛИ ФОРМАТ
           const ext = file.name.split('.').pop().toLowerCase();
           const supportedFormats = ['mp4', 'webm', 'ogg'];
           const isSupported = supportedFormats.includes(ext);
 
           const div = document.createElement('div');
           div.className = 'file-item';
-          div.innerHTML = `
+          
+          // ✅ ФОРМИРУЕМ HTML С УЧЁТОМ ПОДДЕРЖКИ
+          let fileInfoHtml = `
             <div class="file-info">
               <div class="file-name">${file.name}</div>
               <div class="file-meta">${file.resolution || 'N/A'} | ${file.bitrate || 'N/A'}</div>
-              ${!isSupported ? `
-                <div class="unsupported-warning" style="color: #ff6b6b; font-size: 0.7rem; margin-top: 0.25rem;">
-                  <i class="fas fa-exclamation-triangle"></i>
-                  Требуется конвертация
-                </div>
-              ` : ''}
+          `;
+          
+          // ✅ ДОБАВЛЯЕМ ПРЕДУПРЕЖДЕНИЕ, ЕСЛИ ФОРМАТ НЕ ПОДДЕРЖИВАЕТСЯ
+          if (!isSupported) {
+            fileInfoHtml += `
+              <div class="unsupported-warning">
+                <i class="fas fa-exclamation-triangle"></i>
+                Требуется конвертация
+              </div>
+            `;
+          }
+          
+          fileInfoHtml += `
             </div>
-            <select class="template-selector" data-file="${file.name}" style="padding: 0.25rem; font-size: 0.8rem;">
-              <option value="">Select template...</option>
-            </select>
+          `;
+          
+          div.innerHTML = fileInfoHtml + `
+            <div class="file-actions">
+              <!-- ✅ ВЫПАДАЮЩИЙ СПИСОК ШАБЛОНОВ -->
+              <select class="template-selector" data-file="${file.name}" style="padding: 0.25rem; font-size: 0.8rem;">
+                <option value="">Select template...</option>
+              </select>
+              <!-- ✅ КНОПКА БЫСТРОГО ТРАНСКОДИРОВАНИЯ -->
+              <button class="btn btn-sm btn-info quick-transcode-btn" data-file="${file.name}" title="Quick Transcode">
+                <i class="fas fa-bolt"></i>
+              </button>
+            </div>
           `;
           container.appendChild(div);
 
@@ -923,6 +905,15 @@
             if (templateId) {
               await addToQueue(fileId, templateId);
               e.target.value = ''; // Сбрасываем селектор
+            }
+          });
+
+          // ✅ ОБРАБОТЧИК КНОПКИ БЫСТРОГО ТРАНСКОДИРОВАНИЯ
+          div.querySelector('.quick-transcode-btn').addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const fileId = e.target.closest('.quick-transcode-btn').dataset.file;
+            if (fileId) {
+              await quickTranscode(fileId);
             }
           });
         });
@@ -944,16 +935,43 @@
       }
     }
 
-    // === ADD TO QUEUE ===
+    // === ДОБАВИТЬ В ОЧЕРЕДЬ ===
     async function addToQueue(fileId, templateId) {
       const res = await apiCall('/api/transcode/add-to-queue', {
         body: JSON.stringify({ fileId, templateId })
       });
       if (res.success) {
-        showNotification(`Added to queue`, 'success');
+        showNotification(`Added to queue: ${fileId}`, 'success');
         loadQueue();
       } else {
         showNotification('Failed to add to queue: ' + res.error, 'error');
+      }
+    }
+
+    // ✅ БЫСТРОЕ ТРАНСКОДИРОВАНИЕ
+    async function quickTranscode(filename) {
+      if (!confirm(`Запустить быстрое транскодирование файла "${filename}"?\nЭто создаст копию в формате MP4.`)) {
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/transcode/quick-transcode', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filename })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          showNotification(`✅ Быстрое транскодирование завершено: ${data.output}`, 'success');
+          loadFiles(); // Обновляем список файлов
+          loadQueue(); // Обновляем очередь
+        } else {
+          showNotification('❌ Ошибка быстрого транскодирования: ' + data.error, 'error');
+        }
+      } catch (err) {
+        console.error('[TRANSCODE] Ошибка быстрого транскодирования:', err);
+        showNotification('❌ Ошибка соединения: ' + err.message, 'error');
       }
     }
 
@@ -991,6 +1009,59 @@
       }
     }
 
+    // === APPLY TEMPLATE ===
+    async function applyTemplate(templateId) {
+      showNotification('Select files to apply this template', 'success');
+    }
+
+    // === DELETE TEMPLATE ===
+    async function deleteTemplate(templateId) {
+      if (confirm('Delete this template?')) {
+        const res = await apiCall('/api/transcode/delete-template', {
+          body: JSON.stringify({ id: templateId })
+        });
+        if (res.success) {
+          showNotification('Template deleted', 'success');
+          loadTemplates();
+        } else {
+          showNotification('Failed to delete template: ' + res.error, 'error');
+        }
+      }
+    }
+
+    // === SAVE TEMPLATE ===
+    document.getElementById('saveTemplateBtn').addEventListener('click', async () => {
+      const activeMode = document.querySelector('.mode-btn.active').dataset.mode;
+      let name, description, command;
+      
+      if (activeMode === 'simple') {
+        name = document.getElementById('templateNameSimple').value.trim();
+        description = 'Simple template with quality/speed slider';
+        command = document.getElementById('simplePreview').textContent;
+      } else {
+        name = document.getElementById('templateNameAdvanced').value.trim();
+        description = document.getElementById('templateDescAdvanced').value.trim();
+        command = document.getElementById('advancedPreview').textContent;
+      }
+      
+      if (!name || !command) {
+        showNotification('Please fill all required fields', 'error');
+        return;
+      }
+      
+      const res = await apiCall('/api/transcode/save-template', {
+        body: JSON.stringify({ name, description, command })
+      });
+      
+      if (res.success) {
+        showNotification(`Template saved: ${name}`, 'success');
+        closeTemplateModal();
+        loadTemplates();
+      } else {
+        showNotification('Failed to save template: ' + res.error, 'error');
+      }
+    });
+
     // === NOTIFICATIONS ===
     function showNotification(message, type) {
       const notification = document.createElement('div');
@@ -1006,31 +1077,22 @@
     // === INIT ===
     window.addEventListener('DOMContentLoaded', () => {
       document.getElementById('addTemplateBtn').addEventListener('click', openTemplateModal);
-      loadTemplates();
-      loadFiles();
-      loadQueue();
-
-      // Обновляем очередь каждые 2 секунды
-      setInterval(loadQueue, 2000);
-    });
-
-    // === EVENT LISTENERS FOR MODAL ===
-    document.addEventListener('DOMContentLoaded', () => {
-      // Переключение режимов
+      
+      // === MODE SWITCHING ===
       document.querySelectorAll('.mode-btn').forEach(btn => {
         btn.addEventListener('click', () => {
           switchMode(btn.dataset.mode);
         });
       });
       
-      // Слайдеры
+      // === SLIDERS ===
       document.getElementById('qualitySpeedSlider').addEventListener('input', updateSimplePreview);
       document.getElementById('crfSlider').addEventListener('input', (e) => {
         document.getElementById('crfValue').textContent = e.target.value;
         updateAdvancedPreview();
       });
       
-      // Выбор разрешения
+      // === RESOLUTION SELECT ===
       document.getElementById('resolutionSelect').addEventListener('change', (e) => {
         const customDiv = document.getElementById('customResolution');
         customDiv.style.display = e.target.value === 'custom' ? 'block' : 'none';
@@ -1040,15 +1102,22 @@
       document.getElementById('customWidth').addEventListener('input', updateAdvancedPreview);
       document.getElementById('customHeight').addEventListener('input', updateAdvancedPreview);
       
-      // Чекбоксы и селекты
+      // === CHECKBOXES & SELECTS ===
       document.getElementById('useResolution').addEventListener('change', updateAdvancedPreview);
       document.getElementById('presetSelect').addEventListener('change', updateAdvancedPreview);
       document.getElementById('enableAudio').addEventListener('change', updateAdvancedPreview);
       document.getElementById('audioCodec').addEventListener('change', updateAdvancedPreview);
       
-      // Кнопки
+      // === BUTTONS ===
       document.getElementById('addTemplateBtn').addEventListener('click', openTemplateModal);
       document.getElementById('saveTemplateBtn').addEventListener('click', saveTemplate);
+      
+      loadTemplates();
+      loadFiles();
+      loadQueue();
+
+      // Обновляем очередь каждые 2 секунды
+      setInterval(loadQueue, 2000);
     });
   </script>
 </body>

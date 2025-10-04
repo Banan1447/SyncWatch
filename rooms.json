@@ -1,30 +1,17 @@
 {
-  "room_qffmy7wu": {
+  "room_oa1g4o8o": {
     "name": "1",
-    "users": {
-      "nm5hJhlLA49Oo0caAAAR": {
-        "name": "Artur",
-        "ping": 0,
-        "buffer": 0,
-        "status": "paused",
-        "position": 0,
-        "ready": false
-      }
-    },
-    "currentVideo": "Alien.Earth.S01E08.WEB-DLRip.RGzsRutracker.mp4"
-  },
-  "room_6ihn2f4e": {
-    "name": "2",
-    "users": {
-      "WRe1YBk2pLxqjsGbAAAb": {
-        "name": "Artur",
-        "ping": 0,
-        "buffer": 0,
-        "status": "paused",
-        "position": 0,
-        "ready": false
-      }
-    },
-    "currentVideo": "Solo_Leveling_Ep01.mp4"
+    "users": {},
+    "currentVideo": "Alien.Earth.S01E08.WEB-DLRip.RGzsRutracker.mp4",
+    "updatedAt": "2025-10-03T23:30:51.907Z",
+    "state": {
+      "isPlaying": false,
+      "updatedAt": "2025-10-03T23:30:50.086Z",
+      "currentTime": 0,
+      "volume": 1,
+      "muted": false,
+      "playbackRate": 1,
+      "currentVideo": "Alien.Earth.S01E06.WEB-DLRip.RGzsRutracker.mp4"
+    }
   }
 }
