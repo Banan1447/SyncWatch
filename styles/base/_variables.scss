@@ -1,0 +1,23 @@
+:root {
+  --primary: #4a90e2;
+  --secondary: #343a40;
+  --accent: #007bff;
+  --bg-dark: #121212;
+  --bg-darker: #0d0d0d;
+  --text: #ffffff;
+  --text-secondary: #cccccc;
+  --border: #333333;
+  --shadow: rgba(0, 0, 0, 0.5);
+  --hover-bg: #1e1e1e;
+  --progress-bg: #2c2c2c;
+  --progress-fill: #007bff;
+}
+
+body {
+  background: var(--bg-dark);
+  color: var(--text);
+  line-height: 1.6;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  padding: 0;
+  margin: 0;
+}

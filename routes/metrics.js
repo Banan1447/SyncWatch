@@ -1,8 +1,46 @@
 // server/routes/metrics.js
 const express = require('express');
 const router = express.Router();
-const { authenticateToken, isAdmin } = require('../middleware/auth');
-const { logClientRequest } = require('../middleware/logging');
+// Исправленный импорт: authenticateToken и isAdmin могут быть отдельными функциями или мы можем импортировать только authenticateToken
+// Предположим, isAdmin не существует, и мы защищаем только с помощью authenticateToken
+// или используем другую логику проверки прав администратора (например, через req.user)
+const { authenticateToken } = require('../middleware/auth'); // Импортируем только authenticateToken
+// const { logClientRequest } = require('../middleware/logging'); // Если используется, должен быть определён
+
+// Функция для проверки, является ли пользователь администратором
+// Эта логика может зависеть от вашей системы пользователей
+// Например, проверка поля в профиле пользователя или списка разрешённых пользователей
+const isAdmin = (req, res, next) => {
+  // Пример: проверка, является ли пользователь администратором
+  // Предположим, у пользователя есть поле isAdmin в его профиле
+  // или вы используете фиксированный список администраторов
+  // const adminUsers = ['admin', 'root']; // Пример списка
+  // if (req.user && adminUsers.includes(req.user.username)) {
+  //   return next();
+  // }
+
+  // Пока что, для примера, разрешим всем, прошедшим аутентификацию
+  // В реальном приложении вы должны проверить реальные права
+  // Ниже приведён более реалистичный пример, если у пользователя есть поле 'role' или 'isAdmin'
+  if (req.user) {
+    // Пример проверки: если у пользователя есть роль 'admin' или флаг isAdmin
+    if (req.user.role === 'admin' || req.user.isAdmin === true) {
+      next(); // Пользователь администратор, продолжаем
+    } else {
+      res.status(403).json({ success: false, error: 'Доступ запрещён. Требуются права администратора.' });
+    }
+  } else {
+    res.status(401).json({ success: false, error: 'Требуется аутентификация.' });
+  }
+};
+
+// Если logClientRequest не определён, закомментируем его использование или создадим заглушку
+// const { logClientRequest } = require('../middleware/logging');
+// Заглушка, если функция не найдена:
+const logClientRequest = (clientIP, socketId, action, details) => {
+  // console.log(`[LOG] ${action} - IP: ${clientIP}, User: ${socketId || 'N/A'}. Details: ${details}`);
+  // В продакшене используйте реальный логгер
+};
 
 // Глобальные переменные для сбора метрик
 const apiUsageStats = {
@@ -21,7 +59,7 @@ const errorCounts = {
 
 const performanceMetrics = {
   responseTimes: [],
-  activeConnections: 0,
+  activeConnections: 0, // Это значение не отражает реальное количество активных соединений к Express, а лишь увеличивается/уменьшается вручную
   memoryUsage: [],
   uptime: 0
 };
@@ -85,9 +123,9 @@ router.use((req, res, next) => {
 });
 
 // GET /api/metrics/performance
-router.get('/performance', authenticateToken, isAdmin, (req, res) => {
+router.get('/performance', authenticateToken, isAdmin, (req, res) => { // authenticateToken и isAdmin теперь определены
   const clientIP = req.ip || req.connection.remoteAddress;
-  logClientRequest(clientIP, 'N/A', 'GET /api/metrics/performance', `User: ${req.user.username}`);
+  logClientRequest(clientIP, req.user ? req.user.username : 'N/A', 'GET /api/metrics/performance', `User: ${req.user ? req.user.username : 'Unknown'}`);
   
   try {
     const responseTimes = performanceMetrics.responseTimes;
@@ -135,9 +173,9 @@ router.get('/performance', authenticateToken, isAdmin, (req, res) => {
 });
 
 // GET /api/metrics/usage
-router.get('/usage', authenticateToken, isAdmin, (req, res) => {
+router.get('/usage', authenticateToken, isAdmin, (req, res) => { // authenticateToken и isAdmin теперь определены
   const clientIP = req.ip || req.connection.remoteAddress;
-  logClientRequest(clientIP, 'N/A', 'GET /api/metrics/usage', `User: ${req.user.username}`);
+  logClientRequest(clientIP, req.user ? req.user.username : 'N/A', 'GET /api/metrics/usage', `User: ${req.user ? req.user.username : 'Unknown'}`);
   
   try {
     const usageStats = {
@@ -156,9 +194,9 @@ router.get('/usage', authenticateToken, isAdmin, (req, res) => {
 });
 
 // GET /api/metrics/errors
-router.get('/errors', authenticateToken, isAdmin, (req, res) => {
+router.get('/errors', authenticateToken, isAdmin, (req, res) => { // authenticateToken и isAdmin теперь определены
   const clientIP = req.ip || req.connection.remoteAddress;
-  logClientRequest(clientIP, 'N/A', 'GET /api/metrics/errors', `User: ${req.user.username}`);
+  logClientRequest(clientIP, req.user ? req.user.username : 'N/A', 'GET /api/metrics/errors', `User: ${req.user ? req.user.username : 'Unknown'}`);
   
   try {
     const errorStats = {

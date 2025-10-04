@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>API Tests</title>
+  <style>
+    :root {
+      --primary: #4a90e2;
+      --secondary: #343a40;
+      --accent: #007bff;
+      --bg-dark: #121212;
+      --bg-darker: #0d0d0d;
+      --text: #ffffff;
+      --text-secondary: #cccccc;
+      --border: #333333;
+      --shadow: rgba(0, 0, 0, 0.5);
+      --hover-bg: #1e1e1e;
+      --progress-bg: #2c2c2c;
+      --progress-fill: #007bff;
+      --error: #dc3545;
+      --success: #28a745;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    body {
+      background: var(--bg-dark);
+      color: var(--text);
+      line-height: 1.6;
+      transition: background 0.3s ease;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 2rem;
+      background: var(--bg-darker);
+      border-bottom: 1px solid var(--border);
+      box-shadow: 0 2px 10px var(--shadow);
+    }
+
+    .logo-container {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      cursor: pointer;
+      transition: opacity 0.2s ease;
+    }
+
+    .logo-container:hover {
+      opacity: 0.8;
+    }
+
+    .logo-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #4a90e2, #8e44ad); /* Сине-фиолетовый */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: bold;
+      position: relative;
+    }
+
+    .logo-svg {
+      width: 80%; /* Занимает 80% круга */
+      height: 80%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .logo-svg svg {
+      width: 100%;
+      height: 100%;
+    }
+
+    .header h1 {
+      font-size: 1.8rem;
+      font-weight: 600;
+      color: var(--primary);
+    }
+
+    .back-link {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 500;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      transition: all 0.2s ease;
+    }
+
+    .back-link:hover {
+      background: rgba(0, 123, 255, 0.1);
+      color: #fff;
+    }
+
+    .main-container {
+      padding: 2rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+    }
+
+    .api-tests-section {
+      width: 100%;
+      max-width: 800px;
+      background: var(--bg-darker);
+      border-radius: 8px;
+      box-shadow: 0 4px 12px var(--shadow);
+      padding: 2rem;
+    }
+
+    .api-tests-section h2 {
+      margin-bottom: 1.5rem;
+      font-size: 1.5rem;
+      color: var(--primary);
+    }
+
+    .test-item {
+      display: flex;
+      flex-direction: column;
+      padding: 1rem;
+      background: var(--bg-dark);
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      margin-bottom: 0.5rem;
+      transition: background 0.2s ease;
+    }
+
+    .test-item:hover {
+      background: var(--hover-bg);
+    }
+
+    .test-info {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.5rem;
+    }
+
+    .test-name {
+      font-size: 1.1rem;
+      color: var(--text);
+    }
+
+    .test-url {
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+    }
+
+    .test-method {
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      font-weight: bold;
+      margin-right: 1rem;
+      text-transform: uppercase;
+    }
+
+    .test-method.GET { background: #28a745; color: white; }
+    .test-method.POST { background: #007bff; color: white; }
+    .test-method.PUT { background: #ffc107; color: black; }
+    .test-method.DELETE { background: #dc3545; color: white; }
+
+    .test-result {
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      font-weight: 500;
+      margin-top: 0.5rem;
+    }
+
+    .test-result.success {
+      background: var(--success);
+      color: white;
+    }
+
+    .test-result.error {
+      background: var(--error);
+      color: white;
+    }
+
+    .test-result.pending {
+      background: var(--secondary);
+      color: var(--text-secondary);
+    }
+
+    .test-response {
+      margin-top: 0.5rem;
+      padding: 0.5rem;
+      background: var(--bg-dark);
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 0.8rem;
+      max-height: 100px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      display: none; /* Скрыто по умолчанию */
+    }
+
+    .run-test-btn {
+      padding: 0.5rem 1rem;
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: background 0.2s ease;
+      align-self: flex-start;
+      margin-top: 0.5rem;
+    }
+
+    .run-test-btn:hover {
+      background: #0056b3;
+    }
+
+    .run-all-btn {
+      width: 100%;
+      padding: 0.75rem;
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: background 0.2s ease;
+      margin-top: 1rem;
+    }
+
+    .run-all-btn:hover {
+      background: #0056b3;
+    }
+
+    #notifications {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 1000;
+      max-width: 300px;
+    }
+
+    .notification {
+      padding: 1rem;
+      margin-bottom: 0.5rem;
+      border-radius: 4px;
+      box-shadow: 0 4px 12px var(--shadow);
+      animation: slideIn 0.3s ease-out;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .notification.success {
+      background: rgba(40, 167, 69, 0.2);
+      border-left: 4px solid var(--success);
+      color: var(--success);
+    }
+
+    .notification.error {
+      background: rgba(220, 53, 69, 0.2);
+      border-left: 4px solid var(--error);
+      color: var(--error);
+    }
+
+    .notification-close {
+      background: none;
+      border: none;
+      color: inherit;
+      font-size: 1.2rem;
+      cursor: pointer;
+      padding: 0 0.5rem;
+    }
+
+    @keyframes slideIn {
+      from {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo-container" onclick="window.location.href='/select-room.html'">
+      <div class="logo-icon">
+        <div class="logo-svg">
+          <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+            <!-- Градиент -->
+            <defs>
+              <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#4a90e2" />
+                <stop offset="100%" stop-color="#8e44ad" />
+              </linearGradient>
+            </defs>
+
+            <!-- Круговой фон -->
+            <circle cx="50" cy="50" r="48" fill="url(#logoGradient)" />
+
+            <!-- Буква S -->
+            <text 
+              x="50" 
+              y="50" 
+              font-family="Arial, sans-serif" 
+              font-size="40" 
+              fill="white" 
+              text-anchor="middle" 
+              dominant-baseline="middle"
+              alignment-baseline="middle"
+              style="paint-order: stroke; stroke: #000; stroke-width: 1px;"
+            >
+              S
+            </text>
+          </svg>
+        </div>
+      </div>
+      <h1>SyncWatch</h1>
+    </div>
+    <a href="/select-room.html" class="back-link">Back to Rooms</a>
+  </div>
+
+  <div class="main-container">
+    <div class="api-tests-section">
+      <h2>API Tests</h2>
+      <button id="runAllBtn" class="run-all-btn">Run All Tests</button>
+      <div id="apiTestsList">
+        <!-- Элементы тестов будут добавлены здесь -->
+      </div>
+    </div>
+  </div>
+
+  <div id="notifications"></div>
+
+  <script>
+    // Список API тестов
+    const apiTests = [
+      // --- Health & System ---
+      { name: 'Health Check', url: '/api/system/health', method: 'GET' },
+      { name: 'Server Status', url: '/api/system/status', method: 'GET' }, // Скорее всего 404
+      // --- Auth ---
+      { name: 'Auth: Register (Invalid)', url: '/api/auth/register', method: 'POST', data: {} }, // Ожидается ошибка
+      { name: 'Auth: Login (Invalid)', url: '/api/auth/login', method: 'POST', data: {} }, // Ожидается ошибка
+      { name: 'Auth: Profile (No Token)', url: '/api/auth/profile', method: 'GET' }, // Ожидается 401/403, но с заглушкой может пройти
+      // --- Metrics ---
+      { name: 'Metrics: Usage', url: '/api/metrics/usage', method: 'GET' },
+      { name: 'Metrics: Performance', url: '/api/metrics/performance', method: 'GET' },
+      { name: 'Metrics: Errors', url: '/api/metrics/errors', method: 'GET' },
+      // --- Transcode ---
+      { name: 'Transcode: Queue', url: '/api/transcode/queue', method: 'GET' },
+      { name: 'Transcode: Templates', url: '/api/transcode/templates', method: 'GET' },
+      // { name: 'Transcode: Quick Transcode (Invalid)', url: '/api/transcode/quick-transcode', method: 'POST', data: {} }, // Может вызвать ошибку
+      // --- Videos ---
+      { name: 'Videos: List', url: '/api/videos', method: 'GET' },
+      // { name: 'Videos: Delete (Invalid)', url: '/api/delete-video', method: 'POST', data: {} }, // Ожидается ошибка
+      // { name: 'Videos: Rename (Invalid)', url: '/api/rename-video', method: 'POST', data: {} }, // Ожидается ошибка
+      // --- Sessions ---
+      // { name: 'Sessions: List (if exists)', url: '/api/sessions', method: 'GET' }, // Добавьте, если маршрут существует
+      // --- Files ---
+      { name: 'Files: List', url: '/api/files/list', method: 'GET' },
+      // --- Admin ---
+      // { name: 'Admin: Stats (if exists)', url: '/api/admin/stats', method: 'GET' }, // Добавьте, если маршрут существует
+      // --- Rooms (через Socket.IO, не HTTP API) ---
+      // { name: 'Rooms List (Socket)', url: '/api/rooms', method: 'GET' }, // НЕ HTTP API
+    ];
+
+    // Функция для выполнения одного теста
+    async function runApiTest(test) {
+      const startTime = Date.now();
+      try {
+        // Для заглушки аутентификации, не отправляем заголовок Authorization
+        // const response = await fetch(test.url, {
+        //   method: test.method,
+        //   headers: {
+        //     'Content-Type': 'application/json',
+        //     // 'Authorization': `Bearer ${authToken}` // УБРАНО: не нужно с заглушкой
+        //   },
+        //   body: test.data ? JSON.stringify(test.data) : undefined
+        // });
+        const config = {
+          method: test.method,
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        };
+        if (test.data) {
+            config.body = JSON.stringify(test.data);
+        }
+        const response = await fetch(test.url, config);
+        const duration = Date.now() - startTime;
+        let data;
+        try {
+          data = await response.json();
+        } catch (e) {
+          // Если ответ не JSON, используем текст
+          data = await response.text();
+        }
+
+        return {
+          name: test.name,
+          url: test.url,
+          method: test.method,
+          success: response.ok,
+          status: response.status,
+          duration: duration,
+          data: data
+        };
+      } catch (error) {
+        const duration = Date.now() - startTime;
+        return {
+          name: test.name,
+          url: test.url,
+          method: test.method,
+          success: false,
+          status: 'ERROR',
+          duration: duration,
+          error: error.message,
+          data: null
+        };
+      }
+    }
+
+    // Функция для отображения теста
+    function createTestElement(test) {
+      const testItem = document.createElement('div');
+      testItem.className = 'test-item';
+      testItem.dataset.testName = test.name; // Для поиска
+
+      testItem.innerHTML = `
+        <div class="test-info">
+          <div>
+            <span class="test-name">${test.name}</span>
+            <div class="test-url">${test.url}</div>
+          </div>
+          <span class="test-method ${test.method}">${test.method}</span>
+        </div>
+        <button class="run-test-btn">Run Test</button>
+        <div class="test-result pending">Pending...</div>
+        <div class="test-response"></div>
+      `;
+
+      const runBtn = testItem.querySelector('.run-test-btn');
+      const resultDiv = testItem.querySelector('.test-result');
+      const responseDiv = testItem.querySelector('.test-response');
+
+      runBtn.addEventListener('click', async () => {
+        resultDiv.textContent = 'Running...';
+        resultDiv.className = 'test-result pending';
+        responseDiv.style.display = 'none'; // Скрываем предыдущий ответ
+        responseDiv.textContent = '';
+
+        const result = await runApiTest(test);
+
+        resultDiv.textContent = result.success ? `OK (${result.status})` : `FAIL (${result.status || result.error})`;
+        resultDiv.className = `test-result ${result.success ? 'success' : 'error'}`;
+        responseDiv.textContent = JSON.stringify(result.data, null, 2);
+        responseDiv.style.display = 'block'; // Показываем ответ
+      });
+
+      return testItem;
+    }
+
+    // Функция для отображения всех тестов
+    function renderApiTests() {
+      const apiTestsList = document.getElementById('apiTestsList');
+      apiTestsList.innerHTML = ''; // Очищаем
+
+      apiTests.forEach(test => {
+        const testElement = createTestElement(test);
+        apiTestsList.appendChild(testElement);
+      });
+    }
+
+    // Функция для запуска всех тестов
+    async function runAllTests() {
+      const testItems = document.querySelectorAll('#apiTestsList .test-item');
+      testItems.forEach(item => {
+        const runBtn = item.querySelector('.run-test-btn');
+        // Имитируем клик на каждой кнопке
+        runBtn.click();
+      });
+    }
+
+    // === ФУНКЦИЯ УВЕДОМЛЕНИЙ ===
+    function showNotification(message, type) {
+      const notification = document.createElement('div');
+      notification.className = `notification ${type}`;
+      notification.innerHTML = `
+        <span>${message}</span>
+        <button class="notification-close" onclick="this.parentElement.remove()">&times;</button>
+      `;
+      document.getElementById('notifications').appendChild(notification);
+
+      // Автоматически удаляем уведомление через 5 секунд
+      setTimeout(() => {
+        if (notification.parentNode) { // Проверяем, не было ли уже удалено вручную
+            notification.remove();
+        }
+      }, 5000);
+    }
+
+    // Привязываем кнопки
+    document.getElementById('runAllBtn').addEventListener('click', runAllTests);
+
+    // Рендерим тесты при загрузке страницы
+    window.addEventListener('DOMContentLoaded', () => {
+        renderApiTests();
+    });
+  </script>
+</body>
+</html>

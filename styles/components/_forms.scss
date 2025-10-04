@@ -1,0 +1,15 @@
+label {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: var(--text-secondary);
+}
+
+input {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  background: var(--secondary);
+  color: var(--text);
+  border-radius: 4px;
+  font-size: 0.9rem;
+}

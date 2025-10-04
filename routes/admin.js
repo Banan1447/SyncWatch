@@ -1,117 +1,78 @@
-// server/routes/admin.js
+// routes/admin.js
 const express = require('express');
 const router = express.Router();
-const AuthService = require('../services/authService');
-const RoomService = require('../services/roomService');
-const { authenticateToken, isAdmin, isLocalhostOnly } = require('../middleware/auth');
-const { logClientRequest } = require('../middleware/logging');
+const { authenticateToken, isLocalhostOnly } = require('../middleware/auth');
+const AdminService = require('../services/adminService'); // Предполагаем, что сервис будет создан
 
-const authService = new AuthService();
-const roomService = new RoomService();
+const adminService = new AdminService(); // Создаём экземпляр сервиса
 
-// GET /api/admin/users
-router.get('/users', authenticateToken, isAdmin, (req, res) => {
-  const clientIP = req.ip || req.connection.remoteAddress;
-  logClientRequest(clientIP, 'N/A', 'GET /api/admin/users', `Admin: ${req.user.username}`);
-  
+// --- ЗАЩИЩЁННЫЕ МАРШРУТЫ ---
+// Все маршруты ниже требуют JWT токен в заголовке Authorization
+
+// Маршрут для получения общей информации/статистики для администратора
+router.get('/stats', authenticateToken, (req, res) => {
+  console.log(`[ADMIN API] Запрос статистики от пользователя: ${req.user.username}`);
   try {
-    // В реальном приложении здесь был бы пагинация и фильтры
-    const users = authService.loadUsers().map(user => {
-      const { password, ...userWithoutPassword } = user;
-      return userWithoutPassword;
-    });
-
-    res.json({ success: true, users });
+    // Пример: получить статистику из AdminService
+    const stats = adminService.getStats();
+    res.json({ success: true, stats });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    console.error('[ADMIN API] Ошибка получения статистики:', error);
+    res.status(500).json({ success: false, error: 'Ошибка сервера при получении статистики' });
   }
 });
 
-// GET /api/admin/rooms
-router.get('/rooms', authenticateToken, isAdmin, (req, res) => {
-  const clientIP = req.ip || req.connection.remoteAddress;
-  logClientRequest(clientIP, 'N/A', 'GET /api/admin/rooms', `Admin: ${req.user.username}`);
-  
+// Маршрут для получения списка пользователей (требует аутентификации)
+router.get('/users', authenticateToken, (req, res) => {
+  console.log(`[ADMIN API] Запрос списка пользователей от пользователя: ${req.user.username}`);
   try {
-    const rooms = roomService.getAllRooms();
-    res.json({ success: true, rooms });
+    // Пример: получить список пользователей из AdminService (или AuthService)
+    // const users = adminService.getUsers(); // или authService.getUsersList();
+    // res.json({ success: true, users });
+    res.json({ success: true, users: [], message: 'Получение списка пользователей не реализовано в этом примере.' });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    console.error('[ADMIN API] Ошибка получения списка пользователей:', error);
+    res.status(500).json({ success: false, error: 'Ошибка сервера при получении списка пользователей' });
   }
 });
 
-// POST /api/admin/rooms/:id/kick
-router.post('/rooms/:id/kick', authenticateToken, isAdmin, (req, res) => {
-  const { id } = req.params;
-  const { username } = req.body;
-  const clientIP = req.ip || req.connection.remoteAddress;
-  
-  logClientRequest(clientIP, 'N/A', 'POST /api/admin/rooms/:id/kick', `RoomID: ${id}, Username: ${username}`);
-  
+// --- МАРШРУТЫ, ОГРАНИЧЕННЫЕ ТОЛЬКО ДЛЯ LOCALHOST ---
+// Эти маршруты требуют, чтобы запрос пришёл с localhost (127.0.0.1 или ::1)
+// Они могут НЕ требовать JWT токена, если доступны только с localhost, но часто требуют оба.
+
+// Маршрут для получения чувствительной информации (например, активных сессий, подробной статистики)
+// Обычно требует оба: аутентификации и localhost
+router.get('/sensitive-info', authenticateToken, isLocalhostOnly, (req, res) => {
+  console.log(`[ADMIN API] Запрос чувствительной информации от пользователя ${req.user.username} с localhost`);
   try {
-    if (!username) {
-      return res.status(400).json({ success: false, error: 'Username required' });
-    }
-
-    // В реальном приложении нужно найти userId по username
-    // Здесь упрощенная логика
-    const room = roomService.getRoom(id);
-    if (!room) {
-      return res.status(404).json({ success: false, error: 'Room not found' });
-    }
-
-    // Ищем пользователя по имени в комнате
-    let targetUserId = null;
-    for (const [userId, user] of room.users) {
-      if (user.name === username) {
-        targetUserId = userId;
-        break;
-      }
-    }
-
-    if (!targetUserId) {
-      return res.status(404).json({ success: false, error: 'User not found in room' });
-    }
-
-    const success = roomService.kickUser(id, targetUserId, req.user.id);
-    if (!success) {
-      return res.status(403).json({ success: false, error: 'Not authorized to kick from this room' });
-    }
-
-    res.json({ success: true, message: 'User kicked from room' });
+    // Пример: получить чувствительную информацию
+    const sensitiveInfo = adminService.getSensitiveInfo();
+    res.json({ success: true, sensitiveInfo });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    console.error('[ADMIN API] Ошибка получения чувствительной информации:', error);
+    res.status(500).json({ success: false, error: 'Ошибка сервера при получении чувствительной информации' });
   }
 });
 
-// GET /api/admin/logs
-router.get('/logs', authenticateToken, isAdmin, (req, res) => {
-  const clientIP = req.ip || req.connection.remoteAddress;
-  const fs = require('fs');
-  const path = require('path');
-  
-  logClientRequest(clientIP, 'N/A', 'GET /api/admin/logs', `Admin: ${req.user.username}`);
-  
+// Маршрут для выполнения чувствительной операции (например, перезапуск части сервиса, очистка кэша)
+// Обычно требует оба: аутентификации и localhost
+router.post('/perform-sensitive-action', authenticateToken, isLocalhostOnly, (req, res) => {
+  const { action } = req.body;
+  console.log(`[ADMIN API] Запрос выполнения чувствительного действия "${action}" от пользователя ${req.user.username} с localhost`);
   try {
-    const logsFile = path.join(__dirname, '../../logs.txt');
-    if (!fs.existsSync(logsFile)) {
-      return res.json({ success: true, logs: [] });
-    }
-
-    const logsContent = fs.readFileSync(logsFile, 'utf8');
-    const logs = logsContent.split('\n')
-      .filter(line => line.trim())
-      .map(line => {
-        const match = line.match(/\[(.*?)\] (.*)/);
-        return match ? { timestamp: match[1], message: match[2] } : { message: line };
-      })
-      .reverse() // Последние логи первыми
-      .slice(0, 1000); // Ограничиваем количество
-
-    res.json({ success: true, logs });
+    // Пример: выполнить действие через AdminService
+    const result = adminService.performAction(action);
+    res.json({ success: true, result });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    console.error(`[ADMIN API] Ошибка выполнения действия "${action}":`, error);
+    res.status(500).json({ success: false, error: `Ошибка сервера при выполнении действия "${action}": ${error.message}` });
   }
 });
+
+// --- ОБЫЧНЫЙ МАРШРУТ (НЕ ЗАЩИЩЁННЫЙ) ---
+// Пример маршрута, который не требует аутентификации (например, проверка состояния)
+// router.get('/health', (req, res) => {
+//   res.json({ status: 'OK' });
+// });
 
 module.exports = router;

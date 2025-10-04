@@ -19,6 +19,8 @@
       --hover-bg: #1e1e1e;
       --progress-bg: #2c2c2c;
       --progress-fill: #007bff;
+      --error: #dc3545;
+      --success: #28a745;
     }
 
     * {
@@ -89,18 +91,58 @@
       color: var(--primary);
     }
 
-    /* ✅ ИЗМЕНЁННАЯ КНОПКА: Admin Console */
-    .admin-link {
+    .auth-section {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .user-name {
+      color: var(--accent);
+    }
+
+    /* Добавлен стиль для ссылки на профиль */
+    .profile-link {
+      color: var(--text-secondary);
+      text-decoration: none;
+      margin-right: 1rem; /* Отступ от кнопки "Выйти" */
+      transition: color 0.2s ease;
+    }
+
+    .profile-link:hover {
+      color: var(--accent);
+    }
+
+    .login-btn, .register-btn, .logout-btn {
       color: var(--accent);
       text-decoration: none;
       font-weight: 500;
       padding: 0.5rem 1rem;
       border-radius: 4px;
       transition: all 0.2s ease;
+      cursor: pointer;
+      border: 1px solid var(--accent);
+      background: transparent;
     }
 
-    .admin-link:hover {
+    .login-btn:hover, .register-btn:hover {
       background: rgba(0, 123, 255, 0.1);
+      color: #fff;
+    }
+
+    .logout-btn {
+      color: var(--error);
+      border-color: var(--error);
+    }
+
+    .logout-btn:hover {
+      background: rgba(220, 53, 69, 0.1);
       color: #fff;
     }
 
@@ -126,6 +168,60 @@
       margin-bottom: 1.5rem;
       font-size: 1.5rem;
       color: var(--primary);
+    }
+
+    .auth-forms {
+      display: none; /* Скрыто по умолчанию */
+      margin-bottom: 1.5rem;
+    }
+
+    .form-group {
+      margin-bottom: 1rem;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 0.5rem;
+      color: var(--text-secondary);
+    }
+
+    .form-group input {
+      width: 100%;
+      padding: 0.75rem;
+      border: 1px solid var(--border);
+      background: var(--secondary);
+      color: var(--text);
+      border-radius: 4px;
+      font-size: 1rem;
+    }
+
+    .form-group button {
+      width: 100%;
+      padding: 0.75rem;
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: background 0.2s ease;
+      margin-top: 0.5rem;
+    }
+
+    .form-group button:hover {
+      background: #0056b3;
+    }
+
+    .toggle-auth {
+      text-align: center;
+      margin-top: 0.5rem;
+      color: var(--text-secondary);
+    }
+
+    .toggle-auth a {
+      color: var(--accent);
+      cursor: pointer;
+      text-decoration: none;
     }
 
     .input-group {
@@ -223,6 +319,14 @@
       background: #0056b3;
     }
 
+    .delete-btn {
+      background: var(--error);
+    }
+
+    .delete-btn:hover {
+      background: #c82333;
+    }
+
     #notifications {
       position: fixed;
       top: 20px;
@@ -234,11 +338,33 @@
     .notification {
       padding: 1rem;
       margin-bottom: 0.5rem;
-      background: var(--secondary);
-      border-left: 4px solid var(--accent);
       border-radius: 4px;
       box-shadow: 0 4px 12px var(--shadow);
       animation: slideIn 0.3s ease-out;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .notification.success {
+      background: rgba(40, 167, 69, 0.2);
+      border-left: 4px solid var(--success);
+      color: var(--success);
+    }
+
+    .notification.error {
+      background: rgba(220, 53, 69, 0.2);
+      border-left: 4px solid var(--error);
+      color: var(--error);
+    }
+
+    .notification-close {
+      background: none;
+      border: none;
+      color: inherit;
+      font-size: 1.2rem;
+      cursor: pointer;
+      padding: 0 0.5rem;
     }
 
     @keyframes slideIn {
@@ -289,22 +415,65 @@
       </div>
       <h1>SyncWatch</h1>
     </div>
-    <!-- ✅ ИЗМЕНЁННАЯ КНОПКА: Admin Console -->
-    <a href="/admin" class="admin-link">Admin Console</a>
+    <div class="auth-section">
+      <div id="authControls">
+        <!-- Секция аутентификации будет обновляться скриптом -->
+        <!-- Если вошёл: -->
+        <!-- <div class="user-info">
+          <span class="user-name">ИмяПользователя</span>
+          <button class="logout-btn" onclick="handleLogout()">Выйти</button>
+        </div> -->
+        <!-- Если не вошёл: -->
+        <!-- <button class="login-btn" onclick="showAuthForm('login')">Войти</button>
+        <button class="register-btn" onclick="showAuthForm('register')">Регистрация</button> -->
+      </div>
+    </div>
   </div>
 
   <div class="main-container">
     <div class="room-section">
-      <h2>Create Room</h2>
+      <h2>Создать комнату</h2>
+      <div id="authForms" class="auth-forms">
+        <div id="loginForm" style="display: none;">
+          <div class="form-group">
+            <label for="loginUsername">Имя пользователя:</label>
+            <input type="text" id="loginUsername" placeholder="Введите имя">
+          </div>
+          <div class="form-group">
+            <label for="loginPassword">Пароль:</label>
+            <input type="password" id="loginPassword" placeholder="Введите пароль">
+          </div>
+          <button onclick="handleLogin()">Войти</button>
+          <div class="toggle-auth">
+            Нет аккаунта? <a onclick="showAuthForm('register')">Зарегистрироваться</a>
+          </div>
+        </div>
+
+        <div id="registerForm" style="display: none;">
+          <div class="form-group">
+            <label for="registerUsername">Имя пользователя:</label>
+            <input type="text" id="registerUsername" placeholder="Введите имя">
+          </div>
+          <div class="form-group">
+            <label for="registerPassword">Пароль:</label>
+            <input type="password" id="registerPassword" placeholder="Введите пароль (мин. 6)">
+          </div>
+          <button onclick="handleRegister()">Зарегистрироваться</button>
+          <div class="toggle-auth">
+            Уже есть аккаунт? <a onclick="showAuthForm('login')">Войти</a>
+          </div>
+        </div>
+      </div>
+
       <div class="input-group">
-        <label for="roomName">Room Name:</label>
-        <input type="text" id="roomName" placeholder="Enter room name">
-        <button id="createRoomBtn">Create Room</button>
-        <button id="createRoomNoJoinBtn">Create Room (Don't Join)</button>
+        <label for="roomName">Название комнаты:</label>
+        <input type="text" id="roomName" placeholder="Введите название">
+        <button id="createRoomBtn">Создать и присоединиться</button>
+        <button id="createRoomNoJoinBtn">Создать (не присоединяться)</button>
       </div>
 
       <div class="room-list">
-        <h2>Available Rooms</h2>
+        <h2>Доступные комнаты</h2>
         <div id="roomList"></div>
       </div>
     </div>
@@ -315,9 +484,174 @@
   <script src="/socket.io/socket.io.js"></script>
   <script>
     const socket = io();
+    let authToken = localStorage.getItem('authToken'); // Получаем токен из localStorage при загрузке
+
+    // Функция для отправки API-запросов с токеном
+    function apiCall(endpoint, method = 'GET', data = null) {
+        const headers = {
+            'Content-Type': 'application/json',
+        };
+        if (authToken) {
+            headers['Authorization'] = `Bearer ${authToken}`;
+        }
+
+        const config = {
+            method,
+            headers,
+        };
+
+        if (data) {
+            config.body = JSON.stringify(data);
+        }
+
+        return fetch(`/api${endpoint}`, config)
+            .then(response => {
+                if (!response.ok) {
+                    // Проверяем, не связан ли статус с аутентификацией
+                    if (response.status === 401 || response.status === 403) {
+                        // Токен недействителен, очищаем его
+                        console.error('Токен недействителен, очищаем.');
+                        handleLogout(); // Вызываем функцию выхода
+                        throw new Error('Сессия истекла. Пожалуйста, войдите снова.');
+                    }
+                    return response.json().then(err => { throw err; });
+                }
+                return response.json();
+            });
+    }
+
+    // Функция для обновления UI аутентификации
+    function updateAuthUI() {
+        const authControls = document.getElementById('authControls');
+        const authForms = document.getElementById('authForms');
+
+        if (authToken) {
+            // Проверим валидность токена, запросив профиль
+            apiCall('/auth/profile', 'GET')
+                .then(data => {
+                    if (data.success) {
+                        // Обновляем UI с именем пользователя и кнопкой "Выйти"
+                        // Также добавляем ссылку на профиль
+                        authControls.innerHTML = `
+                            <div class="user-info">
+                                <a href="/user-profile.html" class="profile-link">${data.user.username}</a>
+                                <button class="logout-btn" onclick="handleLogout()">Выйти</button>
+                            </div>
+                        `;
+                        authForms.style.display = 'none'; // Скрываем формы
+                    } else {
+                        // Токен недействителен
+                        console.error('Токен не прошёл проверку профиля, очищаем.');
+                        handleLogout();
+                    }
+                })
+                .catch(err => {
+                    console.error('Ошибка проверки токена при обновлении UI:', err);
+                    handleLogout(); // Если ошибка, очищаем токен
+                });
+        } else {
+            authControls.innerHTML = `
+                <button class="login-btn" onclick="showAuthForm('login')">Войти</button>
+                <button class="register-btn" onclick="showAuthForm('register')">Регистрация</button>
+            `;
+            authForms.style.display = 'none'; // Скрываем формы по умолчанию
+        }
+    }
+
+    // Функция для отображения формы (login или register)
+    function showAuthForm(formType) {
+        const loginForm = document.getElementById('loginForm');
+        const registerForm = document.getElementById('registerForm');
+        const authForms = document.getElementById('authForms');
+
+        if (formType === 'login') {
+            loginForm.style.display = 'block';
+            registerForm.style.display = 'none';
+        } else if (formType === 'register') {
+            loginForm.style.display = 'none';
+            registerForm.style.display = 'block';
+        }
+        authForms.style.display = 'block'; // Показываем блок с формами
+    }
+
+    // Функция для обработки входа
+    async function handleLogin() {
+        const username = document.getElementById('loginUsername').value.trim();
+        const password = document.getElementById('loginPassword').value;
+
+        if (!username || !password) {
+            showNotification('Введите имя пользователя и пароль', 'error');
+            return;
+        }
+
+        try {
+            const response = await apiCall('/auth/login', 'POST', { username, password });
+            if (response.success && response.token) {
+                localStorage.setItem('authToken', response.token); // Сохраняем токен
+                authToken = response.token;
+                showNotification('Успешный вход', 'success');
+                updateAuthUI(); // Обновляем UI
+                // Скрываем формы после входа
+                document.getElementById('authForms').style.display = 'none';
+
+                // --- ДОБАВЛЕННОЕ ПЕРЕНАПРАВЛЕНИЕ ---
+                // Перенаправляем на user-profile.html после успешного входа
+                window.location.href = '/user-profile.html';
+                // --- КОНЕЦ ДОБАВЛЕНИЯ ---
+
+            } else {
+                showNotification(response.error || 'Ошибка входа', 'error');
+            }
+        } catch (err) {
+            console.error('Ошибка входа:', err);
+            showNotification(err.message || 'Ошибка входа', 'error');
+        }
+    }
+
+    // Функция для обработки регистрации
+    async function handleRegister() {
+        const username = document.getElementById('registerUsername').value.trim();
+        const password = document.getElementById('registerPassword').value;
+
+        if (!username || !password) {
+            showNotification('Введите имя пользователя и пароль', 'error');
+            return;
+        }
+
+        if (password.length < 6) {
+            showNotification('Пароль должен быть не менее 6 символов', 'error');
+            return;
+        }
+
+        try {
+            const response = await apiCall('/auth/register', 'POST', { username, password });
+            if (response.success) {
+                showNotification(response.message || 'Регистрация успешна', 'success');
+                // Можно автоматически переключиться на форму входа
+                showAuthForm('login');
+            } else {
+                showNotification(response.error || 'Ошибка регистрации', 'error');
+            }
+        } catch (err) {
+            console.error('Ошибка регистрации:', err);
+            showNotification(err.message || 'Ошибка регистрации', 'error');
+        }
+    }
+
+    // Функция для обработки выхода
+    function handleLogout() {
+        localStorage.removeItem('authToken');
+        authToken = null;
+        updateAuthUI(); // Обновляем UI
+        showNotification('Вы вышли из системы', 'success');
+        // Скрываем формы при выходе
+        document.getElementById('authForms').style.display = 'none';
+    }
 
     // === ПРОВЕРЯЕМ, ЕСТЬ ЛИ КОМНАТА В URL И АВТОПЕРЕХОДИМ ===
     window.addEventListener('DOMContentLoaded', () => {
+      updateAuthUI(); // Обновляем UI аутентификации при загрузке
+
       const urlParams = new URLSearchParams(window.location.search);
       const roomId = urlParams.get('room');
       
@@ -333,13 +667,16 @@
     // === CREATE ROOM AND JOIN ===
     document.getElementById('createRoomBtn').addEventListener('click', () => {
       const roomName = document.getElementById('roomName').value.trim();
-      if (!roomName) return;
+      if (!roomName) {
+          showNotification('Введите название комнаты', 'error');
+          return;
+      }
 
       socket.emit('create-room', { name: roomName }, res => {
         if (res && res.id) {
           window.location.href = `/player.html?room=${res.id}`;
         } else {
-          showNotification('Failed to create room', 'error');
+          showNotification('Failed to create room: ' + (res?.error || 'Unknown error'), 'error');
         }
       });
     });
@@ -347,14 +684,17 @@
     // === CREATE ROOM WITHOUT JOINING ===
     document.getElementById('createRoomNoJoinBtn').addEventListener('click', () => {
       const roomName = document.getElementById('roomName').value.trim();
-      if (!roomName) return;
+      if (!roomName) {
+          showNotification('Введите название комнаты', 'error');
+          return;
+      }
 
       socket.emit('create-room', { name: roomName }, res => {
         if (res && res.id) {
           showNotification(`Room created: ${res.name}`, 'success');
           loadRoomList();
         } else {
-          showNotification('Failed to create room', 'error');
+          showNotification('Failed to create room: ' + (res?.error || 'Unknown error'), 'error');
         }
       });
     });
@@ -366,17 +706,19 @@
         roomList.innerHTML = '';
 
         if (!rooms || rooms.length === 0) {
-          roomList.innerHTML = '<div class="room-item">No rooms available</div>';
+          roomList.innerHTML = '<div class="room-item">Нет доступных комнат</div>';
           return;
         }
 
         rooms.forEach(room => {
           const div = document.createElement('div');
           div.className = 'room-item';
+          // Добавляем отображение количества пользователей из "живых"
+          const userCount = room.users ? room.users.size : 0;
           div.innerHTML = `
             <div class="room-info">
               <div class="room-name">${room.name}</div>
-              <div class="room-users">${Object.keys(room.users || {}).length} users</div>
+              <div class="room-users">${userCount} пользователей</div>
             </div>
             <div class="room-actions">
               <button class="action-btn delete-btn" data-id="${room.id}"><i class="fas fa-trash"></i></button>
@@ -394,11 +736,11 @@
           // === DELETE ROOM ===
           div.querySelector('.delete-btn').addEventListener('click', (e) => {
             e.stopPropagation(); // ❗ Don't trigger room click
-            if (confirm(`Delete room "${room.name}"?`)) {
+            if (confirm(`Удалить комнату "${room.name}"?`)) {
               socket.emit('delete-room', { roomId: room.id }, res => {
                 if (res && res.success) {
-                  showNotification(`Room deleted: ${room.name}`, 'success');
-                  loadRoomList();
+                  showNotification(`Комната удалена: ${room.name}`, 'success');
+                  loadRoomList(); // Обновляем список после удаления
                 } else {
                   showNotification('Delete failed: ' + (res?.error || 'Unknown error'), 'error');
                 }
@@ -413,17 +755,36 @@
     function showNotification(message, type) {
       const notification = document.createElement('div');
       notification.className = `notification ${type}`;
-      notification.textContent = message;
+      notification.innerHTML = `
+        <span>${message}</span>
+        <button class="notification-close" onclick="this.parentElement.remove()">&times;</button>
+      `;
       document.getElementById('notifications').appendChild(notification);
 
+      // Автоматически удаляем уведомление через 5 секунд
       setTimeout(() => {
-        notification.remove();
-      }, 3000);
+        if (notification.parentNode) { // Проверяем, не было ли уже удалено вручную
+            notification.remove();
+        }
+      }, 5000);
     }
 
     // === UPDATE ROOM LIST ON CHANGE ===
     socket.on('room-list', (rooms) => {
       loadRoomList();
+    });
+
+    // Обработчик отключения сокета (опционально)
+    socket.on('disconnect', () => {
+        console.log('Соединение с сервером потеряно.');
+        // Можно показать уведомление
+        // showNotification('Соединение с сервером потеряно.', 'error');
+    });
+
+    // Обработчик reconnect (опционально)
+    socket.on('reconnect', () => {
+        console.log('Соединение с сервером восстановлено.');
+        // loadRoomList(); // Попробовать обновить список
     });
   </script>
 </body>

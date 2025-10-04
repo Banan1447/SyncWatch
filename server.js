@@ -13,7 +13,7 @@ const config = require('./config');
 const { logRequests } = require('./middleware/logging');
 
 // Routes - ИСПРАВЛЕНЫ ПУТИ (все маршруты находятся в подкаталоге ./routes/)
-const authRoutes = require('./routes/auth');
+const authRoutes = require('./routes/auth'); // Добавлен маршрут аутентификации
 const videoRoutes = require('./routes/videos');
 const sessionRoutes = require('./routes/sessions');
 const adminRoutes = require('./routes/admin');
@@ -26,14 +26,22 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 
+// Создаем RoomService в server.js
+const RoomService = require('./services/roomService');
+const roomService = new RoomService();
+
 // Middleware
 app.use(logRequests);
 app.use(express.json());
 app.use(express.static('public'));
+// --- ДОБАВЛЕНО: раздача статических файлов из папок styles и js ---
+app.use('/styles', express.static(path.join(__dirname, 'styles')));
+app.use('/js', express.static(path.join(__dirname, 'js')));
+// --- КОНЕЦ ДОБАВЛЕНИЯ ---
 app.use('/videos', express.static(config.videoDirectory));
 
 // API Routes
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', authRoutes); // Добавляем маршрут аутентификации
 app.use('/api/videos', videoRoutes);
 app.use('/api/sessions', sessionRoutes);
 app.use('/api/admin', adminRoutes);
@@ -43,7 +51,7 @@ app.use('/api/transcode', transcodeRoutes);
 app.use('/api/files', fileRoutes); // Теперь правильно подключено
 
 // WebSocket
-require('./socket')(io); // Путь к socket.js в подкаталоге server/
+require('./socket')(io, roomService); // Передаем roomService в socket
 
 // Basic upload (для обратной совместимости)
 const storage = multer.diskStorage({
@@ -122,9 +130,9 @@ app.use((req, res) => {
   res.status(404).json({ success: false, error: 'Endpoint not found' });
 });
 
-// Обработка ошибок
+// Обработка ошибок - ДОБАВЛЕНО
 app.use((error, req, res, next) => {
-  console.error('[SERVER] Unhandled error:', error);
+  console.error('[ERROR] Произошла ошибка:', error);
   res.status(500).json({ success: false, error: 'Internal server error' });
 });
 
@@ -136,4 +144,25 @@ server.listen(config.port, () => {
   console.log(`[INFO] Файловый менеджер: http://localhost:${config.port}/files`);
   console.log(`[INFO] Папка с видео: ${config.videoDirectory}`);
   console.log(`[INFO] JWT Secret: ${config.jwtSecret ? '✓ Настроен' : '✗ Отсутствует'}`);
+});
+
+// Обработчик остановки сервера
+process.on('SIGINT', () => {
+  console.log('[SERVER] Получен сигнал SIGINT, завершение работы...');
+  // Вызываем shutdown у RoomService
+  roomService.shutdown();
+  server.close(() => {
+    console.log('[SERVER] Сервер остановлен.');
+    process.exit(0);
+  });
+});
+
+process.on('SIGTERM', () => {
+  console.log('[SERVER] Получен сигнал SIGTERM, завершение работы...');
+  // Вызываем shutdown у RoomService
+  roomService.shutdown();
+  server.close(() => {
+    console.log('[SERVER] Сервер остановлен.');
+    process.exit(0);
+  });
 });

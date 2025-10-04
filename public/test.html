@@ -1,1555 +1,433 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <title>SyncWatch Test Page</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-    <style>
-        :root {
-            --primary: #4a90e2;
-            --secondary: #343a40;
-            --accent: #007bff;
-            --bg-dark: #121212;
-            --bg-darker: #0d0d0d;
-            --text: #ffffff;
-            --text-secondary: #cccccc;
-            --border: #333333;
-            --shadow: rgba(0, 0, 0, 0.5);
-            --hover-bg: #1e1e1e;
-            --progress-bg: #2c2c2c;
-            --progress-fill: #007bff;
-            --success: #28a745;
-            --warning: #ffc107;
-            --danger: #dc3545;
-            --info: #17a2b8;
-        }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-
-        body {
-            background: var(--bg-dark);
-            color: var(--text);
-            line-height: 1.6;
-            transition: background 0.3s ease;
-        }
-
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 1rem 2rem;
-            background: var(--bg-darker);
-            border-bottom: 1px solid var(--border);
-            box-shadow: 0 2px 10px var(--shadow);
-        }
-
-        .logo-container {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            cursor: pointer;
-            transition: opacity 0.2s ease;
-        }
-
-        .logo-container:hover {
-            opacity: 0.8;
-        }
-
-        .logo-icon {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #4a90e2, #8e44ad);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: bold;
-            position: relative;
-        }
-
-        .logo-svg {
-            width: 80%;
-            height: 80%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .logo-svg svg {
-            width: 100%;
-            height: 100%;
-        }
-
-        .header h1 {
-            font-size: 1.8rem;
-            font-weight: 600;
-            color: var(--primary);
-        }
-
-        .manage-links {
-            display: flex;
-            gap: 1rem;
-        }
-
-        .manage-link {
-            color: var(--accent);
-            text-decoration: none;
-            font-weight: 500;
-            padding: 0.5rem 1rem;
-            border-radius: 4px;
-            transition: all 0.2s ease;
-        }
-
-        .manage-link:hover {
-            background: rgba(0, 123, 255, 0.1);
-            color: #fff;
-        }
-
-        .main-container {
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-            padding: 1rem 2rem;
-            min-height: calc(100vh - 180px);
-        }
-
-        .panel {
-            background: var(--bg-darker);
-            border-radius: 8px;
-            box-shadow: 0 4px 12px var(--shadow);
-            padding: 1rem;
-        }
-
-        .panel h2 {
-            margin-bottom: 1rem;
-            font-size: 1.3rem;
-            color: var(--primary);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .btn {
-            padding: 0.5rem 1rem;
-            background: var(--accent);
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: 500;
-            transition: background 0.2s ease;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .btn:hover {
-            background: #0056b3;
-        }
-
-        .btn-sm {
-            padding: 0.25rem 0.5rem;
-            font-size: 0.8rem;
-        }
-
-        .btn-danger {
-            background: var(--danger);
-        }
-
-        .btn-danger:hover {
-            background: #c82333;
-        }
-
-        .btn-info {
-            background: var(--info);
-        }
-
-        .btn-info:hover {
-            background: #138496;
-        }
-
-        .btn-warning {
-            background: var(--warning);
-            color: #212529;
-        }
-
-        .btn-warning:hover {
-            background: #e0a800;
-        }
-
-        .btn-success {
-            background: var(--success);
-        }
-
-        .btn-success:hover {
-            background: #218838;
-        }
-
-        .form-group {
-            margin-bottom: 1rem;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 0.5rem;
-            color: var(--text-secondary);
-            font-size: 0.9rem;
-        }
-
-        .form-group input,
-        .form-group select,
-        .form-group textarea {
-            width: 100%;
-            padding: 0.75rem;
-            border: 1px solid var(--border);
-            background: var(--secondary);
-            color: var(--text);
-            border-radius: 4px;
-            font-size: 0.9rem;
-        }
-
-        .test-section {
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-            padding: 1rem;
-            background: var(--secondary);
-            border-radius: 4px;
-            border: 1px solid var(--border);
-            margin-bottom: 1rem;
-        }
-
-        .test-section h3 {
-            margin-bottom: 0.5rem;
-            font-size: 1.1rem;
-            color: var(--primary);
-        }
-
-        .test-result {
-            padding: 0.5rem;
-            background: var(--bg-darker);
-            border-radius: 4px;
-            border: 1px solid var(--border);
-            font-size: 0.9rem;
-            color: var(--text-secondary);
-            margin-top: 0.5rem;
-            white-space: pre-wrap;
-            max-height: 200px;
-            overflow-y: auto;
-        }
-
-        .test-result.success {
-            color: var(--success);
-            border-left: 4px solid var(--success);
-        }
-
-        .test-result.error {
-            color: var(--danger);
-            border-left: 4px solid var(--danger);
-        }
-
-        .test-result.warning {
-            color: var(--warning);
-            border-left: 4px solid var(--warning);
-        }
-
-        .test-result.info {
-            color: var(--info);
-            border-left: 4px solid var(--info);
-        }
-
-        .sync-test-container {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1rem;
-            margin-top: 1rem;
-        }
-
-        .video-player {
-            width: 100%;
-            background: var(--bg-dark);
-            border-radius: 4px;
-            border: 1px solid var(--border);
-            max-height: 300px;
-        }
-
-        .sync-stats {
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-            padding: 1rem;
-            background: var(--bg-dark);
-            border-radius: 4px;
-            border: 1px solid var(--border);
-        }
-
-        .stat-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 0.25rem 0;
-        }
-
-        .stat-value {
-            font-weight: bold;
-        }
-
-        .sync-controls {
-            display: flex;
-            gap: 0.5rem;
-            margin-top: 1rem;
-            flex-wrap: wrap;
-        }
-
-        .loading {
-            opacity: 0.6;
-            pointer-events: none;
-        }
-
-        .btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-        }
-
-        #notifications {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 1000;
-            max-width: 300px;
-        }
-
-        .notification {
-            padding: 1rem;
-            margin-bottom: 0.5rem;
-            background: var(--secondary);
-            border-left: 4px solid var(--accent);
-            border-radius: 4px;
-            box-shadow: 0 4px 12px var(--shadow);
-            animation: slideIn 0.3s ease-out;
-        }
-
-        .notification.success {
-            border-left-color: var(--success);
-        }
-
-        .notification.error {
-            border-left-color: var(--danger);
-        }
-
-        .notification.warning {
-            border-left-color: var(--warning);
-        }
-
-        .notification.info {
-            border-left-color: var(--info);
-        }
-
-        @keyframes slideIn {
-            from {
-                transform: translateX(100%);
-                opacity: 0;
-            }
-            to {
-                transform: translateX(0);
-                opacity: 1;
-            }
-        }
-
-        .websocket-status {
-            padding: 0.5rem;
-            border-radius: 4px;
-            margin-bottom: 0.5rem;
-            text-align: center;
-            font-weight: bold;
-        }
-
-        .websocket-connected {
-            background: rgba(40, 167, 69, 0.2);
-            color: var(--success);
-            border: 1px solid var(--success);
-        }
-
-        .websocket-disconnected {
-            background: rgba(220, 53, 69, 0.2);
-            color: var(--danger);
-            border: 1px solid var(--danger);
-        }
-
-        .websocket-connecting {
-            background: rgba(255, 193, 7, 0.2);
-            color: var(--warning);
-            border: 1px solid var(--warning);
-        }
-
-        .auth-section {
-            background: var(--bg-darker);
-            padding: 1rem;
-            border-radius: 8px;
-            margin-bottom: 1rem;
-            border: 1px solid var(--border);
-        }
-
-        .auth-form {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1rem;
-            margin-bottom: 1rem;
-        }
-
-        .auth-form .form-group {
-            margin-bottom: 0.5rem;
-        }
-
-        .token-display {
-            background: var(--secondary);
-            padding: 0.5rem;
-            border-radius: 4px;
-            font-family: monospace;
-            font-size: 0.8rem;
-            word-break: break-all;
-            margin-top: 0.5rem;
-            max-height: 100px;
-            overflow-y: auto;
-        }
-
-        @media (max-width: 768px) {
-            .main-container {
-                flex-direction: column;
-            }
-
-            .header, .controls {
-                padding: 1rem;
-            }
-
-            .video-container {
-                aspect-ratio: 16 / 9;
-            }
-
-            .quality-menu {
-                top: 5px;
-                right: 5px;
-            }
-
-            .upload-section {
-                padding: 0.75rem;
-            }
-
-            .comments-section {
-                padding: 0.75rem;
-            }
-
-            .right-panel {
-                padding: 0.75rem;
-            }
-            
-            .manage-links {
-                flex-direction: column;
-                gap: 0.5rem;
-            }
-
-            .sync-test-container {
-                grid-template-columns: 1fr;
-            }
-
-            .sync-controls {
-                flex-direction: column;
-            }
-
-            .auth-form {
-                grid-template-columns: 1fr;
-            }
-        }
-    </style>
+  <meta charset="UTF-8">
+  <title>Health Checks</title>
+  <style>
+    :root {
+      --primary: #4a90e2;
+      --secondary: #343a40;
+      --accent: #007bff;
+      --bg-dark: #121212;
+      --bg-darker: #0d0d0d;
+      --text: #ffffff;
+      --text-secondary: #cccccc;
+      --border: #333333;
+      --shadow: rgba(0, 0, 0, 0.5);
+      --hover-bg: #1e1e1e;
+      --progress-bg: #2c2c2c;
+      --progress-fill: #007bff;
+      --error: #dc3545;
+      --success: #28a745;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    body {
+      background: var(--bg-dark);
+      color: var(--text);
+      line-height: 1.6;
+      transition: background 0.3s ease;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 2rem;
+      background: var(--bg-darker);
+      border-bottom: 1px solid var(--border);
+      box-shadow: 0 2px 10px var(--shadow);
+    }
+
+    .logo-container {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      cursor: pointer;
+      transition: opacity 0.2s ease;
+    }
+
+    .logo-container:hover {
+      opacity: 0.8;
+    }
+
+    .logo-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #4a90e2, #8e44ad); /* Сине-фиолетовый */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: bold;
+      position: relative;
+    }
+
+    .logo-svg {
+      width: 80%; /* Занимает 80% круга */
+      height: 80%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .logo-svg svg {
+      width: 100%;
+      height: 100%;
+    }
+
+    .header h1 {
+      font-size: 1.8rem;
+      font-weight: 600;
+      color: var(--primary);
+    }
+
+    .back-link {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 500;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      transition: all 0.2s ease;
+    }
+
+    .back-link:hover {
+      background: rgba(0, 123, 255, 0.1);
+      color: #fff;
+    }
+
+    .main-container {
+      padding: 2rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+    }
+
+    .checks-section {
+      width: 100%;
+      max-width: 800px;
+      background: var(--bg-darker);
+      border-radius: 8px;
+      box-shadow: 0 4px 12px var(--shadow);
+      padding: 2rem;
+    }
+
+    .checks-section h2 {
+      margin-bottom: 1.5rem;
+      font-size: 1.5rem;
+      color: var(--primary);
+    }
+
+    .check-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem;
+      background: var(--bg-dark);
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      margin-bottom: 0.5rem;
+      transition: background 0.2s ease;
+    }
+
+    .check-item:hover {
+      background: var(--hover-bg);
+    }
+
+    .check-info {
+      flex: 1;
+    }
+
+    .check-name {
+      font-size: 1.1rem;
+      color: var(--text);
+    }
+
+    .check-url {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+    }
+
+    .check-result {
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      font-weight: 500;
+    }
+
+    .check-result.success {
+      background: var(--success);
+      color: white;
+    }
+
+    .check-result.error {
+      background: var(--error);
+      color: white;
+    }
+
+    .check-result.pending {
+      background: var(--secondary);
+      color: var(--text-secondary);
+    }
+
+    .run-all-btn {
+      width: 100%;
+      padding: 0.75rem;
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: background 0.2s ease;
+      margin-top: 1rem;
+    }
+
+    .run-all-btn:hover {
+      background: #0056b3;
+    }
+
+    #notifications {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 1000;
+      max-width: 300px;
+    }
+
+    .notification {
+      padding: 1rem;
+      margin-bottom: 0.5rem;
+      border-radius: 4px;
+      box-shadow: 0 4px 12px var(--shadow);
+      animation: slideIn 0.3s ease-out;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .notification.success {
+      background: rgba(40, 167, 69, 0.2);
+      border-left: 4px solid var(--success);
+      color: var(--success);
+    }
+
+    .notification.error {
+      background: rgba(220, 53, 69, 0.2);
+      border-left: 4px solid var(--error);
+      color: var(--error);
+    }
+
+    .notification-close {
+      background: none;
+      border: none;
+      color: inherit;
+      font-size: 1.2rem;
+      cursor: pointer;
+      padding: 0 0.5rem;
+    }
+
+    @keyframes slideIn {
+      from {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+  </style>
 </head>
 <body>
-    <div class="header">
-        <div class="logo-container" onclick="window.location.href='/select-room.html'">
-            <div class="logo-icon">
-                <div class="logo-svg">
-                    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-                        <defs>
-                            <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                                <stop offset="0%" stop-color="#4a90e2" />
-                                <stop offset="100%" stop-color="#8e44ad" />
-                            </linearGradient>
-                        </defs>
-                        <circle cx="50" cy="50" r="48" fill="url(#logoGradient)" />
-                        <text 
-                            x="50" 
-                            y="50" 
-                            font-family="Arial, sans-serif" 
-                            font-size="40" 
-                            fill="white" 
-                            text-anchor="middle" 
-                            dominant-baseline="middle"
-                            alignment-baseline="middle"
-                            style="paint-order: stroke; stroke: #000; stroke-width: 1px;"
-                        >
-                            S
-                        </text>
-                    </svg>
-                </div>
-            </div>
-            <h1>SyncWatch</h1>
+  <div class="header">
+    <div class="logo-container" onclick="window.location.href='/select-room.html'">
+      <div class="logo-icon">
+        <div class="logo-svg">
+          <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+            <!-- Градиент -->
+            <defs>
+              <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#4a90e2" />
+                <stop offset="100%" stop-color="#8e44ad" />
+              </linearGradient>
+            </defs>
+
+            <!-- Круговой фон -->
+            <circle cx="50" cy="50" r="48" fill="url(#logoGradient)" />
+
+            <!-- Буква S -->
+            <text 
+              x="50" 
+              y="50" 
+              font-family="Arial, sans-serif" 
+              font-size="40" 
+              fill="white" 
+              text-anchor="middle" 
+              dominant-baseline="middle"
+              alignment-baseline="middle"
+              style="paint-order: stroke; stroke: #000; stroke-width: 1px;"
+            >
+              S
+            </text>
+          </svg>
         </div>
-        <div class="manage-links">
-            <a href="/select-room.html" class="manage-link">Select Room</a>
-            <a href="/transcode" class="manage-link">Transcoder</a>
-            <a href="/files" class="manage-link">File Manager</a>
-        </div>
+      </div>
+      <h1>SyncWatch</h1>
     </div>
+    <a href="/select-room.html" class="back-link">Back to Rooms</a>
+  </div>
 
-    <div class="main-container">
-        <!-- Authentication Section -->
-        <div class="panel">
-            <h2>🔐 Authentication Tests</h2>
-            
-            <div class="auth-section">
-                <div class="auth-form">
-                    <div>
-                        <h3>Register</h3>
-                        <div class="form-group">
-                            <label for="registerUsername">Username:</label>
-                            <input type="text" id="registerUsername" placeholder="Enter username" value="testuser">
-                        </div>
-                        <div class="form-group">
-                            <label for="registerPassword">Password:</label>
-                            <input type="password" id="registerPassword" placeholder="Enter password" value="testpass123">
-                        </div>
-                        <div class="form-group">
-                            <label for="registerEmail">Email (optional):</label>
-                            <input type="email" id="registerEmail" placeholder="Enter email" value="test@example.com">
-                        </div>
-                        <button class="btn btn-success" id="testRegisterBtn">
-                            <i class="fas fa-user-plus"></i> Test Register
-                        </button>
-                    </div>
-                    
-                    <div>
-                        <h3>Login</h3>
-                        <div class="form-group">
-                            <label for="loginUsername">Username:</label>
-                            <input type="text" id="loginUsername" placeholder="Enter username" value="testuser">
-                        </div>
-                        <div class="form-group">
-                            <label for="loginPassword">Password:</label>
-                            <input type="password" id="loginPassword" placeholder="Enter password" value="testpass123">
-                        </div>
-                        <button class="btn btn-info" id="testLoginBtn">
-                            <i class="fas fa-sign-in-alt"></i> Test Login
-                        </button>
-                    </div>
-                </div>
-                
-                <div class="test-result" id="testAuthResult">Not tested yet</div>
-                
-                <div class="sync-stats">
-                    <h4>Current Token</h4>
-                    <div id="currentToken" class="token-display">No token</div>
-                    <div class="sync-controls">
-                        <button class="btn btn-warning" id="testRefreshTokenBtn">
-                            <i class="fas fa-sync"></i> Test Refresh Token
-                        </button>
-                        <button class="btn" id="testProfileBtn">
-                            <i class="fas fa-user"></i> Test Get Profile
-                        </button>
-                        <button class="btn btn-danger" id="testLogoutBtn">
-                            <i class="fas fa-sign-out-alt"></i> Test Logout
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Session Management Tests -->
-        <div class="panel">
-            <h2>🎬 Session Management Tests</h2>
-            
-            <div class="test-section">
-                <h3>Create Session</h3>
-                <div class="form-group">
-                    <label for="sessionName">Session Name:</label>
-                    <input type="text" id="sessionName" placeholder="Enter session name" value="Test Session">
-                </div>
-                <button class="btn" id="testCreateSessionBtn">
-                    <i class="fas fa-plus"></i> Test Create Session
-                </button>
-                <div class="test-result" id="testCreateSessionResult">Not tested yet</div>
-            </div>
-
-            <div class="test-section">
-                <h3>Session Operations</h3>
-                <div class="sync-controls">
-                    <button class="btn btn-info" id="testGetSessionBtn">
-                        <i class="fas fa-info-circle"></i> Test Get Session Info
-                    </button>
-                    <button class="btn" id="testGetSessionUsersBtn">
-                        <i class="fas fa-users"></i> Test Get Session Users
-                    </button>
-                    <button class="btn btn-warning" id="testStopSessionBtn">
-                        <i class="fas fa-stop"></i> Test Stop Session
-                    </button>
-                </div>
-                <div class="test-result" id="testSessionOpsResult">Not tested yet</div>
-            </div>
-
-            <div class="test-section">
-                <h3>Chat Operations</h3>
-                <div class="form-group">
-                    <label for="chatMessage">Chat Message:</label>
-                    <input type="text" id="chatMessage" placeholder="Enter message" value="Hello from test!">
-                </div>
-                <div class="sync-controls">
-                    <button class="btn" id="testSendChatBtn">
-                        <i class="fas fa-comment"></i> Test Send Chat
-                    </button>
-                    <button class="btn btn-info" id="testGetChatHistoryBtn">
-                        <i class="fas fa-history"></i> Test Get Chat History
-                    </button>
-                </div>
-                <div class="test-result" id="testChatResult">Not tested yet</div>
-            </div>
-        </div>
-
-        <!-- Admin Tests -->
-        <div class="panel">
-            <h2>⚙️ Admin Tests</h2>
-            
-            <div class="test-section">
-                <h3>User Management</h3>
-                <div class="sync-controls">
-                    <button class="btn" id="testGetAllUsersBtn">
-                        <i class="fas fa-users"></i> Test Get All Users
-                    </button>
-                    <button class="btn btn-info" id="testGetAllRoomsBtn">
-                        <i class="fas fa-door-open"></i> Test Get All Rooms
-                    </button>
-                </div>
-                <div class="test-result" id="testAdminUsersResult">Not tested yet</div>
-            </div>
-
-            <div class="test-section">
-                <h3>Room Management</h3>
-                <div class="form-group">
-                    <label for="kickRoomId">Room ID to Kick From:</label>
-                    <input type="text" id="kickRoomId" placeholder="Enter room ID">
-                </div>
-                <div class="form-group">
-                    <label for="kickUsername">Username to Kick:</label>
-                    <input type="text" id="kickUsername" placeholder="Enter username">
-                </div>
-                <button class="btn btn-danger" id="testKickUserBtn">
-                    <i class="fas fa-user-slash"></i> Test Kick User
-                </button>
-                <div class="test-result" id="testAdminRoomsResult">Not tested yet</div>
-            </div>
-
-            <div class="test-section">
-                <h3>System Logs</h3>
-                <button class="btn" id="testGetLogsBtn">
-                    <i class="fas fa-file-alt"></i> Test Get Logs
-                </button>
-                <div class="test-result" id="testLogsResult">Not tested yet</div>
-            </div>
-        </div>
-
-        <!-- Metrics Tests -->
-        <div class="panel">
-            <h2>📊 Metrics & Monitoring Tests</h2>
-            
-            <div class="test-section">
-                <h3>Performance Metrics</h3>
-                <div class="sync-controls">
-                    <button class="btn" id="testPerformanceMetricsBtn">
-                        <i class="fas fa-tachometer-alt"></i> Test Performance Metrics
-                    </button>
-                    <button class="btn btn-info" id="testUsageMetricsBtn">
-                        <i class="fas fa-chart-bar"></i> Test Usage Metrics
-                    </button>
-                    <button class="btn btn-warning" id="testErrorMetricsBtn">
-                        <i class="fas fa-exclamation-triangle"></i> Test Error Metrics
-                    </button>
-                </div>
-                <div class="test-result" id="testMetricsResult">Not tested yet</div>
-            </div>
-
-            <div class="test-section">
-                <h3>System Health</h3>
-                <div class="sync-controls">
-                    <button class="btn btn-success" id="testSystemHealthBtn">
-                        <i class="fas fa-heartbeat"></i> Test System Health
-                    </button>
-                    <button class="btn" id="testSystemStatsBtn">
-                        <i class="fas fa-chart-line"></i> Test System Stats
-                    </button>
-                </div>
-                <div class="test-result" id="testSystemResult">Not tested yet</div>
-            </div>
-        </div>
-
-        <!-- Existing Tests (WebSocket, Video Sync, etc.) -->
-        <div class="panel">
-            <h2>🔌 Existing Functionality Tests</h2>
-            
-            <!-- WebSocket Connection Test -->
-            <div class="test-section">
-                <h3>WebSocket Connection Test</h3>
-                <div id="websocketStatus" class="websocket-status websocket-disconnected">
-                    ❌ WebSocket Disconnected
-                </div>
-                <button class="btn" id="testWebSocketBtn">
-                    <i class="fas fa-plug"></i> Test WebSocket Connection
-                </button>
-                <button class="btn btn-info" id="monitorWebSocketBtn">
-                    <i class="fas fa-chart-line"></i> Start Real-time Monitoring
-                </button>
-                <button class="btn btn-warning" id="stopWebSocketMonitorBtn">
-                    <i class="fas fa-stop"></i> Stop Monitoring
-                </button>
-                <div class="test-result" id="testWebSocketResult">Not tested yet</div>
-                <div class="sync-stats">
-                    <h4>WebSocket Statistics</h4>
-                    <div class="stat-item">
-                        <span>Connection Status:</span>
-                        <span id="wsConnectionStatus" class="stat-value">Disconnected</span>
-                    </div>
-                    <div class="stat-item">
-                        <span>Messages Received:</span>
-                        <span id="wsMessagesCount" class="stat-value">0</span>
-                    </div>
-                    <div class="stat-item">
-                        <span>Last Message:</span>
-                        <span id="wsLastMessage" class="stat-value">None</span>
-                    </div>
-                    <div class="stat-item">
-                        <span>Latency:</span>
-                        <span id="wsLatency" class="stat-value">0ms</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Video Sync Test Section -->
-            <div class="test-section">
-                <h3>Video Sync Test</h3>
-                <p>Тестирование синхронизации видео между несколькими плеерами</p>
-                
-                <div class="form-group">
-                    <label for="syncVideoInput">Выберите тестовое видео:</label>
-                    <input type="file" id="syncVideoInput" accept="video/*" class="btn">
-                    <button class="btn" id="loadSelectedVideoBtn">
-                        <i class="fas fa-upload"></i> Загрузить выбранное видео
-                    </button>
-                </div>
-                
-                <div class="sync-test-container">
-                    <div>
-                        <h4>Плеер 1 (Master)</h4>
-                        <video id="video1" class="video-player" controls>
-                            Your browser does not support the video tag.
-                        </video>
-                    </div>
-                    <div>
-                        <h4>Плеер 2 (Slave)</h4>
-                        <video id="video2" class="video-player" controls>
-                            Your browser does not support the video tag.
-                        </video>
-                    </div>
-                </div>
-
-                <div class="sync-stats">
-                    <h4>Статистика синхронизации</h4>
-                    <div class="stat-item">
-                        <span>Разница времени:</span>
-                        <span id="timeDiff" class="stat-value">0.000s</span>
-                    </div>
-                    <div class="stat-item">
-                        <span>Статус:</span>
-                        <span id="syncStatus" class="stat-value">Не синхронизировано</span>
-                    </div>
-                    <div class="stat-item">
-                        <span>Плеер 1 время:</span>
-                        <span id="time1" class="stat-value">0.000s</span>
-                    </div>
-                    <div class="stat-item">
-                        <span>Плеер 2 время:</span>
-                        <span id="time2" class="stat-value">0.000s</span>
-                    </div>
-                    <div class="stat-item">
-                        <span>Состояние плеера 1:</span>
-                        <span id="state1" class="stat-value">Остановлен</span>
-                    </div>
-                    <div class="stat-item">
-                        <span>Состояние плеера 2:</span>
-                        <span id="state2" class="stat-value">Остановлен</span>
-                    </div>
-                </div>
-
-                <div class="sync-controls">
-                    <button class="btn" id="startSyncTestBtn">
-                        <i class="fas fa-play"></i> Начать тест синхронизации
-                    </button>
-                    <button class="btn" id="stopSyncTestBtn">
-                        <i class="fas fa-stop"></i> Остановить тест
-                    </button>
-                    <button class="btn btn-info" id="forceSyncBtn">
-                        <i class="fas fa-sync"></i> Принудительная синхронизация
-                    </button>
-                    <button class="btn btn-warning" id="resetSyncTestBtn">
-                        <i class="fas fa-redo"></i> Сбросить тест
-                    </button>
-                </div>
-
-                <div class="test-result" id="syncTestResult">Тестовое видео не загружено</div>
-            </div>
-
-            <!-- Existing API Tests -->
-            <div class="test-section">
-                <h3>Basic API Tests</h3>
-                <div class="sync-controls">
-                    <button class="btn" id="testGetVideosBtn">
-                        <i class="fas fa-list"></i> Test Get Videos
-                    </button>
-                    <button class="btn btn-info" id="testUploadApiBtn">
-                        <i class="fas fa-upload"></i> Test Upload API
-                    </button>
-                </div>
-                <div class="test-result" id="testBasicApiResult">Not tested yet</div>
-            </div>
-        </div>
+  <div class="main-container">
+    <div class="checks-section">
+      <h2>Health Checks</h2>
+      <button id="runAllBtn" class="run-all-btn">Run All Checks</button>
+      <div id="checksList">
+        <!-- Элементы проверок будут добавлены здесь -->
+      </div>
     </div>
+  </div>
 
-    <div id="notifications"></div>
+  <div id="notifications"></div>
 
-    <script src="/socket.io/socket.io.js"></script>
-    <script>
-        // Global variables
-        let currentToken = null;
-        let currentSessionId = null;
-        let socket = null;
-        let wsMonitorInterval = null;
-        let messagesCount = 0;
-        let pingStartTime = 0;
+  <script>
+    // Список проверок
+    const checks = [
+      { name: 'Server Status', url: '/api/system/status', method: 'GET' }, // Пример маршрута, может не существовать
+      { name: 'Health Check', url: '/api/system/health', method: 'GET' },
+      { name: 'Metrics', url: '/api/metrics/usage', method: 'GET' }, // Требует аутентификации
+      { name: 'Transcode Queue', url: '/api/transcode/queue', method: 'GET' }, // Требует аутентификации
+      { name: 'Video List', url: '/api/videos', method: 'GET' }, // Требует аутентификации
+      { name: 'Rooms List (Socket)', url: '/api/rooms', method: 'GET' }, // Скорее всего, не существует как GET, проверка через сокет
+      // Добавьте другие маршруты для проверки
+    ];
 
-        // Notification system
-        function showNotification(message, type = 'info') {
-            const notifications = document.getElementById('notifications');
-            const notification = document.createElement('div');
-            notification.className = `notification ${type}`;
-            notification.textContent = message;
-            notifications.appendChild(notification);
-            
-            setTimeout(() => {
-                notification.remove();
-            }, 5000);
+    // Функция для выполнения одной проверки
+    async function runCheck(check) {
+      const startTime = Date.now();
+      try {
+        // const response = await fetch(check.url, {
+        //   method: check.method,
+        //   headers: {
+        //     'Authorization': `Bearer ${authToken}` // УБРАНО: не нужно с заглушкой
+        //   }
+        // });
+        const response = await fetch(check.url, { method: check.method });
+        const duration = Date.now() - startTime;
+        const data = await response.json();
+
+        return {
+          name: check.name,
+          url: check.url,
+          success: response.ok,
+          status: response.status,
+          duration: duration,
+          data: data // Включаем данные ответа
+        };
+      } catch (error) {
+        const duration = Date.now() - startTime;
+        return {
+          name: check.name,
+          url: check.url,
+          success: false,
+          status: 'ERROR',
+          duration: duration,
+          error: error.message
+        };
+      }
+    }
+
+    // Функция для отображения результата проверки
+    function displayCheckResult(result) {
+      const checkList = document.getElementById('checksList');
+      const checkItem = document.createElement('div');
+      checkItem.className = 'check-item';
+
+      let statusText = 'Pending...';
+      let statusClass = 'pending';
+
+      if (result.status !== 'PENDING') {
+        statusText = result.success ? `OK (${result.status})` : `FAIL (${result.status || result.error})`;
+        statusClass = result.success ? 'success' : 'error';
+      }
+
+      checkItem.innerHTML = `
+        <div class="check-info">
+          <div class="check-name">${result.name}</div>
+          <div class="check-url">${result.url}</div>
+          <div class="check-duration">Duration: ${result.duration}ms</div>
+          ${result.data ? `<div class="check-data">Data: ${JSON.stringify(result.data).substring(0, 100)}...</div>` : ''}
+        </div>
+        <div class="check-result ${statusClass}">${statusText}</div>
+      `;
+
+      checkList.appendChild(checkItem);
+    }
+
+    // Функция для запуска всех проверок
+    async function runAllChecks() {
+      const checkList = document.getElementById('checksList');
+      checkList.innerHTML = ''; // Очищаем предыдущие результаты
+
+      for (const check of checks) {
+        // Показываем начальное состояние
+        displayCheckResult({ name: check.name, url: check.url, status: 'PENDING', duration: 0 });
+      }
+
+      // Ждем немного, чтобы обновить интерфейс
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      for (const check of checks) {
+        const result = await runCheck(check);
+        // Находим соответствующий элемент и обновляем его
+        const checkItems = document.querySelectorAll('#checksList .check-item');
+        checkItems.forEach(item => {
+          const itemName = item.querySelector('.check-name').textContent;
+          if (itemName === check.name) {
+            item.querySelector('.check-result').textContent = result.success ? `OK (${result.status})` : `FAIL (${result.status || result.error})`;
+            item.querySelector('.check-result').className = `check-result ${result.success ? 'success' : 'error'}`;
+            item.querySelector('.check-duration').textContent = `Duration: ${result.duration}ms`;
+            if (result.data) {
+              const dataDiv = item.querySelector('.check-data');
+              if (dataDiv) {
+                dataDiv.textContent = `Data: ${JSON.stringify(result.data).substring(0, 100)}...`;
+              }
+            }
+          }
+        });
+      }
+    }
+
+    // === ФУНКЦИЯ УВЕДОМЛЕНИЙ ===
+    function showNotification(message, type) {
+      const notification = document.createElement('div');
+      notification.className = `notification ${type}`;
+      notification.innerHTML = `
+        <span>${message}</span>
+        <button class="notification-close" onclick="this.parentElement.remove()">&times;</button>
+      `;
+      document.getElementById('notifications').appendChild(notification);
+
+      // Автоматически удаляем уведомление через 5 секунд
+      setTimeout(() => {
+        if (notification.parentNode) { // Проверяем, не было ли уже удалено вручную
+            notification.remove();
         }
-
-        // API call helper
-        async function apiCall(endpoint, options = {}) {
-            const headers = {
-                'Content-Type': 'application/json',
-                ...options.headers
-            };
-
-            if (currentToken && !endpoint.includes('/auth/')) {
-                headers['Authorization'] = `Bearer ${currentToken}`;
-            }
-
-            try {
-                const response = await fetch(endpoint, {
-                    ...options,
-                    headers
-                });
-
-                const data = await response.json();
-                
-                return {
-                    success: response.ok,
-                    status: response.status,
-                    data
-                };
-            } catch (error) {
-                return {
-                    success: false,
-                    error: error.message
-                };
-            }
-        }
-
-        // Update token display
-        function updateTokenDisplay() {
-            const tokenDisplay = document.getElementById('currentToken');
-            if (currentToken) {
-                // Show only first and last 20 characters for security
-                const shortToken = currentToken.length > 40 
-                    ? `${currentToken.substring(0, 20)}...${currentToken.substring(currentToken.length - 20)}`
-                    : currentToken;
-                tokenDisplay.textContent = shortToken;
-            } else {
-                tokenDisplay.textContent = 'No token';
-            }
-        }
-
-        // ===== AUTHENTICATION TESTS =====
-
-        // Test Register
-        document.getElementById('testRegisterBtn').addEventListener('click', async () => {
-            const resultEl = document.getElementById('testAuthResult');
-            const username = document.getElementById('registerUsername').value;
-            const password = document.getElementById('registerPassword').value;
-            const email = document.getElementById('registerEmail').value;
-
-            try {
-                resultEl.textContent = 'Registering user...';
-                resultEl.className = 'test-result info';
-
-                const result = await apiCall('/api/auth/register', {
-                    method: 'POST',
-                    body: JSON.stringify({ username, password, email })
-                });
-
-                if (result.success) {
-                    resultEl.textContent = `✅ Register successful!\nUser: ${username}\nResponse: ${JSON.stringify(result.data, null, 2)}`;
-                    resultEl.className = 'test-result success';
-                    showNotification('User registered successfully', 'success');
-                } else {
-                    resultEl.textContent = `❌ Register failed: ${result.data?.error || result.error}`;
-                    resultEl.className = 'test-result error';
-                    showNotification('Registration failed', 'error');
-                }
-            } catch (error) {
-                resultEl.textContent = `❌ Register error: ${error.message}`;
-                resultEl.className = 'test-result error';
-            }
-        });
-
-        // Test Login
-        document.getElementById('testLoginBtn').addEventListener('click', async () => {
-            const resultEl = document.getElementById('testAuthResult');
-            const username = document.getElementById('loginUsername').value;
-            const password = document.getElementById('loginPassword').value;
-
-            try {
-                resultEl.textContent = 'Logging in...';
-                resultEl.className = 'test-result info';
-
-                const result = await apiCall('/api/auth/login', {
-                    method: 'POST',
-                    body: JSON.stringify({ username, password })
-                });
-
-                if (result.success && result.data.token) {
-                    currentToken = result.data.token;
-                    updateTokenDisplay();
-                    resultEl.textContent = `✅ Login successful!\nToken received: ${currentToken ? 'Yes' : 'No'}\nUser: ${username}`;
-                    resultEl.className = 'test-result success';
-                    showNotification('Login successful', 'success');
-                } else {
-                    resultEl.textContent = `❌ Login failed: ${result.data?.error || result.error}`;
-                    resultEl.className = 'test-result error';
-                    showNotification('Login failed', 'error');
-                }
-            } catch (error) {
-                resultEl.textContent = `❌ Login error: ${error.message}`;
-                resultEl.className = 'test-result error';
-            }
-        });
-
-        // Test Refresh Token
-        document.getElementById('testRefreshTokenBtn').addEventListener('click', async () => {
-            const resultEl = document.getElementById('testAuthResult');
-            
-            if (!currentToken) {
-                resultEl.textContent = '❌ No token available. Please login first.';
-                resultEl.className = 'test-result error';
-                return;
-            }
-
-            try {
-                resultEl.textContent = 'Refreshing token...';
-                resultEl.className = 'test-result info';
-
-                const result = await apiCall('/api/auth/refresh', {
-                    method: 'POST'
-                });
-
-                if (result.success && result.data.token) {
-                    currentToken = result.data.token;
-                    updateTokenDisplay();
-                    resultEl.textContent = '✅ Token refreshed successfully!';
-                    resultEl.className = 'test-result success';
-                    showNotification('Token refreshed', 'success');
-                } else {
-                    resultEl.textContent = `❌ Token refresh failed: ${result.data?.error || result.error}`;
-                    resultEl.className = 'test-result error';
-                }
-            } catch (error) {
-                resultEl.textContent = `❌ Token refresh error: ${error.message}`;
-                resultEl.className = 'test-result error';
-            }
-        });
-
-        // Test Get Profile
-        document.getElementById('testProfileBtn').addEventListener('click', async () => {
-            const resultEl = document.getElementById('testAuthResult');
-            
-            if (!currentToken) {
-                resultEl.textContent = '❌ No token available. Please login first.';
-                resultEl.className = 'test-result error';
-                return;
-            }
-
-            try {
-                resultEl.textContent = 'Getting profile...';
-                resultEl.className = 'test-result info';
-
-                const result = await apiCall('/api/auth/profile');
-
-                if (result.success) {
-                    resultEl.textContent = `✅ Profile retrieved:\n${JSON.stringify(result.data, null, 2)}`;
-                    resultEl.className = 'test-result success';
-                    showNotification('Profile retrieved', 'success');
-                } else {
-                    resultEl.textContent = `❌ Profile retrieval failed: ${result.data?.error || result.error}`;
-                    resultEl.className = 'test-result error';
-                }
-            } catch (error) {
-                resultEl.textContent = `❌ Profile error: ${error.message}`;
-                resultEl.className = 'test-result error';
-            }
-        });
-
-        // Test Logout
-        document.getElementById('testLogoutBtn').addEventListener('click', async () => {
-            const resultEl = document.getElementById('testAuthResult');
-            
-            if (!currentToken) {
-                resultEl.textContent = '❌ No token available. Please login first.';
-                resultEl.className = 'test-result error';
-                return;
-            }
-
-            try {
-                resultEl.textContent = 'Logging out...';
-                resultEl.className = 'test-result info';
-
-                const result = await apiCall('/api/auth/logout', {
-                    method: 'POST'
-                });
-
-                if (result.success) {
-                    currentToken = null;
-                    updateTokenDisplay();
-                    resultEl.textContent = '✅ Logout successful!';
-                    resultEl.className = 'test-result success';
-                    showNotification('Logout successful', 'success');
-                } else {
-                    resultEl.textContent = `❌ Logout failed: ${result.data?.error || result.error}`;
-                    resultEl.className = 'test-result error';
-                }
-            } catch (error) {
-                resultEl.textContent = `❌ Logout error: ${error.message}`;
-                resultEl.className = 'test-result error';
-            }
-        });
-
-        // ===== SESSION MANAGEMENT TESTS =====
-
-        // Test Create Session
-        document.getElementById('testCreateSessionBtn').addEventListener('click', async () => {
-            const resultEl = document.getElementById('testCreateSessionResult');
-            const sessionName = document.getElementById('sessionName').value;
-
-            if (!currentToken) {
-                resultEl.textContent = '❌ Please login first to create a session';
-                resultEl.className = 'test-result error';
-                return;
-            }
-
-            try {
-                resultEl.textContent = 'Creating session...';
-                resultEl.className = 'test-result info';
-
-                const result = await apiCall('/api/session/create', {
-                    method: 'POST',
-                    body: JSON.stringify({ name: sessionName })
-                });
-
-                if (result.success && result.data.id) {
-                    currentSessionId = result.data.id;
-                    resultEl.textContent = `✅ Session created successfully!\nSession ID: ${currentSessionId}\nName: ${sessionName}`;
-                    resultEl.className = 'test-result success';
-                    showNotification('Session created', 'success');
-                } else {
-                    resultEl.textContent = `❌ Session creation failed: ${result.data?.error || result.error}`;
-                    resultEl.className = 'test-result error';
-                }
-            } catch (error) {
-                resultEl.textContent = `❌ Session creation error: ${error.message}`;
-                resultEl.className = 'test-result error';
-            }
-        });
-
-        // Test Get Session Info
-        document.getElementById('testGetSessionBtn').addEventListener('click', async () => {
-            const resultEl = document.getElementById('testSessionOpsResult');
-            
-            if (!currentSessionId) {
-                resultEl.textContent = '❌ No session ID available. Please create a session first.';
-                resultEl.className = 'test-result error';
-                return;
-            }
-
-            try {
-                resultEl.textContent = 'Getting session info...';
-                resultEl.className = 'test-result info';
-
-                const result = await apiCall(`/api/session/${currentSessionId}`);
-
-                if (result.success) {
-                    resultEl.textContent = `✅ Session info:\n${JSON.stringify(result.data, null, 2)}`;
-                    resultEl.className = 'test-result success';
-                } else {
-                    resultEl.textContent = `❌ Session info failed: ${result.data?.error || result.error}`;
-                    resultEl.className = 'test-result error';
-                }
-            } catch (error) {
-                resultEl.textContent = `❌ Session info error: ${error.message}`;
-                resultEl.className = 'test-result error';
-            }
-        });
-
-        // Test Get Session Users
-        document.getElementById('testGetSessionUsersBtn').addEventListener('click', async () => {
-            const resultEl = document.getElementById('testSessionOpsResult');
-            
-            if (!currentSessionId) {
-                resultEl.textContent = '❌ No session ID available. Please create a session first.';
-                resultEl.className = 'test-result error';
-                return;
-            }
-
-            try {
-                resultEl.textContent = 'Getting session users...';
-                resultEl.className = 'test-result info';
-
-                const result = await apiCall(`/api/session/users?roomId=${currentSessionId}`);
-
-                if (result.success) {
-                    resultEl.textContent = `✅ Session users:\n${JSON.stringify(result.data, null, 2)}`;
-                    resultEl.className = 'test-result success';
-                } else {
-                    resultEl.textContent = `❌ Session users failed: ${result.data?.error || result.error}`;
-                    resultEl.className = 'test-result error';
-                }
-            } catch (error) {
-                resultEl.textContent = `❌ Session users error: ${error.message}`;
-                resultEl.className = 'test-result error';
-            }
-        });
-
-        // Test Stop Session
-        document.getElementById('testStopSessionBtn').addEventListener('click', async () => {
-            const resultEl = document.getElementById('testSessionOpsResult');
-            
-            if (!currentSessionId) {
-                resultEl.textContent = '❌ No session ID available. Please create a session first.';
-                resultEl.className = 'test-result error';
-                return;
-            }
-
-            try {
-                resultEl.textContent = 'Stopping session...';
-                resultEl.className = 'test-result info';
-
-                const result = await apiCall('/api/session/stop', {
-                    method: 'POST',
-                    body: JSON.stringify({ roomId: currentSessionId })
-                });
-
-                if (result.success) {
-                    resultEl.textContent = '✅ Session stopped successfully!';
-                    resultEl.className = 'test-result success';
-                    currentSessionId = null;
-                    showNotification('Session stopped', 'success');
-                } else {
-                    resultEl.textContent = `❌ Session stop failed: ${result.data?.error || result.error}`;
-                    resultEl.className = 'test-result error';
-                }
-            } catch (error) {
-                resultEl.textContent = `❌ Session stop error: ${error.message}`;
-                resultEl.className = 'test-result error';
-            }
-        });
-
-        // Test Send Chat
-        document.getElementById('testSendChatBtn').addEventListener('click', async () => {
-            const resultEl = document.getElementById('testChatResult');
-            const message = document.getElementById('chatMessage').value;
-            
-            if (!currentSessionId) {
-                resultEl.textContent = '❌ No session ID available. Please create a session first.';
-                resultEl.className = 'test-result error';
-                return;
-            }
-
-            try {
-                resultEl.textContent = 'Sending chat message...';
-                resultEl.className = 'test-result info';
-
-                const result = await apiCall('/api/session/chat', {
-                    method: 'POST',
-                    body: JSON.stringify({ 
-                        roomId: currentSessionId,
-                        message: message,
-                        username: 'testuser'
-                    })
-                });
-
-                if (result.success) {
-                    resultEl.textContent = '✅ Chat message sent successfully!';
-                    resultEl.className = 'test-result success';
-                    showNotification('Chat message sent', 'success');
-                } else {
-                    resultEl.textContent = `❌ Chat send failed: ${result.data?.error || result.error}`;
-                    resultEl.className = 'test-result error';
-                }
-            } catch (error) {
-                resultEl.textContent = `❌ Chat send error: ${error.message}`;
-                resultEl.className = 'test-result error';
-            }
-        });
-
-        // Test Get Chat History
-        document.getElementById('testGetChatHistoryBtn').addEventListener('click', async () => {
-            const resultEl = document.getElementById('testChatResult');
-            
-            if (!currentSessionId) {
-                resultEl.textContent = '❌ No session ID available. Please create a session first.';
-                resultEl.className = 'test-result error';
-                return;
-            }
-
-            try {
-                resultEl.textContent = 'Getting chat history...';
-                resultEl.className = 'test-result info';
-
-                const result = await apiCall(`/api/session/chat/history?roomId=${currentSessionId}`);
-
-                if (result.success) {
-                    resultEl.textContent = `✅ Chat history:\n${JSON.stringify(result.data, null, 2)}`;
-                    resultEl.className = 'test-result success';
-                } else {
-                    resultEl.textContent = `❌ Chat history failed: ${result.data?.error || result.error}`;
-                    resultEl.className = 'test-result error';
-                }
-            } catch (error) {
-                resultEl.textContent = `❌ Chat history error: ${error.message}`;
-                resultEl.className = 'test-result error';
-            }
-        });
-
-        // ===== ADMIN TESTS =====
-
-        // Test Get All Users
-        document.getElementById('testGetAllUsersBtn').addEventListener('click', async () => {
-            const resultEl = document.getElementById('testAdminUsersResult');
-
-            try {
-                resultEl.textContent = 'Getting all users...';
-                resultEl.className = 'test-result info';
-
-                const result = await apiCall('/api/admin/users');
-
-                if (result.success) {
-                    resultEl.textContent = `✅ All users:\n${JSON.stringify(result.data, null, 2)}`;
-                    resultEl.className = 'test-result success';
-                } else {
-                    resultEl.textContent = `❌ Get users failed: ${result.data?.error || result.error}`;
-                    resultEl.className = 'test-result error';
-                }
-            } catch (error) {
-                resultEl.textContent = `❌ Get users error: ${error.message}`;
-                resultEl.className = 'test-result error';
-            }
-        });
-
-        // Test Get All Rooms
-        document.getElementById('testGetAllRoomsBtn').addEventListener('click', async () => {
-            const resultEl = document.getElementById('testAdminUsersResult');
-
-            try {
-                resultEl.textContent = 'Getting all rooms...';
-                resultEl.className = 'test-result info';
-
-                const result = await apiCall('/api/admin/rooms');
-
-                if (result.success) {
-                    resultEl.textContent = `✅ All rooms:\n${JSON.stringify(result.data, null, 2)}`;
-                    resultEl.className = 'test-result success';
-                } else {
-                    resultEl.textContent = `❌ Get rooms failed: ${result.data?.error || result.error}`;
-                    resultEl.className = 'test-result error';
-                }
-            } catch (error) {
-                resultEl.textContent = `❌ Get rooms error: ${error.message}`;
-                resultEl.className = 'test-result error';
-            }
-        });
-
-        // Test Kick User
-        document.getElementById('testKickUserBtn').addEventListener('click', async () => {
-            const resultEl = document.getElementById('testAdminRoomsResult');
-            const roomId = document.getElementById('kickRoomId').value;
-            const username = document.getElementById('kickUsername').value;
-
-            if (!roomId || !username) {
-                resultEl.textContent = '❌ Please enter both room ID and username';
-                resultEl.className = 'test-result error';
-                return;
-            }
-
-            try {
-                resultEl.textContent = 'Kicking user...';
-                resultEl.className = 'test-result info';
-
-                const result = await apiCall(`/api/admin/rooms/${roomId}/kick`, {
-                    method: 'POST',
-                    body: JSON.stringify({ username })
-                });
-
-                if (result.success) {
-                    resultEl.textContent = '✅ User kicked successfully!';
-                    resultEl.className = 'test-result success';
-                    showNotification('User kicked', 'success');
-                } else {
-                    resultEl.textContent = `❌ Kick user failed: ${result.data?.error || result.error}`;
-                    resultEl.className = 'test-result error';
-                }
-            } catch (error) {
-                resultEl.textContent = `❌ Kick user error: ${error.message}`;
-                resultEl.className = 'test-result error';
-            }
-        });
-
-        // Test Get Logs
-        document.getElementById('testGetLogsBtn').addEventListener('click', async () => {
-            const resultEl = document.getElementById('testLogsResult');
-
-            try {
-                resultEl.textContent = 'Getting logs...';
-                resultEl.className = 'test-result info';
-
-                const result = await apiCall('/api/admin/logs');
-
-                if (result.success) {
-                    resultEl.textContent = `✅ Server logs:\n${JSON.stringify(result.data, null, 2)}`;
-                    resultEl.className = 'test-result success';
-                } else {
-                    resultEl.textContent = `❌ Get logs failed: ${result.data?.error || result.error}`;
-                    resultEl.className = 'test-result error';
-                }
-            } catch (error) {
-                resultEl.textContent = `❌ Get logs error: ${error.message}`;
-                resultEl.className = 'test-result error';
-            }
-        });
-
-        // ===== METRICS TESTS =====
-
-        // Test Performance Metrics
-        document.getElementById('testPerformanceMetricsBtn').addEventListener('click', async () => {
-            const resultEl = document.getElementById('testMetricsResult');
-
-            try {
-                resultEl.textContent = 'Getting performance metrics...';
-                resultEl.className = 'test-result info';
-
-                const result = await apiCall('/api/metrics/performance');
-
-                if (result.success) {
-                    resultEl.textContent = `✅ Performance metrics:\n${JSON.stringify(result.data, null, 2)}`;
-                    resultEl.className = 'test-result success';
-                } else {
-                    resultEl.textContent = `❌ Performance metrics failed: ${result.data?.error || result.error}`;
-                    resultEl.className = 'test-result error';
-                }
-            } catch (error) {
-                resultEl.textContent = `❌ Performance metrics error: ${error.message}`;
-                resultEl.className = 'test-result error';
-            }
-        });
-
-        // Test Usage Metrics
-        document.getElementById('testUsageMetricsBtn').addEventListener('click', async () => {
-            const resultEl = document.getElementById('testMetricsResult');
-
-            try {
-                resultEl.textContent = 'Getting usage metrics...';
-                resultEl.className = 'test-result info';
-
-                const result = await apiCall('/api/metrics/usage');
-
-                if (result.success) {
-                    resultEl.textContent = `✅ Usage metrics:\n${JSON.stringify(result.data, null, 2)}`;
-                    resultEl.className = 'test-result success';
-                } else {
-                    resultEl.textContent = `❌ Usage metrics failed: ${result.data?.error || result.error}`;
-                    resultEl.className = 'test-result error';
-                }
-            } catch (error) {
-                resultEl.textContent = `❌ Usage metrics error: ${error.message}`;
-                resultEl.className = 'test-result error';
-            }
-        });
-
-        // Test Error Metrics
-        document.getElementById('testErrorMetricsBtn').addEventListener('click', async () => {
-            const resultEl = document.getElementById('testMetricsResult');
-
-            try {
-                resultEl.textContent = 'Getting error metrics...';
-                resultEl.className = 'test-result info';
-
-                const result = await apiCall('/api/metrics/errors');
-
-                if (result.success) {
-                    resultEl.textContent = `✅ Error metrics:\n${JSON.stringify(result.data, null, 2)}`;
-                    resultEl.className = 'test-result success';
-                } else {
-                    resultEl.textContent = `❌ Error metrics failed: ${result.data?.error || result.error}`;
-                    resultEl.className = 'test-result error';
-                }
-            } catch (error) {
-                resultEl.textContent = `❌ Error metrics error: ${error.message}`;
-                resultEl.className = 'test-result error';
-            }
-        });
-
-        // Test System Health
-        document.getElementById('testSystemHealthBtn').addEventListener('click', async () => {
-            const resultEl = document.getElementById('testSystemResult');
-
-            try {
-                resultEl.textContent = 'Checking system health...';
-                resultEl.className = 'test-result info';
-
-                const result = await apiCall('/api/system/health');
-
-                if (result.success) {
-                    resultEl.textContent = `✅ System health:\n${JSON.stringify(result.data, null, 2)}`;
-                    resultEl.className = 'test-result success';
-                } else {
-                    resultEl.textContent = `❌ System health check failed: ${result.data?.error || result.error}`;
-                    resultEl.className = 'test-result error';
-                }
-            } catch (error) {
-                resultEl.textContent = `❌ System health error: ${error.message}`;
-                resultEl.className = 'test-result error';
-            }
-        });
-
-        // Test System Stats
-        document.getElementById('testSystemStatsBtn').addEventListener('click', async () => {
-            const resultEl = document.getElementById('testSystemResult');
-
-            try {
-                resultEl.textContent = 'Getting system stats...';
-                resultEl.className = 'test-result info';
-
-                const result = await apiCall('/api/system/stats');
-
-                if (result.success) {
-                    resultEl.textContent = `✅ System stats:\n${JSON.stringify(result.data, null, 2)}`;
-                    resultEl.className = 'test-result success';
-                } else {
-                    resultEl.textContent = `❌ System stats failed: ${result.data?.error || result.error}`;
-                    resultEl.className = 'test-result error';
-                }
-            } catch (error) {
-                resultEl.textContent = `❌ System stats error: ${error.message}`;
-                resultEl.className = 'test-result error';
-            }
-        });
-
-        // ===== EXISTING FUNCTIONALITY =====
-
-        // WebSocket Connection Test (existing code)
-        document.getElementById('testWebSocketBtn').addEventListener('click', testWebSocketConnection);
-        document.getElementById('monitorWebSocketBtn').addEventListener('click', startWebSocketMonitoring);
-        document.getElementById('stopWebSocketMonitorBtn').addEventListener('click', stopWebSocketMonitoring);
-
-        // Video Sync Test (existing code)
-        document.getElementById('loadSelectedVideoBtn').addEventListener('click', loadSelectedVideo);
-        document.getElementById('startSyncTestBtn').addEventListener('click', startSyncTest);
-        document.getElementById('stopSyncTestBtn').addEventListener('click', stopSyncTest);
-        document.getElementById('forceSyncBtn').addEventListener('click', forceSync);
-        document.getElementById('resetSyncTestBtn').addEventListener('click', resetSyncTest);
-
-        // Basic API Tests
-        document.getElementById('testGetVideosBtn').addEventListener('click', async () => {
-            const resultEl = document.getElementById('testBasicApiResult');
-            
-            try {
-                resultEl.textContent = 'Getting videos...';
-                resultEl.className = 'test-result info';
-
-                const result = await apiCall('/api/videos');
-
-                if (result.success) {
-                    resultEl.textContent = `✅ Videos retrieved:\n${JSON.stringify(result.data, null, 2)}`;
-                    resultEl.className = 'test-result success';
-                } else {
-                    resultEl.textContent = `❌ Get videos failed: ${result.data?.error || result.error}`;
-                    resultEl.className = 'test-result error';
-                }
-            } catch (error) {
-                resultEl.textContent = `❌ Get videos error: ${error.message}`;
-                resultEl.className = 'test-result error';
-            }
-        });
-
-        // ===== EXISTING FUNCTIONS (keep your existing implementations) =====
-
-        function testWebSocketConnection() {
-            // Your existing WebSocket test implementation
-        }
-
-        function startWebSocketMonitoring() {
-            // Your existing WebSocket monitoring implementation
-        }
-
-        function stopWebSocketMonitoring() {
-            // Your existing WebSocket monitoring stop implementation
-        }
-
-        function loadSelectedVideo() {
-            // Your existing video loading implementation
-        }
-
-        function startSyncTest() {
-            // Your existing sync test implementation
-        }
-
-        function stopSyncTest() {
-            // Your existing sync test stop implementation
-        }
-
-        function forceSync() {
-            // Your existing force sync implementation
-        }
-
-        function resetSyncTest() {
-            // Your existing reset sync implementation
-        }
-
-        // Initialize
-        updateTokenDisplay();
-    </script>
+      }, 5000);
+    }
+
+    // Привязываем кнопку
+    document.getElementById('runAllBtn').addEventListener('click', runAllChecks);
+
+    // Запускаем проверки при загрузке страницы (опционально)
+    // window.addEventListener('DOMContentLoaded', runAllChecks);
+  </script>
 </body>
 </html>

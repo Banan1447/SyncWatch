@@ -1,93 +1,47 @@
-// server/routes/auth.js
+// routes/auth.js
 const express = require('express');
 const router = express.Router();
 const AuthService = require('../services/authService');
-const { authenticateToken } = require('../middleware/auth');
-const { logClientRequest } = require('../middleware/logging');
 
-const authService = new AuthService();
+const authService = new AuthService(); // Создаём экземпляр сервиса
 
-// POST /api/auth/register
-router.post('/register', (req, res) => {
-  const { username, password, email } = req.body;
-  const clientIP = req.ip || req.connection.remoteAddress;
-  
-  logClientRequest(clientIP, 'N/A', 'POST /api/auth/register', `Username: ${username}`);
-  
+// Регистрация
+router.post('/register', async (req, res) => {
+  const { username, password } = req.body;
+
   try {
-    if (!username || !password) {
-      return res.status(400).json({ success: false, error: 'Username and password required' });
-    }
-
-    const result = authService.register(username, password, email);
-    res.json({ success: true, ...result });
+    const result = await authService.register(username, password);
+    res.status(201).json(result);
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
   }
 });
 
-// POST /api/auth/login
-router.post('/login', (req, res) => {
+// Вход
+router.post('/login', async (req, res) => {
   const { username, password } = req.body;
-  const clientIP = req.ip || req.connection.remoteAddress;
-  
-  logClientRequest(clientIP, 'N/A', 'POST /api/auth/login', `Username: ${username}`);
-  
-  try {
-    if (!username || !password) {
-      return res.status(400).json({ success: false, error: 'Username and password required' });
-    }
 
-    const result = authService.login(username, password);
-    res.json({ success: true, ...result });
+  try {
+    const result = await authService.login(username, password);
+    res.json(result);
   } catch (error) {
     res.status(401).json({ success: false, error: error.message });
   }
 });
 
-// POST /api/auth/refresh
-router.post('/refresh', authenticateToken, (req, res) => {
-  const clientIP = req.ip || req.connection.remoteAddress;
-  logClientRequest(clientIP, 'N/A', 'POST /api/auth/refresh', `User: ${req.user.username}`);
-  
-  try {
-    const user = authService.findUserById(req.user.id);
-    if (!user) {
-      return res.status(404).json({ success: false, error: 'User not found' });
+// Получение информации о текущем пользователе (требует токен)
+router.get('/profile', (req, res) => {
+  // authenticateToken middleware должен быть вызван до этого маршрута (см. middleware/auth.js)
+  // req.user будет установлено в middleware
+  if (req.user) {
+    const userInfo = authService.getUser(req.user.username);
+    if (userInfo) {
+      res.json({ success: true, user: userInfo });
+    } else {
+      res.status(404).json({ success: false, error: 'Пользователь не найден.' });
     }
-
-    const token = authService.generateToken(user);
-    res.json({ success: true, token });
-  } catch (error) {
-    res.status(400).json({ success: false, error: error.message });
-  }
-});
-
-// POST /api/auth/logout
-router.post('/logout', authenticateToken, (req, res) => {
-  const clientIP = req.ip || req.connection.remoteAddress;
-  logClientRequest(clientIP, 'N/A', 'POST /api/auth/logout', `User: ${req.user.username}`);
-  
-  // В реальном приложении здесь можно добавить token blacklist
-  res.json({ success: true, message: 'Logged out successfully' });
-});
-
-// GET /api/auth/profile
-router.get('/profile', authenticateToken, (req, res) => {
-  const clientIP = req.ip || req.connection.remoteAddress;
-  logClientRequest(clientIP, 'N/A', 'GET /api/auth/profile', `User: ${req.user.username}`);
-  
-  try {
-    const user = authService.findUserById(req.user.id);
-    if (!user) {
-      return res.status(404).json({ success: false, error: 'User not found' });
-    }
-
-    // Не возвращаем пароль
-    const { password, ...userProfile } = user;
-    res.json({ success: true, user: userProfile });
-  } catch (error) {
-    res.status(400).json({ success: false, error: error.message });
+  } else {
+    res.status(401).json({ success: false, error: 'Требуется аутентификация.' });
   }
 });
 

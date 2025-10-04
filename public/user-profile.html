@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Личный кабинет - SyncWatch</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <style>
+    :root {
+      --primary: #4a90e2;
+      --secondary: #343a40;
+      --accent: #007bff;
+      --bg-dark: #121212;
+      --bg-darker: #0d0d0d;
+      --text: #ffffff;
+      --text-secondary: #cccccc;
+      --border: #333333;
+      --shadow: rgba(0, 0, 0, 0.5);
+      --hover-bg: #1e1e1e;
+      --progress-bg: #2c2c2c;
+      --progress-fill: #007bff;
+      --error: #dc3545;
+      --success: #28a745;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    body {
+      background: var(--bg-dark);
+      color: var(--text);
+      line-height: 1.6;
+      transition: background 0.3s ease;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 2rem;
+      background: var(--bg-darker);
+      border-bottom: 1px solid var(--border);
+      box-shadow: 0 2px 10px var(--shadow);
+    }
+
+    .logo-container {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      cursor: pointer;
+      transition: opacity 0.2s ease;
+    }
+
+    .logo-container:hover {
+      opacity: 0.8;
+    }
+
+    .logo-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #4a90e2, #8e44ad); /* Сине-фиолетовый */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: bold;
+      position: relative;
+    }
+
+    .logo-svg {
+      width: 80%; /* Занимает 80% круга */
+      height: 80%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .logo-svg svg {
+      width: 100%;
+      height: 100%;
+    }
+
+    .header h1 {
+      font-size: 1.8rem;
+      font-weight: 600;
+      color: var(--primary);
+    }
+
+    .auth-section {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .user-name {
+      color: var(--accent);
+    }
+
+    .logout-btn {
+      color: var(--error);
+      text-decoration: none;
+      font-weight: 500;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      transition: all 0.2s ease;
+      cursor: pointer;
+      border: 1px solid var(--error);
+      background: transparent;
+    }
+
+    .logout-btn:hover {
+      background: rgba(220, 53, 69, 0.1);
+      color: #fff;
+    }
+
+    .main-container {
+      padding: 2rem;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+    }
+
+    .profile-section {
+      width: 100%;
+      max-width: 600px;
+      background: var(--bg-darker);
+      border-radius: 8px;
+      box-shadow: 0 4px 12px var(--shadow);
+      padding: 2rem;
+    }
+
+    .profile-section h2 {
+      margin-bottom: 1.5rem;
+      font-size: 1.5rem;
+      color: var(--primary);
+    }
+
+    .profile-info {
+      margin-bottom: 1.5rem;
+    }
+
+    .info-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.75rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .info-label {
+      font-weight: 500;
+      color: var(--text-secondary);
+    }
+
+    .info-value {
+      color: var(--text);
+    }
+
+    .change-password-section {
+      margin-top: 2rem;
+    }
+
+    .form-group {
+      margin-bottom: 1rem;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 0.5rem;
+      color: var(--text-secondary);
+    }
+
+    .form-group input {
+      width: 100%;
+      padding: 0.75rem;
+      border: 1px solid var(--border);
+      background: var(--secondary);
+      color: var(--text);
+      border-radius: 4px;
+      font-size: 1rem;
+    }
+
+    .form-group button {
+      width: 100%;
+      padding: 0.75rem;
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: background 0.2s ease;
+    }
+
+    .form-group button:hover {
+      background: #0056b3;
+    }
+
+    #notifications {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 1000;
+      max-width: 300px;
+    }
+
+    .notification {
+      padding: 1rem;
+      margin-bottom: 0.5rem;
+      border-radius: 4px;
+      box-shadow: 0 4px 12px var(--shadow);
+      animation: slideIn 0.3s ease-out;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .notification.success {
+      background: rgba(40, 167, 69, 0.2);
+      border-left: 4px solid var(--success);
+      color: var(--success);
+    }
+
+    .notification.error {
+      background: rgba(220, 53, 69, 0.2);
+      border-left: 4px solid var(--error);
+      color: var(--error);
+    }
+
+    .notification-close {
+      background: none;
+      border: none;
+      color: inherit;
+      font-size: 1.2rem;
+      cursor: pointer;
+      padding: 0 0.5rem;
+    }
+
+    @keyframes slideIn {
+      from {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo-container" onclick="window.location.href='/'">
+      <div class="logo-icon">
+        <div class="logo-svg">
+          <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+            <!-- Градиент -->
+            <defs>
+              <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#4a90e2" />
+                <stop offset="100%" stop-color="#8e44ad" />
+              </linearGradient>
+            </defs>
+
+            <!-- Круговой фон -->
+            <circle cx="50" cy="50" r="48" fill="url(#logoGradient)" />
+
+            <!-- Буква S -->
+            <text 
+              x="50" 
+              y="50" 
+              font-family="Arial, sans-serif" 
+              font-size="40" 
+              fill="white" 
+              text-anchor="middle" 
+              dominant-baseline="middle"
+              alignment-baseline="middle"
+              style="paint-order: stroke; stroke: #000; stroke-width: 1px;"
+            >
+              S
+            </text>
+          </svg>
+        </div>
+      </div>
+      <h1>SyncWatch</h1>
+    </div>
+    <div class="auth-section">
+      <div class="user-info">
+        <span class="user-name" id="profileUsername">Загрузка...</span>
+        <button class="logout-btn" onclick="handleLogout()">Выйти</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="main-container">
+    <div class="profile-section">
+      <h2>Ваш профиль</h2>
+      <div class="profile-info">
+        <div class="info-item">
+          <span class="info-label">Имя пользователя:</span>
+          <span class="info-value" id="displayUsername">Загрузка...</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Дата регистрации:</span>
+          <span class="info-value" id="displayCreatedAt">Загрузка...</span>
+        </div>
+      </div>
+
+      <div class="change-password-section">
+        <h3>Изменить пароль</h3>
+        <div class="form-group">
+          <label for="currentPassword">Текущий пароль:</label>
+          <input type="password" id="currentPassword" placeholder="Введите текущий пароль">
+        </div>
+        <div class="form-group">
+          <label for="newPassword">Новый пароль:</label>
+          <input type="password" id="newPassword" placeholder="Введите новый пароль (мин. 6)">
+        </div>
+        <div class="form-group">
+          <label for="confirmNewPassword">Подтвердите новый пароль:</label>
+          <input type="password" id="confirmNewPassword" placeholder="Подтвердите новый пароль">
+        </div>
+        <div class="form-group">
+          <button onclick="handleChangePassword()">Сменить пароль</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="notifications"></div>
+
+  <script>
+    // Получаем токен из localStorage при загрузке страницы
+    let authToken = localStorage.getItem('authToken');
+
+    // Функция для отправки API-запросов с токеном
+    function apiCall(endpoint, method = 'GET', data = null) {
+        const headers = {
+            'Content-Type': 'application/json',
+        };
+        if (authToken) {
+            headers['Authorization'] = `Bearer ${authToken}`;
+        }
+
+        const config = {
+            method,
+            headers,
+        };
+
+        if (data) {
+            config.body = JSON.stringify(data);
+        }
+
+        return fetch(`/api${endpoint}`, config)
+            .then(response => {
+                if (!response.ok) {
+                    // Проверяем, не связан ли статус с аутентификацией
+                    if (response.status === 401 || response.status === 403) {
+                        // Токен недействителен, очищаем его
+                        console.error('Токен недействителен, очищаем.');
+                        handleLogout(); // Вызываем функцию выхода
+                        throw new Error('Сессия истекла. Пожалуйста, войдите снова.');
+                    }
+                    return response.json().then(err => { throw err; });
+                }
+                return response.json();
+            });
+    }
+
+    // Функция для загрузки профиля пользователя
+    function loadUserProfile() {
+        apiCall('/auth/profile', 'GET')
+            .then(data => {
+                if (data.success && data.user) {
+                    document.getElementById('displayUsername').textContent = data.user.username;
+                    document.getElementById('displayCreatedAt').textContent = new Date(data.user.createdAt).toLocaleString();
+                    document.getElementById('profileUsername').textContent = data.user.username; // Для заголовка
+                } else {
+                    showNotification(data.error || 'Ошибка получения профиля', 'error');
+                }
+            })
+            .catch(err => {
+                console.error('Ошибка загрузки профиля:', err);
+                showNotification(err.message || 'Ошибка загрузки профиля', 'error');
+            });
+    }
+
+    // Функция для обработки выхода
+    function handleLogout() {
+        localStorage.removeItem('authToken');
+        authToken = null;
+        showNotification('Вы вышли из системы', 'success');
+        // Перенаправляем на главную страницу или select-room
+        window.location.href = '/select-room.html';
+    }
+
+    // Функция для обработки смены пароля
+    async function handleChangePassword() {
+        const currentPassword = document.getElementById('currentPassword').value;
+        const newPassword = document.getElementById('newPassword').value;
+        const confirmNewPassword = document.getElementById('confirmNewPassword').value;
+
+        if (!currentPassword || !newPassword || !confirmNewPassword) {
+            showNotification('Заполните все поля', 'error');
+            return;
+        }
+
+        if (newPassword !== confirmNewPassword) {
+            showNotification('Новый пароль и подтверждение не совпадают', 'error');
+            return;
+        }
+
+        if (newPassword.length < 6) {
+            showNotification('Новый пароль должен быть не менее 6 символов', 'error');
+            return;
+        }
+
+        try {
+            // Заглушка для API-запроса смены пароля
+            // В реальности вам нужно реализовать маршрут /api/auth/change-password на сервере
+            // и обновить логику в AuthService
+            showNotification('Смена пароля: API маршрут не реализован в этом примере.', 'error');
+            console.log('Смена пароля:', { currentPassword: '***', newPassword: '***' });
+            // const response = await apiCall('/auth/change-password', 'POST', { currentPassword, newPassword });
+            // if (response.success) {
+            //     showNotification(response.message || 'Пароль успешно изменён', 'success');
+            //     document.getElementById('currentPassword').value = '';
+            //     document.getElementById('newPassword').value = '';
+            //     document.getElementById('confirmNewPassword').value = '';
+            // } else {
+            //     showNotification(response.error || 'Ошибка смены пароля', 'error');
+            // }
+        } catch (err) {
+            console.error('Ошибка смены пароля:', err);
+            showNotification(err.message || 'Ошибка смены пароля', 'error');
+        }
+    }
+
+    // === NOTIFICATIONS ===
+    function showNotification(message, type) {
+      const notification = document.createElement('div');
+      notification.className = `notification ${type}`;
+      notification.innerHTML = `
+        <span>${message}</span>
+        <button class="notification-close" onclick="this.parentElement.remove()">&times;</button>
+      `;
+      document.getElementById('notifications').appendChild(notification);
+
+      // Автоматически удаляем уведомление через 5 секунд
+      setTimeout(() => {
+        if (notification.parentNode) { // Проверяем, не было ли уже удалено вручную
+            notification.remove();
+        }
+      }, 5000);
+    }
+
+    // Загружаем профиль при загрузке страницы
+    window.addEventListener('DOMContentLoaded', () => {
+        if (!authToken) {
+            // Если токена нет, перенаправляем на страницу входа
+            window.location.href = '/select-room.html'; // или '/login.html' если у вас есть отдельная страница входа
+            return;
+        }
+        loadUserProfile();
+    });
+
+  </script>
+</body>
+</html>

@@ -1,259 +1,78 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <title>Admin Panel</title>
-  <link rel="stylesheet" href="style.css">
-  <style>
-    :root {
-      --primary: #4a90e2;
-      --secondary: #343a40;
-      --accent: #007bff;
-      --bg-dark: #121212;
-      --bg-darker: #0d0d0d;
-      --text: #ffffff;
-      --text-secondary: #cccccc;
-      --border: #333333;
-      --shadow: rgba(0, 0, 0, 0.5);
-      --hover-bg: #1e1e1e;
-      --progress-bg: #2c2c2c;
-      --progress-fill: #007bff;
-    }
-
-    body {
-      background: var(--bg-dark);
-      color: var(--text);
-      line-height: 1.6;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      padding: 0;
-      margin: 0;
-    }
-
-    .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 1rem 2rem;
-      background: var(--bg-darker);
-      border-bottom: 1px solid var(--border);
-      box-shadow: 0 2px 10px var(--shadow);
-    }
-
-    .logo-container {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      cursor: pointer;
-      transition: opacity 0.2s ease;
-    }
-
-    .logo-container:hover {
-      opacity: 0.8;
-    }
-
-    .logo-icon {
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, #4a90e2, #8e44ad); /* Сине-фиолетовый */
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: white;
-      font-weight: bold;
-      position: relative;
-    }
-
-    .logo-svg {
-      width: 80%; /* Занимает 80% круга */
-      height: 80%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .logo-svg svg {
-      width: 100%;
-      height: 100%;
-    }
-
-    h1 {
-      font-size: 1.8rem;
-      font-weight: 600;
-      color: var(--primary);
-      margin: 0;
-    }
-
-    .admin-panel {
-      padding: 1rem 2rem;
-    }
-
-    label {
-      display: block;
-      margin-bottom: 0.5rem;
-      color: var(--text-secondary);
-    }
-
-    input {
-      width: 100%;
-      padding: 0.5rem;
-      border: 1px solid var(--border);
-      background: var(--secondary);
-      color: var(--text);
-      border-radius: 4px;
-      font-size: 0.9rem;
-    }
-
-    button {
-      padding: 0.5rem 1rem;
-      background: var(--accent);
-      color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      font-weight: 500;
-      transition: background 0.2s ease;
-      margin-top: 0.5rem;
-    }
-
-    button:hover {
-      background: #0056b3;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel | SyncWatch</title>
+    
+    <!-- Стили -->
+    <link rel="stylesheet" href="styles/main.css">
+    
+    <!-- Иконка (опционально) -->
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
 </head>
 <body>
-  <div class="header">
-    <div class="logo-container" onclick="window.location.href='/select-room.html'">
-      <div class="logo-icon">
-        <div class="logo-svg">
-          <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-            <!-- Градиент -->
-            <defs>
-              <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stop-color="#4a90e2" />
-                <stop offset="100%" stop-color="#8e44ad" />
-              </linearGradient>
-            </defs>
-
-            <!-- Круговой фон -->
-            <circle cx="50" cy="50" r="48" fill="url(#logoGradient)" />
-
-            <!-- Буква S — ровно по центру -->
-            <text 
-              x="50" 
-              y="60" 
-              font-family="Arial, sans-serif" 
-              font-size="100" 
-              fill="white" 
-              text-anchor="middle" 
-              dominant-baseline="middle"
-              alignment-baseline="middle"
-              style="paint-order: stroke; stroke: #000; stroke-width: 1px;"
-            >
-              S
-            </text>
-          </svg>
+    <!-- Шапка сайта -->
+    <header class="header">
+        <div class="logo-container">
+            <div class="logo-icon">
+                <div class="logo-svg">
+                    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                        <defs>
+                            <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stop-color="#4a90e2" />
+                                <stop offset="100%" stop-color="#8e44ad" />
+                            </linearGradient>
+                        </defs>
+                        <circle cx="50" cy="50" r="48" fill="url(#logoGradient)" />
+                        <text x="50" y="60" font-family="Arial, sans-serif" font-size="100" fill="white" text-anchor="middle" dominant-baseline="middle">S</text>
+                    </svg>
+                </div>
+            </div>
+            <h1>SyncWatch Admin Panel</h1>
         </div>
-      </div>
-      <h1>SyncWatch</h1>
-    </div>
-  </div>
+    </header>
 
-  <div class="admin-panel">
-    <h2>Выбор папки с видео</h2>
-    <label for="videoFolder">Путь к папке с видео:</label>
-    <input type="text" id="videoFolder" placeholder="C:\Videos" style="width: 100%; padding: 8px; margin: 10px 0;">
-    <button id="saveFolderBtn">Сохранить</button>
-    <div id="statusMessage" style="margin-top: 10px;"></div>
-  </div>
+    <!-- Основная часть -->
+    <main class="admin-container">
+        <!-- Раздел выбора папки -->
+        <section class="admin-panel">
+            <h2>Настройка папки с видео</h2>
+            <div class="form-group">
+                <label for="videoFolder">Путь к папке с видео:</label>
+                <input type="text" id="videoFolder" placeholder="C:\Videos" required>
+                <button id="saveFolderBtn">Сохранить путь</button>
+            </div>
+            <div id="statusMessage" class="status-message"></div>
+        </section>
 
-  <div class="admin-panel" style="margin-top: 30px;">
-    <h2>Смена порта сервера</h2>
-    <label for="serverPort">Новый порт сервера:</label>
-    <input type="number" id="serverPort" placeholder="5000" value="5000" min="1024" max="65535" style="width: 100%; padding: 8px; margin: 10px 0;">
-    <button id="changePortBtn">Сменить порт</button>
-    <div id="portStatusMessage" style="margin-top: 10px;"></div>
-    <div style="margin-top: 10px; font-size: 0.9em; color: #aaa;">
-      <small>После смены порта перезапустите сервер вручную.</small>
-    </div>
-  </div>
+        <!-- Раздел смены порта -->
+        <section class="admin-panel">
+            <h2>Настройка порта сервера</h2>
+            <div class="form-group">
+                <label for="serverPort">Новый порт:</label>
+                <input type="number" id="serverPort" placeholder="5000" min="1024" max="65535" value="5000">
+                <button id="changePortBtn">Применить</button>
+            </div>
+            <div id="portStatusMessage" class="status-message"></div>
+            <small>Примечание: после изменения порта требуется перезапуск сервера</small>
+        </section>
 
-  <div class="admin-panel" style="margin-top: 30px;">
-    <h2 style="color: #aaa;">Текущие настройки</h2>
-    <div style="padding: 10px; background: #000000; border-radius: 4px;">
-      <strong>Порт сервера:</strong> <span id="currentPort">Загрузка...</span><br>
-      <strong>Папка с видео:</strong> <span id="currentVideoDir">Загрузка...</span>
-    </div>
-  </div>
+        <!-- Текущие настройки -->
+        <section class="admin-panel">
+            <h2>Текущие настройки</h2>
+            <div class="current-settings">
+                <div>
+                    <strong>Порт сервера:</strong> <span id="currentPort">Загрузка...</span>
+                </div>
+                <div>
+                    <strong>Папка с видео:</strong> <span id="currentVideoDir">Загрузка...</span>
+                </div>
+            </div>
+        </section>
+    </main>
 
-  <script>
-    // Загружаем текущие настройки при открытии страницы
-    fetch('/api/config')
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) {
-          document.getElementById('currentPort').textContent = data.port;
-          document.getElementById('currentVideoDir').textContent = data.videoDirectory;
-          document.getElementById('serverPort').value = data.port;
-          document.getElementById('videoFolder').value = data.videoDirectory;
-        } else {
-          console.error('Ошибка получения настроек:', data.error);
-        }
-      })
-      .catch(err => {
-        console.error('Ошибка соединения:', err);
-      });
-
-    // === СМЕНА ПАПКИ ===
-    document.getElementById('saveFolderBtn').addEventListener('click', () => {
-      const folder = document.getElementById('videoFolder').value.trim();
-      if (!folder) return;
-
-      fetch('/api/set-video-folder', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ folder })
-      })
-        .then(res => res.json())
-        .then(data => {
-          const status = document.getElementById('statusMessage');
-          if (data.success) {
-            status.innerHTML = `<span style="color: green;">✅ Папка установлена: ${data.folder}</span>`;
-            document.getElementById('currentVideoDir').textContent = data.folder; // Обновляем отображение
-          } else {
-            status.innerHTML = `<span style="color: red;">❌ Ошибка: ${data.error}</span>`;
-          }
-        });
-    });
-
-    // === СМЕНА ПОРТА ===
-    document.getElementById('changePortBtn').addEventListener('click', () => {
-      const port = parseInt(document.getElementById('serverPort').value.trim());
-      if (!port || port < 1024 || port > 65535) {
-        alert('Порт должен быть числом от 1024 до 65535');
-        return;
-      }
-
-      fetch('/api/set-port', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ port })
-      })
-        .then(res => res.json())
-        .then(data => {
-          const status = document.getElementById('portStatusMessage');
-          if (data.success) {
-            status.innerHTML = `<span style="color: green;">✅ Порт изменён на ${data.port}. Перезапустите сервер.</span>`;
-            document.getElementById('currentPort').textContent = data.port; // Обновляем отображение
-          } else {
-            status.innerHTML = `<span style="color: red;">❌ Ошибка: ${data.error}</span>`;
-          }
-        })
-        .catch(err => {
-          const status = document.getElementById('portStatusMessage');
-          status.innerHTML = `<span style="color: red;">❌ Ошибка соединения: ${err.message}</span>`;
-        });
-    });
-  </script>
+    <!-- JavaScript файлы -->
+    <script type="module" src="js/main.js"></script>
 </body>
 </html>

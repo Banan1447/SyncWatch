@@ -1,32 +1,6 @@
 // server/socket/index.js
-const RoomService = require('../services/roomService');
-const { logClientRequest } = require('../middleware/logging');
-
-module.exports = (io) => {
-  const roomService = new RoomService();
-
-  // Интервал для проверки "мертвых" пользователей
-  const cleanupInterval = setInterval(() => {
-    // Проходим по всем комнатам
-    for (const [roomId, room] of roomService.rooms.entries()) {
-      let usersChanged = false;
-      // Проверяем каждого пользователя в комнате
-      for (const [socketId, userData] of room.users.entries()) {
-        if (!roomService.isUserAlive(userData)) {
-          console.log(`[CLEANUP] Удаляем мертвого пользователя ${socketId} из комнаты ${roomId}`);
-          room.users.delete(socketId);
-          usersChanged = true;
-        }
-      }
-      // Если пользователи были удалены, отправляем обновленное состояние комнаты
-      if (usersChanged) {
-        // Отправляем обновленное состояние только этой комнате
-        io.to(roomId).emit('room-state', roomService.getRoom(roomId));
-        // Также обновляем общий список комнат, если это нужно
-        io.emit('room-list', roomService.getAllRooms());
-      }
-    }
-  }, 5000); // Проверяем каждые 5 секунд (чуть чаще, чем keepalive)
+// Принимает io и roomService из server.js
+module.exports = (io, roomService) => {
 
   io.on('connection', (socket) => {
     const clientIP = socket.request.connection.remoteAddress;
@@ -36,22 +10,23 @@ module.exports = (io) => {
     let userName = `User${Math.floor(Math.random()*10000)}`;
 
     // --- ROOM EVENTS ---
-
     socket.on('create-room', ({ name }, cb) => {
+      const { logClientRequest } = require('../middleware/logging'); // Импорт внутри обработчика
       logClientRequest(clientIP, socket.id, 'SOCKET create-room', `Name: ${name}`);
 
-      const room = roomService.createRoom(name, socket.id);
+      const room = roomService.createRoom(name, socket.id); // socket.id используется как ownerId
       cb && cb({ id: room.id, name: room.name });
       io.emit('room-list', roomService.getAllRooms());
     });
 
     socket.on('get-rooms', (cb) => {
+      const { logClientRequest } = require('../middleware/logging');
       logClientRequest(clientIP, socket.id, 'SOCKET get-rooms', '');
-      // Возвращаем только комнаты с "живыми" пользователями или пустые комнаты
       cb && cb(roomService.getAllRooms());
     });
 
     socket.on('join-room', ({ roomId, name }, cb) => {
+      const { logClientRequest } = require('../middleware/logging');
       logClientRequest(clientIP, socket.id, 'SOCKET join-room', `RoomID: ${roomId}, Name: ${name}`);
 
       if (joinedRoom) {
@@ -70,21 +45,18 @@ module.exports = (io) => {
       socket.join(roomId);
 
       cb && cb({ success: true, room: { id: roomId, name: room.name } });
-      // Отправляем обновленное состояние комнаты только участникам комнаты
-      io.to(roomId).emit('room-state', roomService.getRoom(roomId));
-      // Отправляем обновленный список комнат всем
+      io.to(roomId).emit('room-state', roomService.getRoom(joinedRoom));
       io.emit('room-list', roomService.getAllRooms());
     });
 
     socket.on('leave-room', (cb) => {
+      const { logClientRequest } = require('../middleware/logging');
       logClientRequest(clientIP, socket.id, 'SOCKET leave-room', `RoomID: ${joinedRoom}`);
 
       if (joinedRoom) {
         roomService.leaveRoom(joinedRoom, socket.id);
         socket.leave(joinedRoom);
-        // Отправляем обновленное состояние комнаты только участникам комнаты
         io.to(joinedRoom).emit('room-state', roomService.getRoom(joinedRoom));
-        // Отправляем обновленный список комнат всем
         io.emit('room-list', roomService.getAllRooms());
       }
 
@@ -93,9 +65,10 @@ module.exports = (io) => {
     });
 
     socket.on('delete-room', ({ roomId }, cb) => {
+      const { logClientRequest } = require('../middleware/logging');
       logClientRequest(clientIP, socket.id, 'SOCKET delete-room', `RoomID: ${roomId}`);
 
-      const success = roomService.deleteRoom(roomId, socket.id); // Передаем socket.id, а не ownerSocketId напрямую
+      const success = roomService.deleteRoom(roomId, socket.id); // socket.id как requestingSocketId
       if (success) {
         io.emit('room-list', roomService.getAllRooms());
         cb && cb({ success: true });
@@ -107,6 +80,7 @@ module.exports = (io) => {
     // --- VIDEO COMMANDS ---
     socket.on('video-command', (data) => {
       if (joinedRoom) {
+        const { logClientRequest } = require('../middleware/logging');
         logClientRequest(clientIP, socket.id, 'SOCKET video-command',
           `RoomID: ${joinedRoom}, Type: ${data.type}, Time: ${data.time}`);
 
@@ -121,13 +95,13 @@ module.exports = (io) => {
           roomService.updateRoomState(joinedRoom, { currentTime: data.time });
         }
 
-        // Отправляем обновленное состояние комнаты только участникам комнаты
         io.to(joinedRoom).emit('room-state', roomService.getRoom(joinedRoom));
       }
     });
 
     socket.on('select-video', (filename) => {
       if (joinedRoom) {
+        const { logClientRequest } = require('../middleware/logging');
         logClientRequest(clientIP, socket.id, 'SOCKET select-video',
           `RoomID: ${joinedRoom}, Filename: ${filename}`);
 
@@ -137,27 +111,24 @@ module.exports = (io) => {
         });
 
         io.to(joinedRoom).emit('video-updated', filename);
-        // Отправляем обновленное состояние комнаты только участникам комнаты
         io.to(joinedRoom).emit('room-state', roomService.getRoom(joinedRoom));
       }
     });
 
     socket.on('update-room-state', (stateUpdates) => {
       if (joinedRoom) {
+        const { logClientRequest } = require('../middleware/logging');
         logClientRequest(clientIP, socket.id, 'SOCKET update-room-state',
           `RoomID: ${joinedRoom}, Updates: ${JSON.stringify(stateUpdates)}`);
 
         roomService.updateRoomState(joinedRoom, stateUpdates);
-        // Отправляем обновленное состояние комнаты только участникам комнаты
         io.to(joinedRoom).emit('room-state', roomService.getRoom(joinedRoom));
       }
     });
 
     socket.on('update-user-state', (stateUpdates) => {
       if (joinedRoom) {
-        // updateLastSeen вызывается внутри updateUserState
         roomService.updateUserState(joinedRoom, socket.id, stateUpdates);
-        // Отправляем обновленное состояние комнаты только участникам комнаты
         io.to(joinedRoom).emit('room-state', roomService.getRoom(joinedRoom));
       }
     });
@@ -180,10 +151,7 @@ module.exports = (io) => {
             const user = room.users.get(socket.id);
             if (user) {
               user.ping = latency;
-              // lastSeen обновляется в updateUserState, но pong-response косвенно подтверждает активность
-              // roomService.updateLastSeen(joinedRoom, socket.id); // Можно не вызывать, если update-user-state уже обновляет
               roomService.updateUserState(joinedRoom, socket.id, { ping: latency }); // Используем updateUserState
-              // Отправляем обновленное состояние комнаты только участникам комнаты
               io.to(joinedRoom).emit('room-state', roomService.getRoom(joinedRoom));
             }
         }
@@ -205,7 +173,6 @@ module.exports = (io) => {
                 isBuffering: data.status === 'buffering',
                 isPlaying: data.status === 'playing'
               });
-              // Отправляем обновленное состояние комнаты только участникам комнаты
               io.to(joinedRoom).emit('room-state', roomService.getRoom(joinedRoom));
             }
         }
@@ -214,20 +181,13 @@ module.exports = (io) => {
 
     socket.on('disconnect', () => {
       if (joinedRoom) {
+        const { logClientRequest } = require('../middleware/logging');
         logClientRequest(clientIP, socket.id, 'SOCKET disconnect', `RoomID: ${joinedRoom}`);
         roomService.leaveRoom(joinedRoom, socket.id);
-        // Отправляем обновленное состояние комнаты только участникам комнаты
         io.to(joinedRoom).emit('room-state', roomService.getRoom(joinedRoom));
-        // Отправляем обновленный список комнат всем
         io.emit('room-list', roomService.getAllRooms());
       }
       console.log(`[SOCKET] User disconnected: ${socket.id} from IP: ${clientIP}`);
     });
   });
-
-  // Очищаем интервал при отключении сервера (опционально, если сервер завершает работу корректно)
-  // process.on('SIGINT', () => {
-  //   clearInterval(cleanupInterval);
-  //   process.exit(0);
-  // });
 };
