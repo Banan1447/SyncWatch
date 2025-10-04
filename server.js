@@ -154,7 +154,6 @@ app.get('/api/videos', async (req, res) => {
       const ext = file.split('.').pop().toLowerCase();
       const supportedFormats = ['mp4', 'webm', 'ogg'];
       const isSupported = supportedFormats.includes(ext);
-      // Возвращаем полный путь к файлу, чтобы плеер мог его правильно воспроизвести
       return { name: file, ...info, isSupported };
     });
 
@@ -1168,6 +1167,321 @@ app.post('/api/files/move', isLocalhostOnly, (req, res) => {
     console.error('[FILES] Ошибка перемещения:', err);
     res.status(500).json({ success: false, error: err.message });
   }
+});
+
+// === НОВОЕ: API ДЛЯ РАБОТЫ С КОМНАТАМИ ===
+
+// API: получить список комнат
+app.get('/api/rooms', isLocalhostOnly, (req, res) => {
+  const clientIP = req.ip || req.connection.remoteAddress;
+  logClientRequest(clientIP, 'N/A', 'GET /api/rooms', '');
+  try {
+    const list = getRoomList();
+    res.json({ success: true, rooms: list });
+  } catch (err) {
+    console.error('[ROOMS] Ошибка получения списка комнат:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// API: создать комнату
+app.post('/api/rooms', isLocalhostOnly, (req, res) => {
+  const { name } = req.body;
+  const clientIP = req.ip || req.connection.remoteAddress;
+  logClientRequest(clientIP, 'N/A', 'POST /api/rooms', `Name: ${name}`);
+  try {
+    const id = 'room_' + Math.random().toString(36).substr(2, 8);
+    rooms[id] = {
+      name: name || id,
+      users: {},
+      currentVideo: null,
+      // ✅ ГЛОБАЛЬНОЕ СОСТОЯНИЕ КОМНАТЫ
+      state: {
+        currentVideo: null,
+        currentTime: 0,
+        isPlaying: false,
+        playbackRate: 1.0,
+        volume: 1.0,
+        muted: false,
+        quality: 'original',
+        subtitles: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      },
+      chat: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    roomsData.setRooms(rooms);
+    res.json({ success: true, id, name: rooms[id].name });
+    io.emit('room-list', getRoomList());
+  } catch (err) {
+    console.error('[ROOMS] Ошибка создания комнаты:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// API: удалить комнату
+app.delete('/api/rooms/:id', isLocalhostOnly, (req, res) => {
+  const { id } = req.params;
+  const clientIP = req.ip || req.connection.remoteAddress;
+  logClientRequest(clientIP, 'N/A', 'DELETE /api/rooms/:id', `ID: ${id}`);
+  try {
+    if (rooms[id]) {
+      delete rooms[id];
+      roomsData.setRooms(rooms);
+      io.emit('room-list', getRoomList());
+      res.json({ success: true });
+    } else {
+      res.status(404).json({ success: false, error: 'Room not found' });
+    }
+  } catch (err) {
+    console.error('[ROOMS] Ошибка удаления комнаты:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// API: получить информацию о комнате
+app.get('/api/rooms/:id', isLocalhostOnly, (req, res) => {
+  const { id } = req.params;
+  const clientIP = req.ip || req.connection.remoteAddress;
+  logClientRequest(clientIP, 'N/A', 'GET /api/rooms/:id', `ID: ${id}`);
+  try {
+    if (rooms[id]) {
+      res.json({ success: true, room: rooms[id] });
+    } else {
+      res.status(404).json({ success: false, error: 'Room not found' });
+    }
+  } catch (err) {
+    console.error('[ROOMS] Ошибка получения информации о комнате:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// API: присоединиться к комнате
+app.post('/api/rooms/:id/join', isLocalhostOnly, (req, res) => {
+  const { id } = req.params;
+  const { name } = req.body;
+  const clientIP = req.ip || req.connection.remoteAddress;
+  logClientRequest(clientIP, 'N/A', 'POST /api/rooms/:id/join', `ID: ${id}, Name: ${name}`);
+  try {
+    if (!rooms[id]) {
+      return res.status(404).json({ success: false, error: 'Room not found' });
+    }
+    // В реальном API может потребоваться токен или другая аутентификация
+    // Для простоты, просто возвращаем ID комнаты
+    res.json({ success: true, room: { id, name: rooms[id].name } });
+  } catch (err) {
+    console.error('[ROOMS] Ошибка присоединения к комнате:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// API: выйти из комнаты
+app.post('/api/rooms/:id/leave', isLocalhostOnly, (req, res) => {
+  const { id } = req.params;
+  const clientIP = req.ip || req.connection.remoteAddress;
+  logClientRequest(clientIP, 'N/A', 'POST /api/rooms/:id/leave', `ID: ${id}`);
+  try {
+    if (!rooms[id]) {
+      return res.status(404).json({ success: false, error: 'Room not found' });
+    }
+    // В реальном API может потребоваться токен или другая аутентификация
+    // Для простоты, просто возвращаем успех
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[ROOMS] Ошибка выхода из комнаты:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// API: выбрать видео в комнате
+app.post('/api/rooms/:id/select-video', isLocalhostOnly, (req, res) => {
+  const { id } = req.params;
+  const { filename } = req.body;
+  const clientIP = req.ip || req.connection.remoteAddress;
+  logClientRequest(clientIP, 'N/A', 'POST /api/rooms/:id/select-video', `ID: ${id}, Filename: ${filename}`);
+  try {
+    if (!rooms[id]) {
+      return res.status(404).json({ success: false, error: 'Room not found' });
+    }
+    if (!filename || typeof filename !== 'string') {
+      return res.status(400).json({ success: false, error: 'Invalid filename' });
+    }
+    // УБРАНО: rooms[id].state.currentTime = 0;
+    rooms[id].currentVideo = filename;
+    rooms[id].state.currentVideo = filename;
+    // УБРАНО: rooms[id].state.currentTime = 0; // <-- УДАЛЕНО
+    rooms[id].state.isPlaying = false; // <-- ОСТАВЛЕНО: чтобы остановить воспроизведение
+    rooms[id].state.updatedAt = new Date().toISOString();
+    roomsData.setRooms(rooms);
+    io.to(id).emit('video-updated', filename);
+    io.to(id).emit('room-state', rooms[id]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[ROOMS] Ошибка выбора видео:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// API: отправить команду видео в комнату
+app.post('/api/rooms/:id/video-command', isLocalhostOnly, (req, res) => {
+  const { id } = req.params;
+  const { type, time, volume, muted, rate } = req.body;
+  const clientIP = req.ip || req.connection.remoteAddress;
+  logClientRequest(clientIP, 'N/A', 'POST /api/rooms/:id/video-command', `ID: ${id}, Type: ${type}, Time: ${time}, Volume: ${volume}, Muted: ${muted}, Rate: ${rate}`);
+  try {
+    if (!rooms[id]) {
+      return res.status(404).json({ success: false, error: 'Room not found' });
+    }
+    // Отправляем команду всем в комнате
+    io.to(id).emit('video-command', { type, time, volume, muted, rate });
+    // Обновляем глобальное состояние комнаты
+    if (type === 'play') {
+      rooms[id].state.isPlaying = true;
+      rooms[id].state.updatedAt = new Date().toISOString();
+    } else if (type === 'pause') {
+      rooms[id].state.isPlaying = false;
+      rooms[id].state.updatedAt = new Date().toISOString();
+    } else if (type === 'seek' && typeof time === 'number') {
+      rooms[id].state.currentTime = time;
+      rooms[id].state.updatedAt = new Date().toISOString();
+    } else if (type === 'volume' && typeof volume === 'number') {
+      rooms[id].state.volume = volume;
+      rooms[id].state.updatedAt = new Date().toISOString();
+    } else if (type === 'mute') {
+      rooms[id].state.muted = muted;
+      rooms[id].state.updatedAt = new Date().toISOString();
+    } else if (type === 'rate' && typeof rate === 'number') {
+      rooms[id].state.playbackRate = rate;
+      rooms[id].state.updatedAt = new Date().toISOString();
+    }
+    roomsData.setRooms(rooms);
+    io.to(id).emit('room-state', rooms[id]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[ROOMS] Ошибка отправки команды видео:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// API: получить состояние комнаты
+app.get('/api/rooms/:id/state', isLocalhostOnly, (req, res) => {
+  const { id } = req.params;
+  const clientIP = req.ip || req.connection.remoteAddress;
+  logClientRequest(clientIP, 'N/A', 'GET /api/rooms/:id/state', `ID: ${id}`);
+  try {
+    if (rooms[id]) {
+      res.json({ success: true, state: rooms[id].state });
+    } else {
+      res.status(404).json({ success: false, error: 'Room not found' });
+    }
+  } catch (err) {
+    console.error('[ROOMS] Ошибка получения состояния комнаты:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// API: обновить состояние комнаты
+app.post('/api/rooms/:id/update-state', isLocalhostOnly, (req, res) => {
+  const { id } = req.params;
+  const stateUpdates = req.body;
+  const clientIP = req.ip || req.connection.remoteAddress;
+  logClientRequest(clientIP, 'N/A', 'POST /api/rooms/:id/update-state', `ID: ${id}, Updates: ${JSON.stringify(stateUpdates)}`);
+  try {
+    if (!rooms[id]) {
+      return res.status(404).json({ success: false, error: 'Room not found' });
+    }
+    rooms[id].state = {
+      ...rooms[id].state,
+      ...stateUpdates,
+      updatedAt: new Date().toISOString()
+    };
+    rooms[id].updatedAt = new Date().toISOString();
+    roomsData.setRooms(rooms);
+    io.to(id).emit('room-state', rooms[id]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[ROOMS] Ошибка обновления состояния комнаты:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// API: получить список пользователей в комнате
+app.get('/api/rooms/:id/users', isLocalhostOnly, (req, res) => {
+  const { id } = req.params;
+  const clientIP = req.ip || req.connection.remoteAddress;
+  logClientRequest(clientIP, 'N/A', 'GET /api/rooms/:id/users', `ID: ${id}`);
+  try {
+    if (rooms[id]) {
+      res.json({ success: true, users: rooms[id].users });
+    } else {
+      res.status(404).json({ success: false, error: 'Room not found' });
+    }
+  } catch (err) {
+    console.error('[ROOMS] Ошибка получения списка пользователей:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// API: обновить состояние пользователя
+app.post('/api/rooms/:id/users/:userId/update-state', isLocalhostOnly, (req, res) => {
+  const { id, userId } = req.params;
+  const stateUpdates = req.body;
+  const clientIP = req.ip || req.connection.remoteAddress;
+  logClientRequest(clientIP, 'N/A', 'POST /api/rooms/:id/users/:userId/update-state', `ID: ${id}, UserID: ${userId}, Updates: ${JSON.stringify(stateUpdates)}`);
+  try {
+    if (!rooms[id]) {
+      return res.status(404).json({ success: false, error: 'Room not found' });
+    }
+    if (!rooms[id].users[userId]) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+    rooms[id].users[userId].userState = {
+      ...rooms[id].users[userId].userState,
+      ...stateUpdates,
+      lastUpdated: new Date().toISOString()
+    };
+    roomsData.setRooms(rooms);
+    io.to(id).emit('room-state', rooms[id]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[ROOMS] Ошибка обновления состояния пользователя:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// API: выгнать пользователя из комнаты
+app.post('/api/rooms/:id/users/:userId/kick', isLocalhostOnly, (req, res) => {
+  const { id, userId } = req.params;
+  const clientIP = req.ip || req.connection.remoteAddress;
+  logClientRequest(clientIP, 'N/A', 'POST /api/rooms/:id/users/:userId/kick', `ID: ${id}, KickedUserID: ${userId}`);
+  try {
+    if (rooms[id] && rooms[id].users[userId]) {
+      // Отправляем пользователю команду на выход
+      io.to(userId).emit('kicked-from-room', { message: 'You have been kicked from the room' });
+      // Удаляем пользователя из комнаты
+      delete rooms[id].users[userId];
+      roomsData.setRooms(rooms);
+      // Обновляем состояние комнаты
+      io.to(id).emit('room-state', rooms[id]);
+      io.emit('room-list', getRoomList());
+      res.json({ success: true });
+    } else {
+      res.status(404).json({ success: false, error: 'User not found' });
+    }
+  } catch (err) {
+    console.error('[ROOMS] Ошибка выгона пользователя:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// === НОВОЕ: ФАЙЛ-ПУСТЫШКА ===
+// Перенаправляет в корневую папку видео
+app.get('/.empty', (req, res) => {
+  const clientIP = req.ip || req.connection.remoteAddress;
+  logClientRequest(clientIP, 'N/A', 'GET /.empty', 'Redirecting to root video folder');
+  res.redirect('/files'); // Перенаправляем на страницу управления файлами в корне
 });
 
 // ✅ ГЛАВНАЯ СТРАНИЦА - РЕДИРЕКТ НА SELECT-ROOM

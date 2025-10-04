@@ -35,12 +35,29 @@
           "playbackRate": 1,
           "lastUpdated": "2025-10-04T05:49:16.496Z"
         }
+      },
+      "G9S_98QeuVdV6EoSAAAL": {
+        "name": "Artur",
+        "ping": 0,
+        "buffer": 0,
+        "status": "paused",
+        "position": 0,
+        "ready": false,
+        "userState": {
+          "isReady": false,
+          "isBuffering": false,
+          "currentPosition": 0,
+          "currentVolume": 1,
+          "isMuted": false,
+          "playbackRate": 1,
+          "lastUpdated": "2025-10-04T07:28:46.852Z"
+        }
       }
     },
-    "currentVideo": "Alien.Earth.S01E01.WEB-DLRip.RGzsRutracker.mp4",
+    "currentVideo": "Alien.Earth.S01E04.WEB-DLRip.RGzsRutracker_max_speed.mp4",
     "state": {
-      "currentVideo": "Alien.Earth.S01E01.WEB-DLRip.RGzsRutracker.mp4",
-      "currentTime": 1714.784643,
+      "currentVideo": "Alien.Earth.S01E04.WEB-DLRip.RGzsRutracker_max_speed.mp4",
+      "currentTime": 2576.253315,
       "isPlaying": false,
       "playbackRate": 1,
       "volume": 1,
@@ -48,7 +65,7 @@
       "quality": "original",
       "subtitles": null,
       "createdAt": "2025-10-04T01:39:23.084Z",
-      "updatedAt": "2025-10-04T06:34:00.839Z"
+      "updatedAt": "2025-10-04T07:29:19.616Z"
     },
     "chat": [],
     "createdAt": "2025-10-04T01:39:23.084Z",
