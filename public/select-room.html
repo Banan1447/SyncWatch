@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Select Room</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css  ">
   <style>
     :root {
       --primary: #4a90e2;
@@ -381,7 +381,7 @@
 </head>
 <body>
   <div class="header">
-    <div class="logo-container" onclick="window.location.href='/'">
+    <div class="logo-container" onclick="window.location.href='/select-room.html'">
       <div class="logo-icon">
         <div class="logo-svg">
           <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
@@ -418,14 +418,6 @@
     <div class="auth-section">
       <div id="authControls">
         <!-- Секция аутентификации будет обновляться скриптом -->
-        <!-- Если вошёл: -->
-        <!-- <div class="user-info">
-          <span class="user-name">ИмяПользователя</span>
-          <button class="logout-btn" onclick="handleLogout()">Выйти</button>
-        </div> -->
-        <!-- Если не вошёл: -->
-        <!-- <button class="login-btn" onclick="showAuthForm('login')">Войти</button>
-        <button class="register-btn" onclick="showAuthForm('register')">Регистрация</button> -->
       </div>
     </div>
   </div>
@@ -435,30 +427,34 @@
       <h2>Создать комнату</h2>
       <div id="authForms" class="auth-forms">
         <div id="loginForm" style="display: none;">
-          <div class="form-group">
-            <label for="loginUsername">Имя пользователя:</label>
-            <input type="text" id="loginUsername" placeholder="Введите имя">
-          </div>
-          <div class="form-group">
-            <label for="loginPassword">Пароль:</label>
-            <input type="password" id="loginPassword" placeholder="Введите пароль">
-          </div>
-          <button onclick="handleLogin()">Войти</button>
+          <form class="form-group">
+            <div class="form-group">
+              <label for="loginUsername">Имя пользователя:</label>
+              <input type="text" id="loginUsername" placeholder="Введите имя" autocomplete="username">
+            </div>
+            <div class="form-group">
+              <label for="loginPassword">Пароль:</label>
+              <input type="password" id="loginPassword" placeholder="Введите пароль" autocomplete="current-password">
+            </div>
+            <button type="button" onclick="handleLogin()">Войти</button>
+          </form>
           <div class="toggle-auth">
             Нет аккаунта? <a onclick="showAuthForm('register')">Зарегистрироваться</a>
           </div>
         </div>
 
         <div id="registerForm" style="display: none;">
-          <div class="form-group">
-            <label for="registerUsername">Имя пользователя:</label>
-            <input type="text" id="registerUsername" placeholder="Введите имя">
-          </div>
-          <div class="form-group">
-            <label for="registerPassword">Пароль:</label>
-            <input type="password" id="registerPassword" placeholder="Введите пароль (мин. 6)">
-          </div>
-          <button onclick="handleRegister()">Зарегистрироваться</button>
+          <form class="form-group">
+            <div class="form-group">
+              <label for="registerUsername">Имя пользователя:</label>
+              <input type="text" id="registerUsername" placeholder="Введите имя" autocomplete="username">
+            </div>
+            <div class="form-group">
+              <label for="registerPassword">Пароль:</label>
+              <input type="password" id="registerPassword" placeholder="Введите пароль (мин. 6)" autocomplete="new-password">
+            </div>
+            <button type="button" onclick="handleRegister()">Зарегистрироваться</button>
+          </form>
           <div class="toggle-auth">
             Уже есть аккаунт? <a onclick="showAuthForm('login')">Войти</a>
           </div>
@@ -474,7 +470,7 @@
 
       <div class="room-list">
         <h2>Доступные комнаты</h2>
-        <div id="roomList"></div>
+        <div id="roomList">Загрузка комнат...</div>
       </div>
     </div>
   </div>
@@ -483,8 +479,87 @@
 
   <script src="/socket.io/socket.io.js"></script>
   <script>
-    const socket = io();
-    let authToken = localStorage.getItem('authToken'); // Получаем токен из localStorage при загрузке
+    // Проверка авторизации при загрузке страницы
+    window.addEventListener('load', () => {
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        console.log('Нет токена, перенаправляем на страницу входа');
+        // Если нет токена, перенаправить на страницу входа
+        window.location.href = '/login.html';
+        return;
+      }
+      
+      console.log('Проверяем валидность токена...');
+      // Проверить валидность токена
+      fetch('/api/auth/profile', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      .then(response => {
+        if (!response.ok) {
+          console.log('Токен недействителен, перенаправляем на вход');
+          // Если токен недействителен, перенаправить на вход
+          localStorage.removeItem('authToken');
+          localStorage.removeItem('user');
+          window.location.href = '/login.html';
+        } else {
+          console.log('Токен валидный, загружаем страницу');
+          // Если токен валидный, продолжаем загрузку
+          initializePage();
+        }
+      })
+      .catch(error => {
+        console.error('Ошибка проверки токена:', error);
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('user');
+        window.location.href = '/login.html';
+      });
+    });
+
+    let socket;
+    let authToken = localStorage.getItem('authToken');
+
+    function initializePage() {
+      // Инициализируем сокет только после проверки токена
+      socket = io();
+      
+      // Ждем, пока сокет подключится, прежде чем обновлять UI
+      socket.on('connect', () => {
+        console.log('Сокет подключен');
+        updateAuthUI();
+        
+        const urlParams = new URLSearchParams(window.location.search);
+        const roomId = urlParams.get('room');
+        
+        if (roomId) {
+          // Если есть комната в URL — автопереход на плеер
+          window.location.href = `/player.html?room=${roomId}`;
+          return;
+        }
+        
+        // Загружаем список комнат при подключении
+        loadRoomList();
+      });
+
+      // Обработчик получения списка комнат от сервера
+      socket.on('room-list', (rooms) => {
+        console.log('Получен обновленный список комнат от сервера:', rooms);
+        // Обновляем список комнат без вызова loadRoomList() снова,
+        // чтобы избежать дублирования запроса
+        updateRoomListDisplay(rooms);
+      });
+
+      socket.on('disconnect', () => {
+          console.log('Соединение с сервером потеряно.');
+      });
+
+      socket.on('reconnect', () => {
+          console.log('Соединение с сервером восстановлено.');
+          // Повторно загружаем список комнат после переподключения
+          loadRoomList();
+      });
+    }
 
     // Функция для отправки API-запросов с токеном
     function apiCall(endpoint, method = 'GET', data = null) {
@@ -594,11 +669,8 @@
                 // Скрываем формы после входа
                 document.getElementById('authForms').style.display = 'none';
 
-                // --- ДОБАВЛЕННОЕ ПЕРЕНАПРАВЛЕНИЕ ---
                 // Перенаправляем на user-profile.html после успешного входа
                 window.location.href = '/user-profile.html';
-                // --- КОНЕЦ ДОБАВЛЕНИЯ ---
-
             } else {
                 showNotification(response.error || 'Ошибка входа', 'error');
             }
@@ -641,28 +713,15 @@
     // Функция для обработки выхода
     function handleLogout() {
         localStorage.removeItem('authToken');
+        localStorage.removeItem('user');
         authToken = null;
         updateAuthUI(); // Обновляем UI
         showNotification('Вы вышли из системы', 'success');
         // Скрываем формы при выходе
         document.getElementById('authForms').style.display = 'none';
+        // Перенаправляем на страницу входа
+        window.location.href = '/login.html';
     }
-
-    // === ПРОВЕРЯЕМ, ЕСТЬ ЛИ КОМНАТА В URL И АВТОПЕРЕХОДИМ ===
-    window.addEventListener('DOMContentLoaded', () => {
-      updateAuthUI(); // Обновляем UI аутентификации при загрузке
-
-      const urlParams = new URLSearchParams(window.location.search);
-      const roomId = urlParams.get('room');
-      
-      if (roomId) {
-        // Если есть комната в URL — автопереход на плеер
-        window.location.href = `/player.html?room=${roomId}`;
-        return;
-      }
-      
-      loadRoomList();
-    });
 
     // === CREATE ROOM AND JOIN ===
     document.getElementById('createRoomBtn').addEventListener('click', () => {
@@ -672,8 +731,11 @@
           return;
       }
 
-      socket.emit('create-room', { name: roomName }, res => {
-        if (res && res.id) {
+      console.log('Отправляем запрос на создание комнаты:', roomName);
+      socket.emit('create-room', { name: roomName }, (res) => {
+        console.log('Получен ответ на создание комнаты:', res);
+        if (res && res.success && res.id) {
+          console.log('Переход в комнату:', res.id);
           window.location.href = `/player.html?room=${res.id}`;
         } else {
           showNotification('Failed to create room: ' + (res?.error || 'Unknown error'), 'error');
@@ -689,10 +751,10 @@
           return;
       }
 
-      socket.emit('create-room', { name: roomName }, res => {
-        if (res && res.id) {
+      socket.emit('create-room', { name: roomName }, (res) => {
+        if (res && res.success && res.id) {
           showNotification(`Room created: ${res.name}`, 'success');
-          loadRoomList();
+          // loadRoomList(); // Не нужно вызывать, сервер отправит room-list
         } else {
           showNotification('Failed to create room: ' + (res?.error || 'Unknown error'), 'error');
         }
@@ -701,52 +763,63 @@
 
     // === LOAD ROOM LIST ===
     function loadRoomList() {
+      console.log('Запрашиваем список комнат с сервера...');
       socket.emit('get-rooms', (rooms) => {
-        const roomList = document.getElementById('roomList');
-        roomList.innerHTML = '';
+        console.log('Получили список комнат от сервера через callback:', rooms);
+        updateRoomListDisplay(rooms);
+      });
+    }
 
-        if (!rooms || rooms.length === 0) {
-          roomList.innerHTML = '<div class="room-item">Нет доступных комнат</div>';
-          return;
-        }
+    // === UPDATE ROOM LIST DISPLAY ===
+    function updateRoomListDisplay(rooms) {
+      const roomList = document.getElementById('roomList');
+      roomList.innerHTML = ''; // Очищаем предыдущий список
 
-        rooms.forEach(room => {
-          const div = document.createElement('div');
-          div.className = 'room-item';
-          // Добавляем отображение количества пользователей из "живых"
-          const userCount = room.users ? room.users.size : 0;
-          div.innerHTML = `
-            <div class="room-info">
-              <div class="room-name">${room.name}</div>
-              <div class="room-users">${userCount} пользователей</div>
-            </div>
-            <div class="room-actions">
-              <button class="action-btn delete-btn" data-id="${room.id}"><i class="fas fa-trash"></i></button>
-            </div>
-          `;
-          roomList.appendChild(div);
+      if (!rooms || rooms.length === 0) {
+        roomList.innerHTML = '<div class="room-item">Нет доступных комнат</div>';
+        return;
+      }
 
-          // === CLICK ON ROOM BLOCK - JOIN ROOM ===
-          div.addEventListener('click', (e) => {
-            if (!e.target.closest('.delete-btn')) {
-              window.location.href = `/player.html?room=${room.id}`;
-            }
-          });
+      rooms.forEach(room => {
+        const div = document.createElement('div');
+        div.className = 'room-item';
+        // Добавляем отображение количества пользователей из "живых"
+        const userCount = room.users ? Object.keys(room.users).length : 0; // Изменено: теперь users - объект
+        div.innerHTML = `
+          <div class="room-info">
+            <div class="room-name">${room.name}</div>
+            <div class="room-users">${userCount} пользователей</div>
+          </div>
+          <div class="room-actions">
+            <button class="action-btn delete-btn" data-id="${room.id}"><i class="fas fa-trash"></i></button>
+          </div>
+        `;
+        roomList.appendChild(div);
 
-          // === DELETE ROOM ===
-          div.querySelector('.delete-btn').addEventListener('click', (e) => {
-            e.stopPropagation(); // ❗ Don't trigger room click
-            if (confirm(`Удалить комнату "${room.name}"?`)) {
-              socket.emit('delete-room', { roomId: room.id }, res => {
-                if (res && res.success) {
-                  showNotification(`Комната удалена: ${room.name}`, 'success');
-                  loadRoomList(); // Обновляем список после удаления
-                } else {
-                  showNotification('Delete failed: ' + (res?.error || 'Unknown error'), 'error');
-                }
-              });
-            }
-          });
+        // === CLICK ON ROOM BLOCK - JOIN ROOM ===
+        div.addEventListener('click', (e) => {
+          if (!e.target.closest('.delete-btn')) {
+            window.location.href = `/player.html?room=${room.id}`;
+          }
+        });
+
+        // === DELETE ROOM ===
+        div.querySelector('.delete-btn').addEventListener('click', (e) => {
+          e.stopPropagation(); // ❗ Don't trigger room click
+          if (confirm(`Удалить комнату "${room.name}"?`)) {
+            socket.emit('delete-room', { roomId: room.id }, (res) => {
+              console.log('[CLIENT] Получен ответ на удаление комнаты через callback:', res);
+              if (res && res.success) {
+                console.log('[CLIENT] Удаление комнаты подтверждено сервером');
+                // Уведомление показываем после получения обновленного списка через room-list
+                // showNotification(`Комната удалена: ${room.name}`, 'success');
+              } else {
+                console.log('[CLIENT] Ошибка удаления комнаты в callback:', res?.message || res?.error || 'Unknown error');
+                const errorMessage = res?.message || res?.error || 'Unknown error';
+                showNotification('Delete failed: ' + errorMessage, 'error');
+              }
+            });
+          }
         });
       });
     }
@@ -768,24 +841,6 @@
         }
       }, 5000);
     }
-
-    // === UPDATE ROOM LIST ON CHANGE ===
-    socket.on('room-list', (rooms) => {
-      loadRoomList();
-    });
-
-    // Обработчик отключения сокета (опционально)
-    socket.on('disconnect', () => {
-        console.log('Соединение с сервером потеряно.');
-        // Можно показать уведомление
-        // showNotification('Соединение с сервером потеряно.', 'error');
-    });
-
-    // Обработчик reconnect (опционально)
-    socket.on('reconnect', () => {
-        console.log('Соединение с сервером восстановлено.');
-        // loadRoomList(); // Попробовать обновить список
-    });
   </script>
 </body>
 </html>

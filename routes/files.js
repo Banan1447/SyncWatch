@@ -1,138 +1,181 @@
-// server/routes/files.js
+// routes/files.js
 const express = require('express');
 const router = express.Router();
-const multer = require('multer');
 const FileService = require('../services/fileService');
-const { isLocalhostOnly } = require('../middleware/auth');
-const { logClientRequest } = require('../middleware/logging');
+const { authenticateToken } = require('../middleware/auth');
 const config = require('../config');
 
+// Создаем экземпляр FileService, передавая ему директорию с видео
 const fileService = new FileService(config.videoDirectory);
 
-// Настройка multer для загрузки с поддержкой папок
-const folderAwareStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    let relativeFolderPath = req.headers['x-folder-path'] || req.body.folderPath || '';
-    relativeFolderPath = path.normalize(relativeFolderPath).replace(/^(\.\.(\/|\\|$))+/, '');
-    const absoluteFolderPath = path.join(config.videoDirectory, relativeFolderPath);
-    
-    fileService.ensureDirWithEmpty(absoluteFolderPath);
-    cb(null, absoluteFolderPath);
-  },
-  filename: (req, file, cb) => {
-    cb(null, file.originalname);
-  }
-});
-
-const folderAwareUpload = multer({ storage: folderAwareStorage });
-
-// GET /api/files/list
-router.get('/list', (req, res) => {
-  const clientIP = req.ip || req.connection.remoteAddress;
-  logClientRequest(clientIP, 'N/A', 'GET /api/files/list', '');
-  
+// Маршрут для получения структуры файлов (папки и файлы)
+// Изменено: добавлен authenticateToken middleware
+router.get('/list', authenticateToken, async (req, res) => {
   try {
-    const structure = fileService.getDirectoryStructure();
+    console.log('[FILES ROUTE] Запрос на получение структуры файлов от пользователя:', req.user?.username);
+    const structure = await fileService.getDirectoryStructure();
+    console.log(`[FILES ROUTE] Успешно получена структура файлов. Найдено ${structure.length} элементов на верхнем уровне.`);
     res.json({ success: true, structure });
   } catch (error) {
-    console.error('[FILES API] Ошибка получения структуры:', error);
+    console.error('[FILES ROUTE] Ошибка получения структуры файлов:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// POST /api/files/create-folder
-router.post('/create-folder', isLocalhostOnly, (req, res) => {
-  const { folderPath } = req.body;
-  const clientIP = req.ip || req.connection.remoteAddress;
-  
-  logClientRequest(clientIP, 'N/A', 'POST /api/files/create-folder', `Path: ${folderPath}`);
-  
+// Маршрут для получения содержимого конкретной папки
+// Новый маршрут для получения содержимого папки по пути
+router.get('/list-folder', authenticateToken, async (req, res) => {
   try {
-    if (!folderPath || typeof folderPath !== 'string') {
-      return res.status(400).json({ success: false, error: 'Invalid folder path' });
-    }
-
-    fileService.createFolder(folderPath);
-    res.json({ success: true });
+    const { path: folderPath = '' } = req.query; // Получаем путь из query параметра
+    console.log('[FILES ROUTE] Запрос на получение содержимого папки:', folderPath, 'от пользователя:', req.user?.username);
+    const contents = await fileService.getFolderContents(folderPath);
+    console.log(`[FILES ROUTE] Успешно получено содержимое папки ${folderPath || 'ROOT'}. Найдено ${contents.length} элементов.`);
+    res.json({ success: true, contents });
   } catch (error) {
-    console.error('[FILES API] Ошибка создания папки:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// POST /api/files/delete-folder
-router.post('/delete-folder', isLocalhostOnly, (req, res) => {
-  const { folderPath } = req.body;
-  const clientIP = req.ip || req.connection.remoteAddress;
-  
-  logClientRequest(clientIP, 'N/A', 'POST /api/files/delete-folder', `Path: ${folderPath}`);
-  
-  try {
-    if (!folderPath || typeof folderPath !== 'string') {
-      return res.status(400).json({ success: false, error: 'Invalid folder path' });
+    console.error('[FILES ROUTE] Ошибка получения содержимого папки:', error);
+    // Проверяем, является ли ошибка "папка не найдена" или подобной
+    if (error.code === 'ENOENT' || error.message.includes('not found') || error.message.includes('does not exist')) {
+       res.status(404).json({ success: false, error: 'Folder not found' });
+    } else {
+       res.status(500).json({ success: false, error: error.message });
     }
-
-    fileService.deleteFolder(folderPath);
-    res.json({ success: true });
-  } catch (error) {
-    console.error('[FILES API] Ошибка удаления папки:', error);
-    res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// POST /api/files/move
-router.post('/move', isLocalhostOnly, (req, res) => {
-  const { sourcePath, destPath } = req.body;
-  const clientIP = req.ip || req.connection.remoteAddress;
-  
-  logClientRequest(clientIP, 'N/A', 'POST /api/files/move', `Source: ${sourcePath}, Dest: ${destPath}`);
-  
+// Маршрут для создания новой папки
+router.post('/create-folder', authenticateToken, async (req, res) => {
   try {
-    if (!sourcePath || !destPath || typeof sourcePath !== 'string' || typeof destPath !== 'string') {
-      return res.status(400).json({ success: false, error: 'Invalid source or destination path' });
+    const { path: folderPath } = req.body; // Получаем путь из тела запроса
+    if (!folderPath) {
+       return res.status(400).json({ success: false, error: 'Path is required' });
     }
-
-    fileService.moveItem(sourcePath, destPath);
-    res.json({ success: true });
+    console.log('[FILES ROUTE] Запрос на создание папки:', folderPath, 'от пользователя:', req.user?.username);
+    const result = await fileService.createFolder(folderPath);
+    console.log('[FILES ROUTE] Папка успешно создана:', folderPath);
+    res.json({ success: true, message: result.message });
   } catch (error) {
-    console.error('[FILES API] Ошибка перемещения:', error);
-    res.status(500).json({ success: false, error: error.message });
+    console.error('[FILES ROUTE] Ошибка создания папки:', error);
+    // Проверяем, существует ли уже папка
+    if (error.code === 'EEXIST') {
+       res.status(409).json({ success: false, error: 'Folder already exists' });
+    } else {
+       res.status(500).json({ success: false, error: error.message });
+    }
   }
 });
 
-// POST /api/files/upload/to-folder
-router.post('/upload/to-folder', folderAwareUpload.single('video'), (req, res) => {
-  const clientIP = req.ip || req.connection.remoteAddress;
-  const folderPath = req.headers['x-folder-path'] || req.body.folderPath || '';
-  
-  logClientRequest(clientIP, 'N/A', 'POST /api/files/upload/to-folder', 
-    `File: ${req.file ? req.file.filename : 'N/A'}, Folder: ${folderPath}`);
-  
-  if (req.file) {
-    const relativeFilePath = path.join(folderPath, req.file.filename).split(path.sep).join('/');
-    res.json({ success: true, file: req.file.filename, path: relativeFilePath });
-  } else {
-    res.status(400).json({ success: false, error: 'File not uploaded' });
-  }
-});
-
-// GET /api/files/info
-router.get('/info', (req, res) => {
-  const { path: itemPath } = req.query;
-  const clientIP = req.ip || req.connection.remoteAddress;
-  
-  logClientRequest(clientIP, 'N/A', 'GET /api/files/info', `Path: ${itemPath}`);
-  
+// Маршрут для удаления файла или папки
+router.delete('/delete', authenticateToken, async (req, res) => {
   try {
+    const { path: itemPath } = req.body; // Получаем путь из тела запроса
     if (!itemPath) {
-      return res.status(400).json({ success: false, error: 'Path parameter required' });
+       return res.status(400).json({ success: false, error: 'Path is required' });
     }
-
-    const info = fileService.getItemInfo(itemPath);
-    res.json({ success: true, info });
+    console.log('[FILES ROUTE] Запрос на удаление элемента:', itemPath, 'от пользователя:', req.user?.username);
+    const result = await fileService.deleteItem(itemPath);
+    console.log('[FILES ROUTE] Элемент успешно удален:', itemPath);
+    res.json({ success: true, message: result.message });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    console.error('[FILES ROUTE] Ошибка удаления элемента:', error);
+    // Проверяем, не найден ли элемент
+    if (error.code === 'ENOENT') {
+       res.status(404).json({ success: false, error: 'Item not found' });
+    } else {
+       res.status(500).json({ success: false, error: error.message });
+    }
   }
 });
+
+// Маршрут для переименования файла или папки
+router.put('/rename', authenticateToken, async (req, res) => {
+  try {
+    const { oldPath, newPath } = req.body;
+    if (!oldPath || !newPath) {
+       return res.status(400).json({ success: false, error: 'Both oldPath and newPath are required' });
+    }
+    console.log('[FILES ROUTE] Запрос на переименование элемента:', oldPath, '->', newPath, 'от пользователя:', req.user?.username);
+    const result = await fileService.renameItem(oldPath, newPath);
+    console.log('[FILES ROUTE] Элемент успешно переименован:', oldPath, '->', newPath);
+    res.json({ success: true, message: result.message });
+  } catch (error) {
+    console.error('[FILES ROUTE] Ошибка переименования элемента:', error);
+    // Проверяем специфичные ошибки
+    if (error.code === 'ENOENT') {
+       res.status(404).json({ success: false, error: 'Item not found' });
+    } else if (error.code === 'EEXIST') {
+       res.status(409).json({ success: false, error: 'Destination already exists' });
+    } else {
+       res.status(500).json({ success: false, error: error.message });
+    }
+  }
+});
+
+// === ОБНОВЛЕННЫЙ МАРШРУТ: Перемещение файлов или папок ===
+router.put('/move', authenticateToken, async (req, res) => {
+  try {
+    // Изменяем ожидаемые поля: теперь items (массив) и destination (строка)
+    const { items, destination } = req.body;
+    
+    // Валидация входных данных
+    if (!Array.isArray(items) || items.length === 0) {
+       return res.status(400).json({ success: false, error: 'Items array is required and cannot be empty' });
+    }
+    if (typeof destination !== 'string') {
+       return res.status(400).json({ success: false, error: 'Destination must be a string' });
+    }
+
+    console.log(`[FILES ROUTE] Запрос на перемещение ${items.length} элементов в папку: "${destination}" от пользователя:`, req.user?.username);
+    console.log(`[FILES ROUTE] Элементы для перемещения:`, items);
+
+    let successCount = 0;
+    let failCount = 0;
+    const errors = [];
+
+    // Используем оригинальный метод moveItem для каждого элемента
+    // Предполагается, что fileService.moveItem может перемещать как файлы, так и папки
+    for (const itemPath of items) {
+        try {
+            console.log(`[FILES ROUTE] Перемещение элемента: "${itemPath}" -> "${destination}"`);
+            
+            // Вызываем оригинальный метод перемещения из fileService
+            const result = await fileService.moveItem(itemPath, destination);
+            
+            console.log(`[FILES ROUTE] Элемент успешно перемещен: "${itemPath}" -> "${destination}"`);
+            successCount++;
+        } catch (itemError) {
+            console.error(`[FILES ROUTE] Ошибка перемещения элемента "${itemPath}":`, itemError.message);
+            errors.push({ item: itemPath, error: itemError.message });
+            failCount++;
+            // Продолжаем попытки переместить остальные элементы
+        }
+    }
+
+    if (failCount === 0) {
+        res.status(200).json({ 
+            success: true, 
+            message: `Successfully moved ${successCount} item(s).` 
+        });
+    } else if (successCount === 0) {
+        // Если ни один элемент не был перемещен успешно
+        res.status(500).json({ 
+            success: false, 
+            error: 'Failed to move any items.', 
+            details: errors 
+        });
+    } else {
+        // Частичный успех
+        res.status(207).json({ 
+            success: false, 
+            message: `Operation completed with errors. Moved ${successCount}, failed ${failCount}.`, 
+            details: errors 
+        });
+    }
+
+  } catch (error) {
+    console.error('[FILES ROUTE] Неожиданная ошибка в обработчике /move:', error);
+    res.status(500).json({ success: false, error: 'Internal server error during move operation.' });
+  }
+});
+// === КОНЕЦ ОБНОВЛЕННОГО МАРШРУТА ===
 
 module.exports = router;

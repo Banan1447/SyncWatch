@@ -2,9 +2,25 @@
   {
     "id": "user_1",
     "username": "admin",
-    "password": "admin",
+    "password": "$2b$10$Qm4sVkBn6RSzyGlrr5kvj.MKwZnYZhleBzLcWS.95kM.yUOH7NUT6",
     "email": "admin@localhost",
     "role": "admin",
-    "createdAt": "2025-10-04T18:21:31.053Z"
+    "createdAt": "2025-10-04T22:55:52.955Z"
+  },
+  {
+    "id": "user_1759618584717",
+    "username": "Artur",
+    "email": "a@daw.ri",
+    "password": "$2b$10$dZQ80R.0F8m3Jvw.FDKsMO/Dtu4ibHJviZa2OzZlLU03uWiH82qeK",
+    "role": "user",
+    "createdAt": "2025-10-04T22:56:24.717Z"
+  },
+  {
+    "id": "user_1759628170354",
+    "username": "phonearch",
+    "email": "as@rt.ru",
+    "password": "$2b$10$Z1saReYTn7Tq5l3Nh5BCEeKxpSbzMhZOm4j652K.lYi6kWofKpKqe",
+    "role": "user",
+    "createdAt": "2025-10-05T01:36:10.354Z"
   }
 ]

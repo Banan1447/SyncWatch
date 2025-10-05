@@ -2,77 +2,1007 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
+    <title>SyncWatch - Панель администрирования</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Panel | SyncWatch</title>
-    
-    <!-- Стили -->
-    <link rel="stylesheet" href="styles/main.css">
-    
-    <!-- Иконка (опционально) -->
-    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <link rel="stylesheet" href="/styles/main.css">
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --secondary-color: #64748b;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --danger-color: #ef4444;
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --text-color: #1e293b;
+            --border-color: #e2e8f0;
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.6;
+        }
+        .admin-container {
+            display: flex;
+            min-height: 100vh;
+        }
+        /* Sidebar */
+        .sidebar {
+            width: 250px;
+            background: var(--card-bg);
+            border-right: 1px solid var(--border-color);
+            padding: 1rem 0;
+        }
+        .sidebar-header {
+            padding: 0 1.5rem 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 1rem;
+        }
+        .sidebar-header h1 {
+            font-size: 1.25rem;
+            color: var(--primary-color);
+        }
+        .nav-item {
+            padding: 0.75rem 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            text-decoration: none;
+            color: var(--text-color);
+            transition: all 0.3s ease;
+            border-left: 3px solid transparent;
+            cursor: pointer;
+        }
+        .nav-item:hover {
+            background: var(--bg-color);
+            color: var(--primary-color);
+        }
+        .nav-item.active {
+            background: var(--primary-color);
+            color: white;
+            border-left-color: var(--primary-color);
+        }
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            padding: 2rem;
+            overflow-y: auto;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .header h1 {
+            font-size: 1.875rem;
+            font-weight: 700;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        .stat-card {
+            background: var(--card-bg);
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        .stat-card h3 {
+            font-size: 0.875rem;
+            color: var(--secondary-color);
+            margin-bottom: 0.5rem;
+        }
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--primary-color);
+        }
+        .section {
+            background: var(--card-bg);
+            border-radius: 0.5rem;
+            border: 1px solid var(--border-color);
+            margin-bottom: 2rem;
+            overflow: hidden;
+        }
+        .section-header {
+            padding: 1rem 1.5rem;
+            background: var(--bg-color);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .section-header h2 {
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+        .section-content {
+            padding: 1.5rem;
+        }
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .table th,
+        .table td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .table th {
+            background: var(--bg-color);
+            font-weight: 600;
+        }
+        .btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 0.375rem;
+            cursor: pointer;
+            font-size: 0.875rem;
+            transition: all 0.3s ease;
+        }
+        .btn-primary {
+            background: var(--primary-color);
+            color: white;
+        }
+        .btn-danger {
+            background: var(--danger-color);
+            color: white;
+        }
+        .btn:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+        .status-badge {
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .status-active { background: #dcfce7; color: #166534; }
+        .status-inactive { background: #fef2f2; color: #991b1b; }
+        .status-processing { background: #fef3c7; color: #92400e; }
+        .status-completed { background: #d1fae5; color: #065f46; }
+        .status-pending { background: #e0e7ff; color: #3730a3; }
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: var(--secondary-color);
+        }
+        .error {
+            background: #fef2f2;
+            color: #991b1b;
+            padding: 1rem;
+            border-radius: 0.375rem;
+            margin: 1rem 0;
+        }
+        .success {
+            background: #f0fdf4;
+            color: #166534;
+            padding: 1rem;
+            border-radius: 0.375rem;
+            margin: 1rem 0;
+        }
+        .login-form {
+            max-width: 400px;
+            margin: 2rem auto;
+            padding: 2rem;
+            background: var(--card-bg);
+            border-radius: 0.5rem;
+            border: 1px solid var(--border-color);
+        }
+        .login-form h2 {
+            text-align: center;
+            margin-bottom: 1.5rem;
+            color: var(--primary-color);
+        }
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 0.375rem;
+            font-size: 1rem;
+        }
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+        .hidden {
+            display: none;
+        }
+        .last-updated {
+            font-size: 0.875rem;
+            color: var(--secondary-color);
+            text-align: right;
+            margin-top: 1rem;
+        }
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--secondary-color);
+        }
+        .logout-btn {
+            background: none;
+            border: 1px solid var(--border-color);
+            color: var(--secondary-color);
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .logout-btn:hover {
+            background: var(--danger-color);
+            color: white;
+            border-color: var(--danger-color);
+        }
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: var(--secondary-color);
+        }
+        .empty-state h3 {
+            margin-bottom: 0.5rem;
+            color: var(--text-color);
+        }
+        .action-buttons {
+            display: flex;
+            gap: 0.5rem;
+        }
+        .btn-sm {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: var(--border-color);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 0.5rem;
+        }
+        .progress-fill {
+            height: 100%;
+            background: var(--primary-color);
+            transition: width 0.3s ease;
+        }
+        .metric-card {
+            background: var(--card-bg);
+            padding: 1rem;
+            border-radius: 0.5rem;
+            border: 1px solid var(--border-color);
+            margin-bottom: 1rem;
+        }
+        .metric-card h4 {
+            margin-bottom: 0.5rem;
+            color: var(--secondary-color);
+        }
+        .metric-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary-color);
+        }
+    </style>
 </head>
 <body>
-    <!-- Шапка сайта -->
-    <header class="header">
-        <div class="logo-container">
-            <div class="logo-icon">
-                <div class="logo-svg">
-                    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-                        <defs>
-                            <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                                <stop offset="0%" stop-color="#4a90e2" />
-                                <stop offset="100%" stop-color="#8e44ad" />
-                            </linearGradient>
-                        </defs>
-                        <circle cx="50" cy="50" r="48" fill="url(#logoGradient)" />
-                        <text x="50" y="60" font-family="Arial, sans-serif" font-size="100" fill="white" text-anchor="middle" dominant-baseline="middle">S</text>
-                    </svg>
-                </div>
-            </div>
-            <h1>SyncWatch Admin Panel</h1>
+    <div id="login-screen" class="login-form">
+        <h2>Вход в панель администрирования</h2>
+        <div class="form-group">
+            <label for="username">Имя пользователя:</label>
+            <input type="text" id="username" placeholder="admin" value="admin">
         </div>
-    </header>
-
-    <!-- Основная часть -->
-    <main class="admin-container">
-        <!-- Раздел выбора папки -->
-        <section class="admin-panel">
-            <h2>Настройка папки с видео</h2>
-            <div class="form-group">
-                <label for="videoFolder">Путь к папке с видео:</label>
-                <input type="text" id="videoFolder" placeholder="C:\Videos" required>
-                <button id="saveFolderBtn">Сохранить путь</button>
+        <div class="form-group">
+            <label for="password">Пароль:</label>
+            <input type="password" id="password" placeholder="admin" value="admin">
+        </div>
+        <button id="login-btn" class="btn btn-primary" style="width: 100%;">Войти</button>
+        <div id="login-error" class="error hidden"></div>
+        <div class="form-group" style="margin-top: 1rem; text-align: center;">
+            <small style="color: var(--secondary-color);">
+                По умолчанию: admin / admin
+            </small>
+        </div>
+    </div>
+    <div id="admin-panel" class="admin-container hidden">
+        <!-- Sidebar -->
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h1>SyncWatch Admin</h1>
             </div>
-            <div id="statusMessage" class="status-message"></div>
-        </section>
-
-        <!-- Раздел смены порта -->
-        <section class="admin-panel">
-            <h2>Настройка порта сервера</h2>
-            <div class="form-group">
-                <label for="serverPort">Новый порт:</label>
-                <input type="number" id="serverPort" placeholder="5000" min="1024" max="65535" value="5000">
-                <button id="changePortBtn">Применить</button>
-            </div>
-            <div id="portStatusMessage" class="status-message"></div>
-            <small>Примечание: после изменения порта требуется перезапуск сервера</small>
-        </section>
-
-        <!-- Текущие настройки -->
-        <section class="admin-panel">
-            <h2>Текущие настройки</h2>
-            <div class="current-settings">
-                <div>
-                    <strong>Порт сервера:</strong> <span id="currentPort">Загрузка...</span>
+            <a href="#" class="nav-item active" data-section="dashboard">
+                📊 Дашборд
+            </a>
+            <a href="#" class="nav-item" data-section="rooms">
+                🏠 Комнаты
+            </a>
+            <a href="#" class="nav-item" data-section="users">
+                👥 Пользователи
+            </a>
+            <a href="#" class="nav-item" data-section="transcode">
+                📹 Транскодирование
+            </a>
+            <a href="#" class="nav-item" data-section="system">
+                ⚙️ Система
+            </a>
+        </nav>
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Header -->
+            <div class="header">
+                <h1>Панель администрирования</h1>
+                <div class="user-info">
+                    <span id="current-user">Администратор</span>
+                    <button class="logout-btn" onclick="logout()">Выйти</button>
                 </div>
-                <div>
-                    <strong>Папка с видео:</strong> <span id="currentVideoDir">Загрузка...</span>
-                </div>
             </div>
-        </section>
-    </main>
+            <!-- Dashboard Section -->
+            <section id="dashboard-section" class="section">
+                <div class="section-header">
+                    <h2>Общая статистика</h2>
+                    <div class="action-buttons">
+                        <button id="refresh-stats" class="btn btn-primary">Обновить</button>
+                    </div>
+                </div>
+                <div class="section-content">
+                    <div class="stats-grid" id="stats-grid">
+                        <div class="loading">Загрузка статистики...</div>
+                    </div>
+                    <div class="last-updated" id="last-updated"></div>
+                </div>
+            </section>
+            <!-- Rooms Section -->
+            <section id="rooms-section" class="section hidden">
+                <div class="section-header">
+                    <h2>Управление комнатами</h2>
+                    <div class="action-buttons">
+                        <button id="refresh-rooms" class="btn btn-primary">Обновить</button>
+                    </div>
+                </div>
+                <div class="section-content">
+                    <div id="rooms-list">
+                        <div class="loading">Загрузка списка комнат...</div>
+                    </div>
+                </div>
+            </section>
+            <!-- Users Section -->
+            <section id="users-section" class="section hidden">
+                <div class="section-header">
+                    <h2>Управление пользователями</h2>
+                    <div class="action-buttons">
+                        <button id="refresh-users" class="btn btn-primary">Обновить</button>
+                    </div>
+                </div>
+                <div class="section-content">
+                    <div id="users-list">
+                        <div class="loading">Загрузка списка пользователей...</div>
+                    </div>
+                </div>
+            </section>
+            <!-- Transcode Section -->
+            <section id="transcode-section" class="section hidden">
+                <div class="section-header">
+                    <h2>Транскодирование</h2>
+                    <div class="action-buttons">
+                        <button id="refresh-transcode" class="btn btn-primary">Обновить</button>
+                    </div>
+                </div>
+                <div class="section-content">
+                    <h3>Очередь заданий</h3>
+                    <div id="transcode-queue">
+                        <div class="loading">Загрузка очереди транскодирования...</div>
+                    </div>
+                    <h3 style="margin-top: 2rem;">Шаблоны транскодирования</h3>
+                    <div id="transcode-templates">
+                        <div class="loading">Загрузка шаблонов...</div>
+                    </div>
+                </div>
+            </section>
+            <!-- System Section -->
+            <section id="system-section" class="section hidden">
+                <div class="section-header">
+                    <h2>Системные метрики</h2>
+                    <div class="action-buttons">
+                        <button id="refresh-system" class="btn btn-primary">Обновить</button>
+                    </div>
+                </div>
+                <div class="section-content">
+                    <div id="system-metrics">
+                        <div class="loading">Загрузка системных метрик...</div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+    <script>
+        // --- Инициализация переменных ---
+        let currentToken = '';
+        let refreshInterval;
+        let currentUser = null;
 
-    <!-- JavaScript файлы -->
-    <script type="module" src="js/main.js"></script>
+        // --- Элементы DOM ---
+        let loginScreen, adminPanel, loginBtn, loginError, currentUserElement;
+        let navItems, sections;
+
+        // --- API функции ---
+        async function apiCall(endpoint, options = {}) {
+            const headers = {
+                'Content-Type': 'application/json',
+                ...options.headers
+            };
+            if (currentToken) {
+                headers['Authorization'] = `Bearer ${currentToken}`;
+            }
+            try {
+                const response = await fetch(`/api${endpoint}`, {
+                    ...options,
+                    headers
+                });
+                if (response.status === 401) {
+                    // Token expired
+                    logout();
+                    return null;
+                }
+                const data = await response.json();
+                return data;
+            } catch (error) {
+                console.error('API Error:', error);
+                return null;
+            }
+        }
+
+        // --- Аутентификация ---
+        async function login(username, password) {
+            const result = await apiCall('/auth/login', {
+                method: 'POST',
+                body: JSON.stringify({ username, password })
+            });
+            if (result && result.success) {
+                currentToken = result.token;
+                currentUser = result.user;
+                localStorage.setItem('adminToken', currentToken);
+                showAdminPanel();
+                return true;
+            } else {
+                showLoginError(result?.error || 'Ошибка входа');
+                return false;
+            }
+        }
+
+        function logout() {
+            currentToken = '';
+            currentUser = null;
+            localStorage.removeItem('adminToken');
+            showLoginScreen();
+            clearInterval(refreshInterval);
+        }
+
+        function showLoginScreen() {
+            loginScreen.classList.remove('hidden');
+            adminPanel.classList.add('hidden');
+            loginError.classList.add('hidden');
+        }
+
+        function showAdminPanel() {
+            loginScreen.classList.add('hidden');
+            adminPanel.classList.remove('hidden');
+            if (currentUser) {
+                currentUserElement.textContent = currentUser.username;
+            }
+            loadDashboard();
+            startAutoRefresh();
+        }
+
+        function showLoginError(message) {
+            loginError.textContent = message;
+            loginError.classList.remove('hidden');
+        }
+
+        // --- Навигация ---
+        function setupNavigation() {
+            navItems.forEach(item => {
+                item.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    // Update active nav item
+                    navItems.forEach(nav => nav.classList.remove('active'));
+                    item.classList.add('active');
+                    // Show corresponding section
+                    const sectionName = item.dataset.section;
+                    sections.forEach(section => section.classList.add('hidden'));
+                    document.getElementById(`${sectionName}-section`).classList.remove('hidden');
+                    // Load section data
+                    switch(sectionName) {
+                        case 'dashboard':
+                            loadDashboard();
+                            break;
+                        case 'rooms':
+                            loadRooms();
+                            break;
+                        case 'users':
+                            loadUsers();
+                            break;
+                        case 'transcode':
+                            loadTranscode();
+                            break;
+                        case 'system':
+                            loadSystemMetrics();
+                            break;
+                    }
+                });
+            });
+        }
+
+        // --- Загрузка данных ---
+        async function loadDashboard() {
+            const stats = await apiCall('/admin/stats');
+            const statsGrid = document.getElementById('stats-grid');
+            if (!stats) {
+                statsGrid.innerHTML = '<div class="error">Ошибка подключения к серверу</div>';
+                return;
+            }
+            if (stats.success) {
+                statsGrid.innerHTML = `
+                    <div class="stat-card">
+                        <h3>Активные комнаты</h3>
+                        <div class="stat-value">${stats.stats.rooms.active}</div>
+                        <div>Всего комнат: ${stats.stats.rooms.total}</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Активные пользователи</h3>
+                        <div class="stat-value">${stats.stats.users.active}</div>
+                        <div>Зарегистрировано: ${stats.stats.users.registered}</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Транскодирование</h3>
+                        <div class="stat-value">${stats.stats.transcode.activeJobs}</div>
+                        <div>Всего заданий: ${stats.stats.transcode.totalJobs}</div>
+                        <div>Шаблонов: ${stats.stats.transcode.templates}</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Система</h3>
+                        <div class="stat-value">${Math.floor(stats.stats.system.uptime / 60)}м</div>
+                        <div>Память: ${Math.round(stats.stats.system.memory.heapUsed / 1024 / 1024)}MB</div>
+                    </div>
+                `;
+            } else {
+                statsGrid.innerHTML = `<div class="error">Ошибка загрузки статистики: ${stats.error}</div>`;
+            }
+            document.getElementById('last-updated').textContent = 
+                `Обновлено: ${new Date().toLocaleTimeString()}`;
+        }
+
+        async function loadRooms() {
+            const roomsList = document.getElementById('rooms-list');
+            const roomsData = await apiCall('/admin/rooms');
+            if (!roomsData) {
+                roomsList.innerHTML = '<div class="error">Ошибка подключения к серверу</div>';
+                return;
+            }
+            if (roomsData.success) {
+                if (roomsData.rooms.length === 0) {
+                    roomsList.innerHTML = `
+                        <div class="empty-state">
+                            <h3>Нет активных комнат</h3>
+                            <p>В системе пока нет созданных комнат</p>
+                        </div>
+                    `;
+                    return;
+                }
+                roomsList.innerHTML = `
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Название</th>
+                                <th>Пользователи</th>
+                                <th>Текущее видео</th>
+                                <th>Создана</th>
+                                <th>Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${roomsData.rooms.map(room => `
+                                <tr>
+                                    <td><code>${room.id}</code></td>
+                                    <td><strong>${room.name}</strong></td>
+                                    <td>
+                                        <span class="status-badge ${room.users > 0 ? 'status-active' : 'status-inactive'}">
+                                            ${room.users} пользователей
+                                        </span>
+                                    </td>
+                                    <td title="${room.currentVideo || 'Нет'}">
+                                        ${room.currentVideo ? room.currentVideo.substring(0, 20) + '...' : 'Нет'}
+                                    </td>
+                                    <td>${new Date(room.createdAt).toLocaleDateString()}</td>
+                                    <td>
+                                        <button class="btn btn-danger btn-sm" onclick="deleteRoom('${room.id}')">
+                                            Удалить
+                                        </button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            } else {
+                roomsList.innerHTML = `<div class="error">Ошибка загрузки списка комнат: ${roomsData.error}</div>`;
+            }
+        }
+
+        async function loadUsers() {
+            const usersList = document.getElementById('users-list');
+            const usersData = await apiCall('/admin/users');
+            if (!usersData) {
+                usersList.innerHTML = '<div class="error">Ошибка подключения к серверу</div>';
+                return;
+            }
+            if (usersData.success) {
+                if (usersData.users.length === 0) {
+                    usersList.innerHTML = `
+                        <div class="empty-state">
+                            <h3>Нет пользователей</h3>
+                            <p>В системе пока нет зарегистрированных пользователей</p>
+                        </div>
+                    `;
+                    return;
+                }
+                usersList.innerHTML = `
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Имя пользователя</th>
+                                <th>Email</th>
+                                <th>Роль</th>
+                                <th>Дата регистрации</th>
+                                <th>Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${usersData.users.map(user => `
+                                <tr>
+                                    <td><code>${user.id}</code></td>
+                                    <td><strong>${user.username}</strong></td>
+                                    <td>${user.email || 'Не указан'}</td>
+                                    <td>
+                                        <span class="status-badge ${user.role === 'admin' ? 'status-active' : 'status-inactive'}">
+                                            ${user.role}
+                                        </span>
+                                    </td>
+                                    <td>${new Date(user.createdAt).toLocaleDateString()}</td>
+                                    <td>
+                                        <div class="action-buttons">
+                                            <button class="btn btn-danger btn-sm" onclick="deleteUser('${user.id}')" ${user.role === 'admin' ? 'disabled' : ''}>
+                                                Удалить
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            } else {
+                usersList.innerHTML = `<div class="error">Ошибка загрузки списка пользователей: ${usersData.error}</div>`;
+            }
+        }
+
+        async function loadTranscode() {
+            const queueElement = document.getElementById('transcode-queue');
+            const templatesElement = document.getElementById('transcode-templates');
+            const queueData = await apiCall('/admin/transcode/queue');
+            const templatesData = await apiCall('/admin/transcode/templates');
+            if (!queueData || !templatesData) {
+                queueElement.innerHTML = '<div class="error">Ошибка подключения к серверу</div>';
+                templatesElement.innerHTML = '<div class="error">Ошибка подключения к серверу</div>';
+                return;
+            }
+            // Очередь транскодирования
+            if (queueData.success) {
+                if (queueData.queue.length === 0) {
+                    queueElement.innerHTML = `
+                        <div class="empty-state">
+                            <h3>Очередь пуста</h3>
+                            <p>Нет заданий в очереди транскодирования</p>
+                        </div>
+                    `;
+                } else {
+                    queueElement.innerHTML = `
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Файл</th>
+                                    <th>Шаблон</th>
+                                    <th>Статус</th>
+                                    <th>Прогресс</th>
+                                    <th>Создано</th>
+                                    <th>Действия</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${queueData.queue.map(job => `
+                                    <tr>
+                                        <td><code>${job.id}</code></td>
+                                        <td title="${job.fileId}">${job.fileId.substring(0, 20)}...</td>
+                                        <td><code>${job.templateId}</code></td>
+                                        <td>
+                                            <span class="status-badge ${
+                                                job.status === 'completed' ? 'status-completed' :
+                                                job.status === 'processing' ? 'status-processing' :
+                                                job.status === 'pending' ? 'status-pending' :
+                                                'status-inactive'
+                                            }">${job.status}</span>
+                                        </td>
+                                        <td>
+                                            ${job.progress ? Math.round(job.progress) + '%' : '0%'}
+                                            ${job.progress ? `
+                                                <div class="progress-bar">
+                                                    <div class="progress-fill" style="width: ${job.progress}%"></div>
+                                                </div>
+                                            ` : ''}
+                                        </td>
+                                        <td>${new Date(job.createdAt).toLocaleDateString()}</td>
+                                        <td>
+                                            <button class="btn btn-danger btn-sm" onclick="cancelTranscodeJob('${job.id}')" ${job.status === 'completed' || job.status === 'error' ? 'disabled' : ''}>
+                                                Отмена
+                                            </button>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    `;
+                }
+            } else {
+                queueElement.innerHTML = `<div class="error">Ошибка загрузки очереди транскодирования: ${queueData.error}</div>`;
+            }
+            // Шаблоны транскодирования
+            if (templatesData.success) {
+                if (templatesData.templates.length === 0) {
+                    templatesElement.innerHTML = `
+                        <div class="empty-state">
+                            <h3>Нет шаблонов</h3>
+                            <p>Шаблоны транскодирования не настроены</p>
+                        </div>
+                    `;
+                } else {
+                    templatesElement.innerHTML = `
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Название</th>
+                                    <th>Описание</th>
+                                    <th>Команда</th>
+                                    <th>Создан</th>
+                                    <th>Действия</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${templatesData.templates.map(template => `
+                                    <tr>
+                                        <td><code>${template.id}</code></td>
+                                        <td><strong>${template.name}</strong></td>
+                                        <td>${template.description}</td>
+                                        <td title="${template.command}">
+                                            <code>${template.command.substring(0, 50)}...</code>
+                                        </td>
+                                        <td>${new Date(template.createdAt).toLocaleDateString()}</td>
+                                        <td>
+                                            <button class="btn btn-danger btn-sm" onclick="deleteTemplate('${template.id}')">
+                                                Удалить
+                                            </button>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    `;
+                }
+            } else {
+                templatesElement.innerHTML = `<div class="error">Ошибка загрузки шаблонов: ${templatesData.error}</div>`;
+            }
+        }
+
+        async function loadSystemMetrics() {
+            const metrics = await apiCall('/metrics/performance');
+            const systemElement = document.getElementById('system-metrics');
+            if (!metrics) {
+                systemElement.innerHTML = '<div class="error">Ошибка подключения к серверу</div>';
+                return;
+            }
+            if (metrics.success) {
+                systemElement.innerHTML = `
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <h3>Производительность</h3>
+                            <div class="metric-value">${metrics.metrics.responseTime.average}ms</div>
+                            <div>Среднее время ответа</div>
+                            <div>Мин: ${metrics.metrics.responseTime.min}ms</div>
+                            <div>Макс: ${metrics.metrics.responseTime.max}ms</div>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Память</h3>
+                            <div class="metric-value">${metrics.metrics.memory.heapUsed}MB</div>
+                            <div>Использовано heap</div>
+                            <div>Всего heap: ${metrics.metrics.memory.heapTotal}MB</div>
+                            <div>RSS: ${metrics.metrics.memory.rss}MB</div>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Система</h3>
+                            <div class="metric-value">${Math.floor(metrics.metrics.system.uptime / 3600)}ч</div>
+                            <div>Время работы</div>
+                            <div>Версия: ${metrics.metrics.system.nodeVersion}</div>
+                            <div>Платформа: ${metrics.metrics.system.platform}</div>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Соединения</h3>
+                            <div class="metric-value">${metrics.metrics.system.activeConnections}</div>
+                            <div>Активные соединения</div>
+                            <div>Статус: Работает</div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                systemElement.innerHTML = `<div class="error">Ошибка загрузки системных метрик: ${metrics.error}</div>`;
+            }
+        }
+
+        // --- Действия администратора (реальные запросы) ---
+        async function deleteRoom(roomId) {
+            if (!confirm('Вы уверены, что хотите удалить эту комнату? Все пользователи будут отключены.')) {
+                return;
+            }
+            const result = await apiCall(`/admin/rooms/${roomId}`, {
+                method: 'DELETE'
+            });
+            if (result && result.success) {
+                showNotification('Комната успешно удалена', 'success');
+                loadRooms();
+                loadDashboard(); // Обновляем статистику
+            } else {
+                showNotification('Ошибка при удалении комнаты: ' + (result?.error || 'Неизвестная ошибка'), 'error');
+            }
+        }
+
+        async function deleteUser(userId) {
+            if (!confirm('Вы уверены, что хотите удалить этого пользователя?')) {
+                return;
+            }
+            const result = await apiCall(`/admin/users/${userId}`, {
+                method: 'DELETE'
+            });
+            if (result && result.success) {
+                showNotification('Пользователь успешно удален', 'success');
+                loadUsers();
+                loadDashboard();
+            } else {
+                showNotification('Ошибка при удалении пользователя: ' + (result?.error || 'Неизвестная ошибка'), 'error');
+            }
+        }
+
+        async function cancelTranscodeJob(jobId) {
+            if (!confirm('Вы уверены, что хотите отменить это задание транскодирования?')) {
+                return;
+            }
+            const result = await apiCall(`/admin/transcode/queue/${jobId}`, {
+                method: 'DELETE'
+            });
+            if (result && result.success) {
+                showNotification('Задание транскодирования отменено', 'success');
+                loadTranscode();
+                loadDashboard();
+            } else {
+                showNotification('Ошибка при отмене задания: ' + (result?.error || 'Неизвестная ошибка'), 'error');
+            }
+        }
+
+        async function deleteTemplate(templateId) {
+            if (!confirm('Вы уверены, что хотите удалить этот шаблон транскодирования?')) {
+                return;
+            }
+            const result = await apiCall(`/admin/transcode/templates/${templateId}`, {
+                method: 'DELETE'
+            });
+            if (result && result.success) {
+                showNotification('Шаблон успешно удален', 'success');
+                loadTranscode();
+                loadDashboard();
+            } else {
+                showNotification('Ошибка при удалении шаблона: ' + (result?.error || 'Неизвестная ошибка'), 'error');
+            }
+        }
+
+        function showNotification(message, type = 'info') {
+            // Простая реализация уведомлений
+            alert(message); // В реальном приложении можно использовать toast-уведомления
+        }
+
+        // --- Автообновление ---
+        function startAutoRefresh() {
+            refreshInterval = setInterval(() => {
+                const activeSection = document.querySelector('.section:not(.hidden)');
+                if (activeSection.id === 'dashboard-section') {
+                    loadDashboard();
+                }
+            }, 10000); // Обновлять каждые 10 секунд
+        }
+
+        // --- Инициализация ---
+        document.addEventListener('DOMContentLoaded', function() {
+            // Присваиваем элементы после загрузки DOM
+            loginScreen = document.getElementById('login-screen');
+            adminPanel = document.getElementById('admin-panel');
+            loginBtn = document.getElementById('login-btn');
+            loginError = document.getElementById('login-error');
+            currentUserElement = document.getElementById('current-user');
+            // Навигация
+            navItems = document.querySelectorAll('.nav-item');
+            sections = document.querySelectorAll('.section');
+
+            setupNavigation();
+            // Проверка сохраненного токена
+            const savedToken = localStorage.getItem('adminToken');
+            if (savedToken) {
+                currentToken = savedToken;
+                // Проверяем валидность токена
+                apiCall('/auth/profile').then(result => {
+                    if (result && result.success) {
+                        currentUser = result.user;
+                        showAdminPanel();
+                    } else {
+                        logout();
+                    }
+                });
+            }
+
+            // Обработчик входа
+            loginBtn.addEventListener('click', async () => {
+                const username = document.getElementById('username').value;
+                const password = document.getElementById('password').value;
+                if (!username || !password) {
+                    showLoginError('Введите имя пользователя и пароль');
+                    return;
+                }
+                await login(username, password);
+            });
+
+            // Enter для входа
+            document.getElementById('password').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    loginBtn.click();
+                }
+            });
+
+            // Кнопки обновления
+            document.getElementById('refresh-stats').addEventListener('click', loadDashboard);
+            document.getElementById('refresh-rooms').addEventListener('click', loadRooms);
+            document.getElementById('refresh-users').addEventListener('click', loadUsers);
+            document.getElementById('refresh-transcode').addEventListener('click', loadTranscode);
+            // Загрузка начальной секции (например, дашборда)
+            loadDashboard();
+        });
+    </script>
 </body>
 </html>

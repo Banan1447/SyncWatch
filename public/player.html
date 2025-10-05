@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <title>SyncWatch Player</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-  <!-- ✅ ПОДКЛЮЧАЕМ SOCKET.IO ДЛЯ СИНХРОНИЗАЦИИ -->
+  <!-- Подключаем Socket.IO для синхронизации -->
   <script src="/socket.io/socket.io.js"></script>
   <style>
     :root {
@@ -24,22 +24,20 @@
       --warning: #ffc107;
       --danger: #dc3545;
       --info: #17a2b8;
+      --drag-over: rgba(74, 144, 226, 0.2);
     }
-
     * {
       margin: 0;
       padding: 0;
       box-sizing: border-box;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     }
-
     body {
       background: var(--bg-dark);
       color: var(--text);
       line-height: 1.6;
       transition: background 0.3s ease;
     }
-
     .header {
       display: flex;
       justify-content: space-between;
@@ -49,7 +47,6 @@
       border-bottom: 1px solid var(--border);
       box-shadow: 0 2px 10px var(--shadow);
     }
-
     .logo-container {
       display: flex;
       align-items: center;
@@ -57,16 +54,14 @@
       cursor: pointer;
       transition: opacity 0.2s ease;
     }
-
     .logo-container:hover {
       opacity: 0.8;
     }
-
     .logo-icon {
       width: 40px;
       height: 40px;
       border-radius: 50%;
-      background: linear-gradient(135deg, #4a90e2, #8e44ad); /* Сине-фиолетовый */
+      background: linear-gradient(135deg, #4a90e2, #8e44ad);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -74,31 +69,26 @@
       font-weight: bold;
       position: relative;
     }
-
     .logo-svg {
-      width: 80%; /* Занимает 80% круга */
+      width: 80%;
       height: 80%;
       display: flex;
       align-items: center;
       justify-content: center;
     }
-
     .logo-svg svg {
       width: 100%;
       height: 100%;
     }
-
     .header h1 {
       font-size: 1.8rem;
       font-weight: 600;
       color: var(--primary);
     }
-
     .manage-links {
       display: flex;
       gap: 1rem;
     }
-
     .manage-link {
       color: var(--accent);
       text-decoration: none;
@@ -107,12 +97,10 @@
       border-radius: 4px;
       transition: all 0.2s ease;
     }
-
     .manage-link:hover {
       background: rgba(0, 123, 255, 0.1);
       color: #fff;
     }
-
     .controls {
       display: flex;
       align-items: center;
@@ -121,12 +109,10 @@
       background: var(--bg-darker);
       border-bottom: 1px solid var(--border);
     }
-
     .controls label {
       font-size: 0.9rem;
       color: var(--text-secondary);
     }
-
     .controls input {
       padding: 0.5rem;
       border: 1px solid var(--border);
@@ -136,7 +122,6 @@
       font-size: 0.9rem;
       width: 150px;
     }
-
     .controls button {
       padding: 0.5rem 1rem;
       background: var(--accent);
@@ -147,30 +132,40 @@
       font-weight: 500;
       transition: background 0.2s ease;
     }
-
     .controls button:hover {
       background: #0056b3;
     }
-
     .status-line {
       font-size: 0.9rem;
       color: var(--text-secondary);
     }
-
     .main-container {
       display: flex;
+      flex-direction: column;
       gap: 1rem;
       padding: 1rem 2rem;
       min-height: calc(100vh - 180px);
     }
-
+    .top-panel {
+        display: flex;
+        gap: 1rem;
+    }
     .left-panel {
       flex: 3;
       display: flex;
       flex-direction: column;
       gap: 1rem;
     }
-
+    .right-panel {
+      flex: 1;
+      background: var(--secondary);
+      border-radius: 8px;
+      box-shadow: 0 4px 12px var(--shadow);
+      padding: 1rem;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+    }
     .video-container {
       position: relative;
       border-radius: 8px;
@@ -179,7 +174,6 @@
       box-shadow: 0 4px 12px var(--shadow);
       aspect-ratio: 16 / 9;
     }
-
     #videoPlayer {
       width: 100%;
       height: 100%;
@@ -187,30 +181,24 @@
       outline: none;
       object-fit: contain;
     }
-
-    /* Убираем затемнение родных контролей */
     video::-webkit-media-controls {
       background: transparent;
     }
-
     video::-webkit-media-controls-panel {
       background: transparent;
     }
-
     video::-webkit-media-controls-play-button,
     video::-webkit-media-controls-mute-button,
     video::-webkit-media-controls-volume-slider {
-      filter: none; /* Убираем инверсию цвета */
+      filter: none;
       color: white;
     }
-
     .quality-menu {
       position: absolute;
       top: 10px;
       right: 10px;
       z-index: 10;
     }
-
     .quality-btn-player {
       background: rgba(0, 0, 0, 0.6);
       color: white;
@@ -221,11 +209,9 @@
       font-size: 0.9rem;
       transition: background 0.2s ease;
     }
-
     .quality-btn-player:hover {
       background: rgba(0, 0, 0, 0.8);
     }
-
     .dropdown-content {
       display: none;
       position: absolute;
@@ -238,11 +224,9 @@
       min-width: 120px;
       z-index: 100;
     }
-
     .dropdown-content.show {
-      display: block; /* Показываем, если есть класс show */
+      display: block;
     }
-
     .dropdown-content a {
       display: block;
       padding: 0.75rem 1rem;
@@ -250,11 +234,9 @@
       text-decoration: none;
       transition: background 0.2s ease;
     }
-
     .dropdown-content a:hover {
       background: var(--hover-bg);
     }
-
     .upload-section {
       display: flex;
       flex-direction: column;
@@ -264,7 +246,6 @@
       border-radius: 8px;
       box-shadow: 0 4px 12px var(--shadow);
     }
-
     #uploadBtn {
       display: flex;
       align-items: center;
@@ -278,11 +259,9 @@
       font-weight: 500;
       transition: background 0.2s ease;
     }
-
     #uploadBtn:hover {
       background: #0056b3;
     }
-
     .progress-bar {
       width: 100%;
       height: 6px;
@@ -290,16 +269,14 @@
       border-radius: 3px;
       overflow: hidden;
       margin-top: 0.5rem;
-      display: none; /* Скрываем по умолчанию */
+      display: none;
     }
-
     .progress-bar-fill {
       height: 100%;
       background: var(--progress-fill);
       width: 0%;
       transition: width 0.3s ease;
     }
-
     #status {
       padding: 0.75rem;
       background: var(--secondary);
@@ -308,7 +285,6 @@
       color: var(--text-secondary);
       text-align: center;
     }
-
     #leaveRoomBtn {
       padding: 0.5rem 1rem;
       background: #dc3545;
@@ -320,20 +296,9 @@
       transition: background 0.2s ease;
       margin-bottom: 1rem;
     }
-
     #leaveRoomBtn:hover {
       background: #c82333;
     }
-
-    .right-panel {
-      flex: 1;
-      background: var(--secondary);
-      border-radius: 8px;
-      box-shadow: 0 4px 12px var(--shadow);
-      padding: 1rem;
-      overflow-y: auto;
-    }
-
     .right-panel h3 {
       margin-bottom: 1rem;
       font-size: 1.2rem;
@@ -342,7 +307,6 @@
       justify-content: space-between;
       align-items: center;
     }
-
     .manage-videos-link {
       color: var(--accent);
       text-decoration: none;
@@ -352,14 +316,12 @@
       border-radius: 4px;
       transition: all 0.2s ease;
     }
-
     .manage-videos-link:hover {
       background: rgba(0, 123, 255, 0.1);
       color: #fff;
       text-decoration: none;
     }
-
-    /* ✅ НОВОЕ: Стиль для хлебных крошек */
+    /* Стиль для хлебных крошек */
     .breadcrumb {
       display: flex;
       align-items: center;
@@ -369,56 +331,101 @@
       border-bottom: 1px solid var(--border);
       font-size: 0.9rem;
     }
-
     .breadcrumb span {
       cursor: pointer;
       color: var(--accent);
     }
-
     .breadcrumb span:hover {
       text-decoration: underline;
     }
-
     .breadcrumb .separator {
       color: var(--text-secondary);
       cursor: default;
     }
-
-    #videoList {
+    /* Стиль для проводника файлов */
+    .explorer-container {
+      flex-grow: 1;
       display: flex;
       flex-direction: column;
-      gap: 0.5rem;
+      background: var(--bg-darker);
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+      margin-top: 1rem;
     }
-
-    /* ✅ НОВОЕ: Стиль для элементов папок в списке видео */
-    .folder-item-grid {
+    .explorer-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem 1rem;
+        background: var(--secondary);
+        border-bottom: 1px solid var(--border);
+        font-weight: 500;
+    }
+    .explorer-actions {
+        display: flex;
+        gap: 0.5rem;
+    }
+    .explorer-actions button {
+        padding: 0.25rem 0.5rem;
+        background: var(--accent);
+        color: white;
+        border: none;
+        border-radius: 3px;
+        cursor: pointer;
+        font-size: 0.8rem;
+        transition: background 0.2s ease;
+    }
+    .explorer-actions button:hover {
+      background: #0056b3;
+    }
+    .explorer-actions button:disabled {
+        background: var(--text-secondary);
+        cursor: not-allowed;
+    }
+    #explorerList {
+      flex-grow: 1;
+      overflow-y: auto;
+      padding: 0.5rem;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 0.75rem;
+    }
+    .explorer-item {
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 0.75rem;
-      background: var(--bg-darker);
+      padding: 0.75rem 0.5rem;
+      background: var(--bg-dark);
       border-radius: 4px;
       border: 1px solid var(--border);
       cursor: pointer;
-      transition: background 0.2s ease;
-      position: relative; /* Для drag handle */
+      transition: all 0.2s ease;
+      position: relative; /* Для drag handle и контекстного меню */
+      user-select: none; /* Предотвращает выделение текста при перетаскивании */
     }
-
-    .folder-item-grid:hover {
+    .explorer-item:hover {
       background: var(--hover-bg);
       transform: translateY(-2px);
       box-shadow: 0 4px 8px var(--shadow);
     }
-
-    .folder-item-grid i {
-      font-size: 2.5rem; /* Уменьшен размер иконки */
-      margin-bottom: 0.4rem;
-      color: var(--warning); /* Жёлтый для папок */
+    .explorer-item.drag-over {
+        background: var(--drag-over);
+        border: 1px dashed var(--primary);
     }
-
-    .folder-name {
-      font-size: 0.9rem; /* Уменьшен размер шрифта имени */
+    .explorer-item i.folder-icon {
+      font-size: 2.5rem;
+      margin-bottom: 0.4rem;
+      color: var(--warning);
+    }
+    .explorer-item i.file-icon {
+      font-size: 2.5rem;
+      margin-bottom: 0.4rem;
+      color: var(--primary);
+    }
+    .explorer-item .item-name {
+      font-size: 0.8rem;
       text-align: center;
       word-break: break-word;
       width: 100%;
@@ -428,93 +435,144 @@
       -webkit-line-clamp: 2;
       -webkit-box-orient: vertical;
     }
-
-    .video-item {
+    .explorer-item.selected {
+        border: 2px solid var(--primary) !important; /* Приоритет для перезаписи hover */
+        background: var(--hover-bg);
+    }
+    .explorer-item .item-actions {
+        position: absolute;
+        top: 2px;
+        right: 2px;
+        display: none; /* Скрываем по умолчанию */
+        background: rgba(0, 0, 0, 0.5);
+        border-radius: 3px;
+    }
+    .explorer-item:hover .item-actions {
+        display: flex; /* Показываем при наведении */
+    }
+    .explorer-item .item-actions button {
+        background: none;
+        border: none;
+        color: white;
+        cursor: pointer;
+        padding: 2px 4px;
+        font-size: 0.7rem;
+        transition: color 0.2s ease;
+    }
+    .explorer-item .item-actions button:hover {
+        color: var(--danger);
+    }
+    /* Стили для модального окна создания папки */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1001;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+      justify-content: center;
+      align-items: center;
+    }
+    .modal-content {
+      background-color: var(--bg-darker);
+      margin: auto;
+      padding: 2rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: 0 4px 12px var(--shadow);
+      width: 90%;
+      max-width: 500px;
+    }
+    .modal-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 0.75rem;
-      background: var(--bg-darker);
-      border-radius: 4px;
-      border: 1px solid var(--border);
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .modal-header h2 {
+      margin: 0;
+      font-size: 1.5rem;
+      color: var(--primary);
+    }
+    .close-modal {
+      background: none;
+      border: none;
+      color: var(--text-secondary);
+      font-size: 1.5rem;
       cursor: pointer;
-      transition: background 0.2s ease;
+      transition: color 0.2s ease;
     }
-
-    .video-item:hover {
-      background: var(--hover-bg);
-    }
-
-    .video-info {
-      flex: 1;
-      overflow: hidden;
-    }
-
-    .video-title {
-      font-size: 0.9rem;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+    .close-modal:hover {
       color: var(--text);
     }
-
-    .video-meta {
-      font-size: 0.7rem;
+    .modal-body {
+      margin-bottom: 1.5rem;
+    }
+    .modal-body label {
+      display: block;
+      margin-bottom: 0.5rem;
       color: var(--text-secondary);
-      margin-top: 0.25rem;
     }
-
-    /* ✅ НОВОЕ: ПРЕДУПРЕЖДЕНИЕ ДЛЯ НЕПОДДЕРЖИВАЕМЫХ ФАЙЛОВ */
-    .unsupported-warning {
-      color: var(--warning); /* Жёлтый цвет */
-      font-size: 0.7rem;
-      font-weight: 500;
-      margin-top: 0.25rem;
+    .modal-body input {
+      width: 100%;
+      padding: 0.75rem;
+      border: 1px solid var(--border);
+      background: var(--secondary);
+      color: var(--text);
+      border-radius: 4px;
+      font-size: 1rem;
+    }
+    .modal-footer {
       display: flex;
-      align-items: center;
-      gap: 0.25rem;
+      justify-content: flex-end;
+      gap: 1rem;
     }
-
-    .unsupported-warning i {
-      font-size: 0.8rem;
-    }
-
-    .play-btn {
-      background: var(--accent);
-      color: white;
+    .modal-footer button {
+      padding: 0.5rem 1rem;
       border: none;
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      border-radius: 4px;
       cursor: pointer;
+      font-weight: 500;
       transition: background 0.2s ease;
     }
-
-    .play-btn:hover {
+    .btn-cancel {
+      background: var(--secondary);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-cancel:hover {
+      background: var(--hover-bg);
+    }
+    .btn-create {
+      background: var(--accent);
+      color: white;
+    }
+    .btn-create:hover {
       background: #0056b3;
     }
-
+    .btn-create:disabled {
+      background: var(--text-secondary);
+      cursor: not-allowed;
+    }
     .users-section {
       margin-top: 2rem;
       padding-top: 1rem;
       border-top: 1px solid var(--border);
     }
-
     .users-section h3 {
       margin-bottom: 1rem;
       font-size: 1.2rem;
       color: var(--primary);
     }
-
     #usersList {
       display: flex;
       flex-direction: column;
       gap: 0.5rem;
     }
-
     .user-item {
       display: flex;
       justify-content: space-between;
@@ -524,12 +582,10 @@
       border-radius: 4px;
       border: 1px solid var(--border);
     }
-
     .user-name {
       font-size: 0.9rem;
       color: var(--text);
     }
-
     .kick-btn {
       background: #dc3545;
       color: white;
@@ -543,11 +599,9 @@
       cursor: pointer;
       transition: background 0.2s ease;
     }
-
     .kick-btn:hover {
       background: #c82333;
     }
-
     #notifications {
       position: fixed;
       top: 20px;
@@ -555,7 +609,6 @@
       z-index: 1000;
       max-width: 300px;
     }
-
     .notification {
       padding: 1rem;
       margin-bottom: 0.5rem;
@@ -565,7 +618,6 @@
       box-shadow: 0 4px 12px var(--shadow);
       animation: slideIn 0.3s ease-out;
     }
-
     @keyframes slideIn {
       from {
         transform: translateX(100%);
@@ -576,40 +628,35 @@
         opacity: 1;
       }
     }
-
     @media (max-width: 768px) {
       .main-container {
         flex-direction: column;
       }
-
       .header, .controls {
         padding: 1rem;
       }
-
       .video-container {
         aspect-ratio: 16 / 9;
       }
-
       .quality-menu {
         top: 5px;
         right: 5px;
       }
-
       .upload-section {
         padding: 0.75rem;
       }
-
       .comments-section {
         padding: 0.75rem;
       }
-
       .right-panel {
         padding: 0.75rem;
       }
-      
       .manage-links {
         flex-direction: column;
         gap: 0.5rem;
+      }
+      .top-panel {
+          flex-direction: column;
       }
     }
   </style>
@@ -620,18 +667,13 @@
       <div class="logo-icon">
         <div class="logo-svg">
           <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-            <!-- Градиент -->
             <defs>
               <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stop-color="#4a90e2" />
                 <stop offset="100%" stop-color="#8e44ad" />
               </linearGradient>
             </defs>
-
-            <!-- Круговой фон -->
             <circle cx="50" cy="50" r="48" fill="url(#logoGradient)" />
-
-            <!-- Буква S -->
             <text 
               x="50" 
               y="50" 
@@ -655,7 +697,6 @@
       <a href="/transcode" class="manage-link">Transcoder</a>
     </div>
   </div>
-
   <div class="controls">
     <label for="userName">Your Name:</label>
     <input type="text" id="userName" placeholder="Enter your name">
@@ -664,74 +705,99 @@
       В сети: <span id="onlineCount">0</span>
     </div>
   </div>
-
   <div class="main-container">
-    <!-- Левая часть -->
-    <div class="left-panel">
-      <button id="leaveRoomBtn">Выйти из комнаты</button>
-
-      <div class="video-container">
-        <video id="videoPlayer" width="100%" controls></video>
-        <div class="quality-menu">
-          <button id="qualityBtn" class="quality-btn-player">Settings</button>
-          <div id="qualityDropdown" class="dropdown-content">
-            <a href="#" data-quality="original">Original</a>
-            <a href="#" data-quality="low">Low (240p)</a>
-            <a href="#" data-quality="medium">Medium (720p)</a>
+    <div class="top-panel">
+        <div class="left-panel">
+          <button id="leaveRoomBtn">Выйти из комнаты</button>
+          <div class="video-container">
+            <video id="videoPlayer" width="100%" controls></video>
+            <div class="quality-menu">
+              <button id="qualityBtn" class="quality-btn-player">Settings</button>
+              <div id="qualityDropdown" class="dropdown-content">
+                <a href="#" data-quality="original">Original</a>
+                <a href="#" data-quality="low">Low (240p)</a>
+                <a href="#" data-quality="medium">Medium (720p)</a>
+              </div>
+            </div>
+          </div>
+          <div class="upload-section">
+            <button id="uploadBtn"><i class="fas fa-upload"></i> Upload Video</button>
+            <input type="file" id="uploadInput" accept="video/*" style="display:none;">
+            <div class="progress-bar" style="display:none;">
+              <div class="progress-bar-fill"></div>
+            </div>
+          </div>
+          <div id="status">Status: Not connected</div>
+        </div>
+        <div class="right-panel">
+          <h3>
+            Videos
+            <a href="javascript:void(0)" class="manage-videos-link" id="manageVideosLink">Manage Videos</a>
+          </h3>
+          <!-- Хлебные крошки для навигации по папкам -->
+          <div class="breadcrumb" id="videoBreadcrumb">
+            <!-- Хлебные крошки будут здесь -->
+          </div>
+          <div id="videoList"></div>
+          <!-- Список пользователей -->
+          <div class="users-section">
+            <h3>Users Online</h3>
+            <div id="usersList"></div>
           </div>
         </div>
-      </div>
-
-      <div class="upload-section">
-        <button id="uploadBtn"><i class="fas fa-upload"></i> Upload Video</button>
-        <input type="file" id="uploadInput" accept="video/*" style="display:none;">
-        <div class="progress-bar" style="display:none;">
-          <div class="progress-bar-fill"></div>
-        </div>
-      </div>
-
-      <div id="status">Status: Not connected</div>
     </div>
-
-    <!-- Правая часть -->
-    <div class="right-panel">
-      <h3>
-        Videos
-        <a href="javascript:void(0)" class="manage-videos-link" id="manageVideosLink">Manage Videos</a>
-      </h3>
-      <!-- ✅ НОВОЕ: Хлебные крошки для навигации по папкам -->
-      <div class="breadcrumb" id="videoBreadcrumb">
-        <!-- Хлебные крошки будут здесь -->
+    <!-- НОВОЕ: Проводник файлов под видеоплеером -->
+    <div class="explorer-container">
+        <div class="explorer-header">
+            <span>File Explorer</span>
+            <div class="explorer-actions">
+                <button id="createFolderBtnExplorer" title="Create New Folder"><i class="fas fa-folder-plus"></i></button>
+                <button id="refreshExplorerBtn" title="Refresh"><i class="fas fa-sync-alt"></i></button>
+                <!-- Кнопки перемещения и удаления появятся при выборе -->
+                <button id="moveItemsBtn" title="Move Selected" disabled><i class="fas fa-arrow-right"></i></button>
+                <button id="deleteItemsBtn" title="Delete Selected" disabled><i class="fas fa-trash-alt"></i></button>
+            </div>
+        </div>
+         <!-- Хлебные крошки для навигации по папкам в проводнике -->
+        <div class="breadcrumb" id="explorerBreadcrumb">
+            <!-- Хлебные крошки будут здесь -->
+        </div>
+        <div id="explorerList"></div>
+    </div>
+  </div>
+  <div id="notifications"></div>
+  <!-- НОВОЕ: Модальное окно создания папки -->
+  <div id="createFolderModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Create New Folder</h2>
+        <button class="close-modal">&times;</button>
       </div>
-      <div id="videoList"></div>
-
-      <!-- Список пользователей -->
-      <div class="users-section">
-        <h3>Users Online</h3>
-        <div id="usersList"></div>
+      <div class="modal-body">
+        <label for="newFolderName">Folder Name:</label>
+        <input type="text" id="newFolderName" placeholder="Enter folder name">
+        <input type="hidden" id="currentModalPath" value=""> <!-- Для передачи текущего пути -->
+      </div>
+      <div class="modal-footer">
+        <button class="btn-cancel" id="cancelCreateFolder">Cancel</button>
+        <button class="btn-create" id="confirmCreateFolder">Create</button>
       </div>
     </div>
   </div>
-
-  <div id="notifications"></div>
-
   <script>
     // === SOCKET CONNECTION ===
-    const socket = io(); // ✅ Теперь io определено благодаря <script src="/socket.io/socket.io.js">
+    const socket = io();
     let joinedRoom = null;
     let currentVideoFile = null;
-    let isVideoReady = false; // Флаг готовности видео
-    let lastSeekSent = 0; // Для предотвращения зацикливания seek
+    let isVideoReady = false;
+    let lastSeekSent = 0;
     let userName = localStorage.getItem('userName') || `User${Math.floor(Math.random()*10000)}`;
-
     // === URL PARAMS ===
     const urlParams = new URLSearchParams(window.location.search);
     const roomId = urlParams.get('room');
-
     if (!roomId) {
       window.location.href = '/select-room.html';
     }
-
     // === ROOM JOIN LOGIC ===
     function joinRoom() {
       const name = localStorage.getItem('userName') || '';
@@ -742,23 +808,19 @@
         } else {
           joinedRoom = roomId;
           userName = res.room.name;
-          // ✅ После присоединения к комнате, загружаем видео из корневой папки
           updateVideoBreadcrumb();
-          loadAndRenderVideoListForPath(''); 
+          loadAndRenderVideoListForPath('');
+          loadAndRenderExplorerForPath(''); // Загружаем проводник
         }
       });
     }
-
     // === DOM LOADED ===
     window.addEventListener('DOMContentLoaded', () => {
-      // === ЗАПОМИНАЕМ КОМНАТУ ПРИ ЗАГРУЗКЕ СТРАНИЦЫ ===
       if (roomId) {
         localStorage.setItem('lastRoomId', roomId);
       }
-      
       joinRoom();
     });
-
     // === ELEMENTS ===
     const video = document.getElementById('videoPlayer');
     const statusEl = document.getElementById('status');
@@ -771,9 +833,8 @@
     const qualityDropdown = document.getElementById('qualityDropdown');
     const leaveRoomBtn = document.getElementById('leaveRoomBtn');
     const usersList = document.getElementById('usersList');
-    const videoBreadcrumb = document.getElementById('videoBreadcrumb'); // ✅ Элемент для хлебных крошек
-    const manageVideosLink = document.getElementById('manageVideosLink'); // ✅ Элемент для ссылки File Manager
-
+    const videoBreadcrumb = document.getElementById('videoBreadcrumb');
+    const manageVideosLink = document.getElementById('manageVideosLink');
     // === MANAGE VIDEOS LINK WITH ROOM REMEMBER ===
     manageVideosLink.addEventListener('click', () => {
       if (roomId) {
@@ -783,12 +844,10 @@
         window.location.href = '/files';
       }
     });
-
     // === NAME INPUT ===
     if (localStorage.getItem('userName')) {
       userNameInput.value = localStorage.getItem('userName');
     }
-
     saveNameBtn.addEventListener('click', () => {
       const name = userNameInput.value.trim();
       if (name) {
@@ -796,33 +855,26 @@
         socket.emit('set-name', name);
       }
     });
-
     // === QUALITY MENU ===
     qualityBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       qualityDropdown.classList.toggle('show');
     });
-
     document.addEventListener('click', (e) => {
       if (!qualityBtn.contains(e.target) && !qualityDropdown.contains(e.target)) {
         qualityDropdown.classList.remove('show');
       }
     });
-
     qualityDropdown.querySelectorAll('a').forEach(item => {
       item.addEventListener('click', (e) => {
         e.preventDefault();
         const quality = item.dataset.quality;
-
         if (!currentVideoFile) return;
-
         if (quality === 'original') {
           socket.emit('select-video', currentVideoFile);
           qualityDropdown.classList.remove('show');
           return;
         }
-
-        // Проверяем, существует ли перекодированное видео
         fetch(`/api/check-quality/${currentVideoFile}/${quality}`)
           .then(res => res.json())
           .then(data => {
@@ -837,32 +889,25 @@
           });
       });
     });
-
     // === UPLOAD VIDEO ===
     uploadBtn.addEventListener('click', () => {
       uploadInput.click();
     });
-
     uploadInput.addEventListener('change', (e) => {
       const file = e.target.files[0];
       if (file) {
         const formData = new FormData();
         formData.append('video', file);
-
-        // Показать прогресс-бар
         const progressBar = document.querySelector('.progress-bar');
         progressBar.style.display = 'block';
         const progressBarFill = document.querySelector('.progress-bar-fill');
-
         const xhr = new XMLHttpRequest();
-
         xhr.upload.addEventListener('progress', (e) => {
           if (e.lengthComputable) {
             const percentComplete = (e.loaded / e.total) * 100;
             progressBarFill.style.width = `${percentComplete}%`;
           }
         });
-
         xhr.addEventListener('load', () => {
           if (xhr.status === 200) {
             const data = JSON.parse(xhr.responseText);
@@ -870,8 +915,8 @@
               showNotification(`Video uploaded: ${data.file}`, 'success');
               progressBar.style.display = 'none';
               progressBarFill.style.width = '0';
-              // После загрузки обновляем список видео
-              loadAndRenderVideoListForPath(currentPlayerPath); // Обновляем текущую папку
+              loadAndRenderVideoListForPath(currentPlayerPath);
+              loadAndRenderExplorerForPath(currentExplorerPath); // Обновляем проводник
             } else {
               showNotification('Upload failed', 'error');
               progressBar.style.display = 'none';
@@ -881,48 +926,40 @@
             progressBar.style.display = 'none';
           }
         });
-
         xhr.open('POST', '/upload');
         xhr.send(formData);
       }
     });
-
     // === LEAVE ROOM ===
     leaveRoomBtn.addEventListener('click', () => {
       socket.emit('leave-room', () => {
         window.location.href = '/select-room.html';
       });
     });
-
     // === VIDEO EVENTS ===
     video.addEventListener('loadedmetadata', () => {
       isVideoReady = true;
     });
-
     video.addEventListener('play', () => {
       if (isVideoReady) {
-        socket.emit('video-command', { type: 'play' });
+        socket.emit('video-command', { type: 'play', roomId: joinedRoom });
       }
     });
-
     video.addEventListener('pause', () => {
       if (isVideoReady) {
-        socket.emit('video-command', { type: 'pause' });
+        socket.emit('video-command', { type: 'pause', roomId: joinedRoom });
       }
     });
-
-    // === ПРОСТОЙ ФУНКЦИОНАЛ ПЕРЕМАТЫВАНИЯ ===
     video.addEventListener('seeked', () => {
       if (isVideoReady) {
         const now = Date.now();
         if (now - lastSeekSent > 500) {
-          socket.emit('video-command', { type: 'seek', time: video.currentTime });
+          socket.emit('video-command', { type: 'seek', time: video.currentTime, roomId: joinedRoom });
           lastSeekSent = now;
         }
       }
     });
-
-    // === ПРИЁМ КОМАНДЫ ОТ ДРУГИХ ПОЛЬЗОВАТЕЛЕЙ ===
+    // === RECEIVE VIDEO COMMAND FROM OTHER USERS ===
     socket.on('video-command', (data) => {
       if (isVideoReady && video.readyState >= 1) {
         if (data.type === 'play') {
@@ -947,15 +984,13 @@
         }
       }
     });
-
-    // === ПРОГРЕСС БУФЕРА ===
+    // === PROGRESS BUFFER ===
     video.addEventListener('progress', () => {
       const buffered = video.buffered;
       if (buffered.length > 0) {
         const bufferedEnd = buffered.end(0);
         const duration = video.duration;
         const percent = (bufferedEnd / duration) * 100;
-
         let bufferBar = document.querySelector('.buffer-progress');
         if (!bufferBar) {
           bufferBar = document.createElement('div');
@@ -963,106 +998,84 @@
           bufferBar.innerHTML = '<div class="buffer-progress-fill"></div>';
           video.parentNode.insertBefore(bufferBar, video.nextSibling);
         }
-
         bufferBar.querySelector('.buffer-progress-fill').style.width = `${percent}%`;
       }
     });
-
-    // === ФУНКЦИЯ УВЕДОМЛЕНИЙ ===
+    // === NOTIFICATION FUNCTION ===
     function showNotification(message, type) {
       const notification = document.createElement('div');
       notification.className = `notification ${type}`;
       notification.textContent = message;
       document.getElementById('notifications').appendChild(notification);
-
       setTimeout(() => {
         notification.remove();
       }, 3000);
     }
-
-    // === НОВОЕ: ПОЛЬЗОВАТЕЛЬ ВЫГНАН ===
+    // === USER KICKED ===
     socket.on('kicked-from-room', (data) => {
       alert(data.message || 'You have been kicked from the room');
       window.location.href = '/select-room.html';
     });
-
-    // === НОВОЕ: ВИДЕО ОБНОВЛЕНО ===
+    // === VIDEO UPDATED ===
     socket.on('video-updated', (filename) => {
       console.log(`SyncWatch: Video updated event received: ${filename}`);
-      // ✅ Обновляем src видео сразу
       video.src = `/videos/${filename}`;
-      statusEl.innerHTML = `Video loaded: ${filename.split('/').pop()}`; // Отображаем только имя
-      currentVideoFile = filename; // ✅ Обновляем локальную переменную
-      isVideoReady = false; // ✅ Сбрасываем флаг готовности
-      // ✅ Обновляем выделение в списке видео
+      statusEl.innerHTML = `Video loaded: ${filename.split('/').pop()}`;
+      currentVideoFile = filename;
+      isVideoReady = false;
       highlightSelectedVideo(filename);
-      // ✅ Обновляем список видео в текущей папке
       loadAndRenderVideoListForPath(currentPlayerPath);
+      loadAndRenderExplorerForPath(currentExplorerPath); // Обновляем проводник
     });
-
-    // === ГЛОБАЛЬНОЕ СОСТОЯНИЕ КОМНАТЫ ===
+    // === GLOBAL ROOM STATE ===
     let roomState = null;
     socket.on('room-state', (state) => {
       roomState = state;
-      // Видео
       if (state.currentVideo) {
-        // ✅ Проверяем, изменилось ли видео
         if (currentVideoFile !== state.currentVideo) {
-          // ✅ Если видео изменилось, обновляем src
           video.src = `/videos/${state.currentVideo}`;
-          statusEl.innerHTML = `Video loaded: ${state.currentVideo.split('/').pop()}`; // Отображаем только имя
+          statusEl.innerHTML = `Video loaded: ${state.currentVideo.split('/').pop()}`;
           currentVideoFile = state.currentVideo;
-          isVideoReady = false; // ✅ Сбрасываем флаг готовности
-          // ✅ НЕ устанавливаем currentTime при смене видео, браузер сам сбросит на 0
+          isVideoReady = false;
           console.log(`[PLAYER] Video src changed to: ${state.currentVideo}`);
         } else {
-          // ✅ Если видео НЕ изменилось, но пришло обновление состояния
-          // Можем обновить currentTime, но только если видео готово
-          if (isVideoReady && video.readyState >= 1) { // >= 1 означает, что duration известна
-             // Проверяем, отличается ли текущее время в плеере от времени в состоянии комнаты
-             // Это нужно, чтобы не перескакивать, если пользователь сам перематывает
-             // Но для простоты, можно обновить, если разница > 0.5 секунды (как в seek)
+          if (isVideoReady && video.readyState >= 1) {
              if (Math.abs(video.currentTime - state.currentTime) > 0.5) {
-                 // Избегаем зацикливания: не устанавливаем, если последнее действие - seek
                  const now = Date.now();
-                 if (now - lastSeekSent > 1000) { // 1 секунда
+                 if (now - lastSeekSent > 1000) {
                      video.currentTime = state.currentTime;
                      console.log(`SyncWatch: Syncing time to ${state.currentTime}s`);
                  }
              }
           }
         }
-        // ✅ Обновляем выделение в списке видео
         highlightSelectedVideo(state.currentVideo);
       }
-      // Пользователи
       document.getElementById('onlineCount').textContent = Object.keys(state.users).length;
-      renderUsersList();
-      // ✅ Обновляем список видео в текущей папке
+      renderUsersList(); // Обновляем список пользователей
       loadAndRenderVideoListForPath(currentPlayerPath);
+      loadAndRenderExplorerForPath(currentExplorerPath); // Обновляем проводник
     });
-
     // === USERS LIST ===
     function renderUsersList() {
       if (!roomState || !roomState.users) return;
       usersList.innerHTML = '';
-
       Object.keys(roomState.users).forEach(userId => {
         const user = roomState.users[userId];
         const div = document.createElement('div');
         div.className = 'user-item';
+        // Используем имя из состояния комнаты, если оно там есть, иначе fallback
+        const displayName = user.name || user.displayName || `User-${userId.substring(0, 8)}`;
         div.innerHTML = `
-          <div class="user-name">${user.name}</div>
+          <div class="user-name">${displayName}</div>
           <button class="kick-btn" data-id="${userId}"><i class="fas fa-times"></i></button>
         `;
         usersList.appendChild(div);
-
-        // === KICK USER ===
         div.querySelector('.kick-btn').addEventListener('click', () => {
-          if (confirm(`Kick user "${user.name}" from room?`)) {
+          if (confirm(`Kick user "${displayName}" from room?`)) {
             socket.emit('kick-user', { userId, roomId }, res => {
               if (res && res.success) {
-                showNotification(`User kicked: ${user.name}`, 'success');
+                showNotification(`User kicked: ${displayName}`, 'success');
               } else {
                 showNotification('Kick failed: ' + (res?.error || 'Unknown error'), 'error');
               }
@@ -1071,42 +1084,31 @@
         });
       });
     }
-
-    // === ЛОГИКА НАВИГАЦИИ ПО ПАПКАМ В ПЛЕЕРЕ ===
-    let currentPlayerPath = ''; // Текущий путь в плеере
-
-    // Функция для навигации к папке
+    // === NAVIGATION LOGIC FOR PLAYER PANEL ===
+    let currentPlayerPath = '';
     async function navigatePlayerToFolder(folderPath) {
         currentPlayerPath = folderPath;
         updateVideoBreadcrumb();
         await loadAndRenderVideoListForPath(folderPath);
     }
-
-    // Функция для обновления хлебных крошек
     function updateVideoBreadcrumb() {
-      videoBreadcrumb.innerHTML = ''; // Очищаем
-
+      videoBreadcrumb.innerHTML = '';
       const homeSpan = document.createElement('span');
       homeSpan.style.cursor = 'pointer';
       homeSpan.style.color = 'var(--accent)';
       homeSpan.textContent = 'Home';
       homeSpan.addEventListener('click', () => navigatePlayerToFolder(''));
       videoBreadcrumb.appendChild(homeSpan);
-
       if (currentPlayerPath === '') return;
-
-      const parts = currentPlayerPath.split('/'); // Используем '/' для путей API
+      const parts = currentPlayerPath.split('/');
       let pathSoFar = '';
-
       parts.forEach((part, index) => {
         const separator = document.createElement('span');
         separator.className = 'separator';
         separator.textContent = ' / ';
         separator.style.margin = '0 0.25rem';
         videoBreadcrumb.appendChild(separator);
-
         pathSoFar = pathSoFar ? pathSoFar + '/' + part : part;
-
         const partSpan = document.createElement('span');
         partSpan.style.cursor = 'pointer';
         partSpan.style.color = 'var(--accent)';
@@ -1115,20 +1117,20 @@
         videoBreadcrumb.appendChild(partSpan);
       });
     }
-
-    // === ЗАГРУЗКА И ОТРИСОВКА СПИСКА ВИДЕО И ПАПОК ИЗ КОНКРЕТНОЙ ПАПКИ ===
     async function loadAndRenderVideoListForPath(path) {
-        // Нам нужен новый API эндпоинт на сервере, который отдает содержимое конкретной папки
-        // Пока что симулируем это, загружая всю структуру и фильтруя
-        // В реальном приложении лучше сделать отдельный эндпоинт, например `/api/files/list?path=...`
-
+        console.log(`[PLAYER] Запрашиваем содержимое папки: '${path}'`);
         try {
-             // 1. Загружаем структуру папок (новый эндпоинт)
-             const structRes = await fetch('/api/files/list');
+             const token = localStorage.getItem('authToken');
+             if (!token) {
+                 throw new Error('Authentication token not found. Please log in again.');
+             }
+             const structRes = await fetch('/api/files/list', {
+                 headers: {
+                     'Authorization': `Bearer ${token}`
+                 }
+             });
              const structData = await structRes.json();
              if (!structData.success) throw new Error(structData.error || 'Failed to load structure');
-
-             // 2. Находим содержимое нужной папки
              const findContents = (items, targetPath) => {
                if (targetPath === '') return items;
                for (const item of items) {
@@ -1140,78 +1142,49 @@
                    if (found) return found;
                  }
                }
-               return []; // Если не найдено, возвращаем пустой массив
+               return [];
              };
-
              const contentsAtPath = findContents(structData.structure, path);
-
-             // 3. ✅ НЕ ФИЛЬТРУЕМ содержимое, передаём ВСЁ (и файлы, и папки)
-             // const videoFiles = contentsAtPath.filter(item => item.type === 'file'); // <-- УДАЛЕНО
-             const itemsToRender = contentsAtPath; // <-- ИСПОЛЬЗУЕМ ВСЁ СОДЕРЖИМОЕ
-
-             // 4. Получаем метаданные для каждого файла (как в старом /api/videos)
-             // Так как у нас нет эндпоинта для метаданных по путям, симулируем
-             // В реальности, серверный /api/videos должен уметь фильтровать или быть другим
-
-             // Для простоты, предположим, что у нас есть эндпоинт, который может отдать
-             // информацию о файлах по списку путей. Пока используем старый /api/videos
-             // и фильтруем на клиенте. Это не эффективно, но быстро для MVP.
-
-             // Получаем ВСЕ видео (старый способ)
-             const allVideosRes = await fetch('/api/videos');
+             const itemsToRender = contentsAtPath;
+             const allVideosRes = await fetch('/api/videos', {
+                 headers: {
+                     'Authorization': `Bearer ${token}`
+                 }
+             });
              const allVideosData = await allVideosRes.json();
-
-             // Фильтруем те, которые находятся в нужной папке
              const videosInFolder = allVideosData.filter(videoObj => {
-                 // videoObj.name содержит имя файла, например `subfolder/video.mp4`.
-                 // Нам нужно проверить, начинается ли путь с `currentPlayerPath`
-                 // и что уровень вложенности на 1 больше.
-                 const videoPath = videoObj.name; // Этот путь относительный от VIDEO_FOLDER
+                 const videoPath = videoObj.name;
                  if (path === '') {
-                     // Корневая папка: путь не должен содержать '/'
                      return !videoPath.includes('/');
                  } else {
-                     // Проверяем, что путь файла начинается с `path + '/'`
                      return videoPath.startsWith(path + '/');
                  }
              });
-
              console.log(`[PLAYER] Загружено ${videosInFolder.length} видео из папки: ${path || 'Root'}`);
-             // ✅ Передаём ВСЁ содержимое папки в renderVideoListItems
-             renderVideoListItems(itemsToRender, videosInFolder); // <-- ОБНОВЛЕНО: передаём и содержимое, и метаданные
-
+             renderVideoListItems(itemsToRender, videosInFolder);
         } catch (err) {
              console.error('[PLAYER] Ошибка загрузки списка видео из папки:', err);
              showNotification('Failed to load video list: ' + err.message, 'error');
              videoList.innerHTML = '<div class="video-item">Error loading videos</div>';
         }
     }
-
-    // === МГНОВЕННОЕ ВЫДЕЛЕНИЕ ВИДЕО ===
     function highlightSelectedVideo(videoPath) {
-        // Убираем выделение со всех элементов
         document.querySelectorAll('.video-item, .folder-item-grid').forEach(item => {
-            item.style.border = '1px solid var(--border)'; // Сброс стиля
+            item.style.border = '1px solid var(--border)';
         });
-
-        // Находим элемент с data-path, равным videoPath, и выделяем его
         const selectedItem = document.querySelector(`.video-item[data-path="${videoPath}"], .folder-item-grid[data-path="${videoPath}"]`);
         if (selectedItem) {
-            selectedItem.style.border = '2px solid var(--primary)'; // Пример выделения
+            selectedItem.style.border = '2px solid var(--primary)';
         }
     }
-
-    // === ОТРИСОВКА СПИСКА ВИДЕО И ПАПОК (обновлённая версия с поддержкой путей, папок и мгновенного выделения) ===
-    function renderVideoListItems(contents, videoMetadata = []) { // <-- Добавлен videoMetadata
-      videoList.innerHTML = ''; // Очищаем текущий список
-
-      // ✅ ВСЕГДА ДОБАВЛЯЕМ ССЫЛКУ НА ".." (HOME) В НАЧАЛО СПИСКА
+    function renderVideoListItems(contents, videoMetadata = []) {
+      videoList.innerHTML = '';
       const homeItem = document.createElement('div');
       homeItem.className = 'video-item';
       homeItem.innerHTML = `
         <i class="fas fa-home"></i>
         <div class="video-info">
-          <div class="video-title">..</div> <!-- Или 'Home' -->
+          <div class="video-title">..</div>
           <div class="video-meta">Go to parent/root folder</div>
         </div>
         <i class="fas fa-arrow-circle-up preview-icon"></i>
@@ -1225,48 +1198,34 @@
         }
       });
       videoList.appendChild(homeItem);
-
       if (contents.length === 0) {
         videoList.innerHTML += '<div class="video-item" style="justify-content: center; opacity: 0.7;"><i class="fas fa-info-circle"></i><span>Folder is empty</span></div>';
         return;
       }
-
       contents.forEach(item => {
         const div = document.createElement('div');
         if (item.type === 'folder') {
-          // ✅ ОТРИСОВКА ПАПКИ
           div.className = 'folder-item-grid';
-          div.dataset.path = item.path; // ✅ Сохраняем полный путь папки
+          div.dataset.path = item.path;
           div.innerHTML = `
             <i class="fas fa-folder"></i>
             <div class="folder-name">${item.name}</div>
           `;
           div.addEventListener('click', () => {
-            // ✅ Переходим внутрь папки
             navigatePlayerToFolder(item.path);
           });
         } else {
-          // ✅ ОТРИСОВКА ФАЙЛА
-          // `item.name` теперь может быть `subfolder/video.mp4`
-          // Извлекаем только имя файла для отображения
-          const fileName = item.name.split('/').pop(); // Получаем последнюю часть пути
-
-          // ✅ ОПРЕДЕЛЯЕМ, ПОДДЕРЖИВАЕТСЯ ЛИ ФОРМАТ (по расширению имени файла)
+          const fileName = item.name.split('/').pop();
           const ext = fileName.split('.').pop().toLowerCase();
           const supportedFormats = ['mp4', 'webm', 'ogg'];
           const isSupported = supportedFormats.includes(ext);
-
           div.className = 'video-item';
-          div.dataset.path = item.name; // ✅ Сохраняем ПОЛНЫЙ путь файла
-
-          // ✅ ФОРМИРУЕМ HTML С УЧЁТОМ ПОДДЕРЖКИ
+          div.dataset.path = item.name;
           let videoInfoHtml = `
             <div class="video-info">
-              <strong class="video-title">${fileName}</strong><br> <!-- Отображаем только имя файла -->
+              <strong class="video-title">${fileName}</strong><br>
               <small class="video-meta">${item.resolution || 'N/A'} | ${item.bitrate || 'N/A'}</small>
           `;
-
-          // ✅ ДОБАВЛЯЕМ ПРЕДУПРЕЖДЕНИЕ, ЕСЛИ ФОРМАТ НЕ ПОДДЕРЖИВАЕТСЯ
           if (!isSupported) {
             videoInfoHtml += `
               <div class="unsupported-warning">
@@ -1275,38 +1234,629 @@
               </div>
             `;
           }
-
           videoInfoHtml += `
             </div>
           `;
-
           div.innerHTML = videoInfoHtml + `
             <i class="fas fa-play-circle preview-icon"></i>
           `;
-          
           div.addEventListener('click', () => {
             if (!isSupported) {
               if (!confirm(`Формат видео "${fileName}" может не воспроизводиться в браузере. Продолжить?`)) {
                 return;
               }
             }
-            // ✅ МГНОВЕННОЕ ВЫДЕЛЕНИЕ: обновляем UI сразу
-            highlightSelectedVideo(item.name); // ✅ Выделяем кликнутый элемент
-            // ✅ Устанавливаем video.src сразу
+            highlightSelectedVideo(item.name);
             video.src = `/videos/${item.name}`;
-            statusEl.innerHTML = `Video loaded: ${fileName}`; // Отображаем только имя
-            currentVideoFile = item.name; // ✅ Обновляем локальную переменную
-            isVideoReady = false; // ✅ Сбрасываем флаг готовности
-
-            // ✅ Отправляем на сервер ПОЛНЫЙ путь
+            statusEl.innerHTML = `Video loaded: ${fileName}`;
+            currentVideoFile = item.name;
+            isVideoReady = false;
             socket.emit('select-video', item.name);
-            // currentVideoFile обновится через room-state
           });
         }
         videoList.appendChild(div);
       });
     }
+    // ===========================================================================
+    // === НОВОЕ: ЛОГИКА ПРОВОДНИКА ФАЙЛОВ (EXPLORER) ============================
+    // ===========================================================================
+    let currentExplorerPath = ''; // Текущий путь в проводнике
+    let selectedItems = new Set(); // Множество выбранных элементов (пути)
+    // === НАВИГАЦИЯ В ПРОВОДНИКЕ ===
+    async function navigateExplorerToFolder(folderPath) {
+        currentExplorerPath = folderPath;
+        updateExplorerBreadcrumb();
+        await loadAndRenderExplorerForPath(folderPath);
+    }
+    // === ОБНОВЛЕНИЕ ХЛЕБНЫХ КРОШЕК ПРОВОДНИКА ===
+    function updateExplorerBreadcrumb() {
+        // Обновляем хлебные крошки проводника
+        const explorerBreadcrumb = document.getElementById('explorerBreadcrumb');
+        if (!explorerBreadcrumb) {
+            console.error('[EXPLORER] Explorer breadcrumb element not found.');
+            return;
+        }
+        explorerBreadcrumb.innerHTML = '';
+        const homeSpan = document.createElement('span');
+        homeSpan.style.cursor = 'pointer';
+        homeSpan.style.color = 'var(--accent)';
+        homeSpan.textContent = 'Home';
+        homeSpan.addEventListener('click', () => navigateExplorerToFolder(''));
+        explorerBreadcrumb.appendChild(homeSpan);
+        if (currentExplorerPath === '') return;
+        const parts = currentExplorerPath.split('/');
+        let pathSoFar = '';
+        parts.forEach((part, index) => {
+            const separator = document.createElement('span');
+            separator.className = 'separator';
+            separator.textContent = ' / ';
+            separator.style.margin = '0 0.25rem';
+            explorerBreadcrumb.appendChild(separator);
+            pathSoFar = pathSoFar ? pathSoFar + '/' + part : part;
+            const partSpan = document.createElement('span');
+            partSpan.style.cursor = 'pointer';
+            partSpan.style.color = 'var(--accent)';
+            partSpan.textContent = part;
+            partSpan.addEventListener('click', () => navigateExplorerToFolder(pathSoFar));
+            explorerBreadcrumb.appendChild(partSpan);
+        });
+    }
+    // === ЗАГРУЗКА И ОТРИСОВКА СОДЕРЖИМОГО ПРОВОДНИКА ===
+    async function loadAndRenderExplorerForPath(path) {
+        console.log(`[EXPLORER] Запрашиваем содержимое папки: '${path}'`);
+        const explorerList = document.getElementById('explorerList');
+        explorerList.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 2rem; opacity: 0.7;">Loading...</div>'; // Индикатор загрузки
+        try {
+            const token = localStorage.getItem('authToken');
+            if (!token) {
+                throw new Error('Authentication token not found. Please log in again.');
+            }
+            const structRes = await fetch('/api/files/list', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            const structData = await structRes.json();
+            if (!structData.success) throw new Error(structData.error || 'Failed to load structure');
+            const findContents = (items, targetPath) => {
+                if (targetPath === '') return items;
+                for (const item of items) {
+                    if (item.type === 'folder' && item.path === targetPath) {
+                        return item.children || [];
+                    }
+                    if (item.type === 'folder' && item.children) {
+                        const found = findContents(item.children, targetPath);
+                        if (found) return found;
+                    }
+                }
+                return [];
+            };
+            const contentsAtPath = findContents(structData.structure, path);
+            // Сбрасываем выбор при смене папки
+            selectedItems.clear();
+            updateExplorerActions(); // Обновляем состояние кнопок действий
+            renderExplorerItems(contentsAtPath);
+        } catch (err) {
+            console.error('[EXPLORER] Ошибка загрузки содержимого папки:', err);
+            showNotification('Explorer failed to load: ' + err.message, 'error');
+            explorerList.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 2rem; opacity: 0.7;">Error loading folder contents</div>';
+        }
+    }
+    // === ОТРИСОВКА ЭЛЕМЕНТОВ ПРОВОДНИКА (ИСПРАВЛЕННАЯ) ===
+    function renderExplorerItems(contents) {
+        const explorerList = document.getElementById('explorerList');
+        explorerList.innerHTML = ''; // Очищаем
 
+        // Добавляем элемент ".." для возврата в родительскую папку, если не в корне
+        // ВАЖНО: Это должно быть ДО проверки contents.length
+        if (currentExplorerPath !== '') {
+            const parentItem = document.createElement('div');
+            parentItem.className = 'explorer-item';
+            parentItem.dataset.path = '..'; // Уникальный путь для элемента родителя
+            parentItem.dataset.type = 'folder';
+            parentItem.draggable = false; // ".." не перетаскиваем
+
+            parentItem.innerHTML = `
+                <i class="fas fa-level-up-alt folder-icon"></i> <!-- Альтернативная иконка -->
+                <div class="item-name">..</div>
+            `;
+
+            // Обработчик клика для перехода наверх
+            parentItem.addEventListener('click', (e) => {
+                 // Игнорируем клик по кнопкам действий (их тут нет, но на всякий случай)
+                 if (e.target.closest('.item-actions')) return;
+
+                 // Обычный клик: снять выделение со всех, выделить только этот (..)
+                 selectedItems.clear();
+                 selectedItems.add('..');
+                 updateExplorerSelection(); // Обновляем визуальное выделение
+                 updateExplorerActions(); // Обновляем состояние кнопок
+
+                 // Переходим в родительскую папку
+                 const parentPath = currentExplorerPath.split('/').slice(0, -1).join('/');
+                 navigateExplorerToFolder(parentPath);
+            });
+
+            // Обработчик двойного клика для перехода наверх
+            parentItem.addEventListener('dblclick', (e) => {
+                 // Игнорируем клик по кнопкам действий (их тут нет, но на всякий случай)
+                 if (e.target.closest('.item-actions')) return;
+
+                 // Переходим в родительскую папку
+                 const parentPath = currentExplorerPath.split('/').slice(0, -1).join('/');
+                 navigateExplorerToFolder(parentPath);
+            });
+
+            // --- НОВОЕ: Обработчик dragover для ".." (позволяем перетаскивать сюда) ---
+            parentItem.addEventListener('dragover', (e) => {
+                e.preventDefault(); // Обязательно для drop
+                e.dataTransfer.dropEffect = 'move';
+                // ".." всегда может быть целью, если не является источником
+                if (!selectedItems.has('..')) {
+                    parentItem.classList.add('drag-over');
+                }
+            });
+
+            // --- НОВОЕ: Обработчик dragleave для ".." ---
+            parentItem.addEventListener('dragleave', (e) => {
+                const rect = parentItem.getBoundingClientRect();
+                const x = e.clientX;
+                const y = e.clientY;
+                if (x <= rect.left || x >= rect.right || y <= rect.top || y >= rect.bottom) {
+                    parentItem.classList.remove('drag-over');
+                }
+            });
+
+            // --- НОВОЕ: Обработчик drop для ".." (перемещение в родительскую папку) ---
+            parentItem.addEventListener('drop', (e) => {
+                e.preventDefault();
+                parentItem.classList.remove('drag-over');
+
+                const draggedPath = e.dataTransfer.getData('text/plain');
+                if (!draggedPath) return; // Был drag, а не drop из списка
+
+                console.log(`[EXPLORER] Dropped ${draggedPath} onto .. (parent folder)`);
+
+                // Определяем родительскую папку
+                const parentPath = currentExplorerPath.split('/').slice(0, -1).join('/') || ''; // Если уже в корне, то ''
+
+                // Проверяем, не пытаемся ли перетащить саму папку ".."
+                if (draggedPath === '..') {
+                    console.log('[EXPLORER] Cannot drop ".." onto itself.');
+                    return;
+                }
+
+                // Проверяем, не пытаемся ли перетащить в ту же папку (в корне это невозможно, но на всякий случай)
+                if (draggedPath.split('/').slice(0, -1).join('/') === parentPath) {
+                    console.log('[EXPLORER] Item is already in the target parent folder.');
+                    return;
+                }
+
+                // Вызываем функцию перемещения
+                moveItemsViaDragDrop([draggedPath], parentPath);
+            });
+            // --- /НОВОЕ ---
+
+            explorerList.appendChild(parentItem);
+        }
+
+
+        if (contents.length === 0) {
+            // ВАЖНО: Создаем элемент, а не используем innerHTML +=, чтобы не затереть ..
+            const emptyMessage = document.createElement('div');
+            emptyMessage.style.gridColumn = '1 / -1';
+            emptyMessage.style.textAlign = 'center';
+            emptyMessage.style.padding = '2rem';
+            emptyMessage.style.opacity = '0.7';
+            emptyMessage.innerHTML = '<i class="fas fa-info-circle"></i> Folder is empty';
+            explorerList.appendChild(emptyMessage); // Добавляем сообщение ОБ ИСТОЧНИКЕ
+            return;
+        }
+
+        contents.forEach(item => {
+            const div = document.createElement('div');
+            div.className = 'explorer-item';
+            div.dataset.path = item.path; // Полный путь
+            div.dataset.type = item.type; // 'folder' или 'file'
+            div.draggable = true; // Делаем элемент перетаскиваемым
+
+            if (item.type === 'folder') {
+                div.innerHTML = `
+                    <i class="fas fa-folder folder-icon"></i>
+                    <div class="item-name">${item.name}</div>
+                    <!-- УБРАЛИ КНОПКУ УДАЛЕНИЯ -->
+                `;
+            } else {
+                // Определяем иконку по расширению
+                const ext = item.name.split('.').pop().toLowerCase();
+                let iconClass = 'fas fa-file'; // По умолчанию
+                if (['mp4', 'avi', 'mov', 'wmv', 'flv', 'webm', 'mkv'].includes(ext)) {
+                    iconClass = 'fas fa-file-video';
+                } else if (['mp3', 'wav', 'ogg', 'flac'].includes(ext)) {
+                    iconClass = 'fas fa-file-audio';
+                } else if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg'].includes(ext)) {
+                    iconClass = 'fas fa-file-image';
+                } else if (['txt', 'doc', 'docx', 'pdf', 'md'].includes(ext)) {
+                    iconClass = 'fas fa-file-alt';
+                }
+                div.innerHTML = `
+                    <i class="${iconClass} file-icon"></i>
+                    <div class="item-name">${item.name.split('/').pop()}</div>
+                    <!-- УБРАЛИ КНОПКУ УДАЛЕНИЯ -->
+                `;
+            }
+
+            // === DRAG START ===
+            div.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/plain', item.path); // Передаем путь
+                e.dataTransfer.effectAllowed = 'move';
+                console.log(`[EXPLORER] Drag started for: ${item.path}`);
+            });
+
+            // === DRAG OVER (для drop targets) ===
+            div.addEventListener('dragover', (e) => {
+                e.preventDefault(); // Обязательно для drop
+                e.dataTransfer.dropEffect = 'move';
+                if (item.type === 'folder' && !selectedItems.has(item.path)) {
+                    div.classList.add('drag-over');
+                }
+            });
+
+            // === DRAG LEAVE (для drop targets) ===
+            div.addEventListener('dragleave', (e) => {
+                // Проверяем, действительно ли курсор покинул элемент
+                // Это необходимо, чтобы избежать мерцания
+                const rect = div.getBoundingClientRect();
+                const x = e.clientX;
+                const y = e.clientY;
+                if (x <= rect.left || x >= rect.right || y <= rect.top || y >= rect.bottom) {
+                    div.classList.remove('drag-over');
+                }
+            });
+
+            // === DROP (на папки) ===
+            div.addEventListener('drop', (e) => {
+                e.preventDefault();
+                div.classList.remove('drag-over');
+                if (item.type !== 'folder') return; // Только на папки
+                const draggedPath = e.dataTransfer.getData('text/plain');
+                if (!draggedPath || draggedPath === item.path) return; // Не перетаскиваем в себя
+
+                console.log(`[EXPLORER] Dropped ${draggedPath} onto folder ${item.path}`);
+
+                // --- Вызов функции перемещения ---
+                moveItemsViaDragDrop([draggedPath], item.path);
+                // --- /Вызов функции перемещения ---
+            });
+
+            // === CLICK для выбора/отмены выбора ===
+            div.addEventListener('click', (e) => {
+                // Игнорируем клик по кнопкам действий
+                if (e.target.closest('.item-actions')) return;
+                if (e.ctrlKey || e.metaKey) {
+                    // Ctrl/Cmd+Click для множественного выбора
+                    if (selectedItems.has(item.path)) {
+                        selectedItems.delete(item.path);
+                    } else {
+                        selectedItems.add(item.path);
+                    }
+                } else if (e.shiftKey) {
+                    // Shift+Click для выбора диапазона (упрощенная реализация)
+                    // Для простоты, будем выбирать всё между первым выбранным и текущим
+                    // Более сложная логика требует отслеживания последнего кликнутого элемента
+                    // Пока просто добавим/удалим
+                    if (selectedItems.has(item.path)) {
+                        selectedItems.delete(item.path);
+                    } else {
+                        selectedItems.add(item.path);
+                    }
+                } else {
+                    // Обычный клик: снять выделение со всех, выделить только этот
+                    selectedItems.clear();
+                    selectedItems.add(item.path);
+                }
+                updateExplorerSelection(); // Обновляем визуальное выделение
+                updateExplorerActions(); // Обновляем состояние кнопок
+            });
+
+            // === DOUBLE CLICK для открытия/воспроизведения ===
+            div.addEventListener('dblclick', (e) => {
+                 // Игнорируем клик по кнопкам действий
+                 if (e.target.closest('.item-actions')) return;
+                 if (item.type === 'folder') {
+                     // Открываем папку
+                     navigateExplorerToFolder(item.path);
+                 } else {
+                     // Воспроизводим видео
+                     const fileName = item.name.split('/').pop();
+                     const ext = fileName.split('.').pop().toLowerCase();
+                     const supportedFormats = ['mp4', 'webm', 'ogg'];
+                     const isSupported = supportedFormats.includes(ext);
+                     if (!isSupported) {
+                       if (!confirm(`Формат видео "${fileName}" может не воспроизводиться в браузере. Продолжить?`)) {
+                         return;
+                       }
+                     }
+                     // Устанавливаем видео в основном плеере
+                     video.src = `/videos/${item.name}`;
+                     statusEl.innerHTML = `Video loaded: ${fileName}`;
+                     currentVideoFile = item.name;
+                     isVideoReady = false;
+                     socket.emit('select-video', item.name);
+                     // Выделяем в списке плеера
+                     highlightSelectedVideo(item.name);
+                 }
+            });
+
+            // === CONTEXT MENU (ПКМ) - Упрощённый вариант через кнопки действий ===
+            // Кнопка удаления УБРАНА
+
+            explorerList.appendChild(div);
+        });
+        updateExplorerSelection(); // Обновляем визуальное выделение после рендеринга
+    }
+    // === ОБНОВЛЕНИЕ ВИЗУАЛЬНОГО ВЫДЕЛЕНИЯ В ПРОВОДНИКЕ ===
+    function updateExplorerSelection() {
+        document.querySelectorAll('.explorer-item').forEach(el => {
+            const itemPath = el.dataset.path;
+            if (selectedItems.has(itemPath)) {
+                el.classList.add('selected');
+            } else {
+                el.classList.remove('selected');
+            }
+        });
+    }
+    // === ОБНОВЛЕНИЕ СОСТОЯНИЯ КНОПОК ДЕЙСТВИЙ В ПРОВОДНИКЕ ===
+    function updateExplorerActions() {
+        const moveBtn = document.getElementById('moveItemsBtn');
+        const deleteBtn = document.getElementById('deleteItemsBtn');
+        const hasSelection = selectedItems.size > 0;
+        moveBtn.disabled = !hasSelection;
+        deleteBtn.disabled = !hasSelection;
+    }
+    // --- НОВАЯ ФУНКЦИЯ: Перемещение элементов ---
+    async function moveItems(itemsToMove, targetPath) {
+        if (!itemsToMove || itemsToMove.length === 0) {
+            console.warn('[EXPLORER] No items selected to move.');
+            return false;
+        }
+        // ИСПРАВЛЕНО: проверяем на undefined, null, или пустую строку
+        if (targetPath === undefined || targetPath === null || typeof targetPath !== 'string') {
+            console.warn('[EXPLORER] Invalid or no target path specified for move operation:', targetPath);
+            showNotification('Invalid target path for move operation.', 'error');
+            return false;
+        }
+
+        console.log(`[EXPLORER] Attempting to move items to: "${targetPath}"`); // Отладка
+        console.log(`[EXPLORER] Items to move:`, itemsToMove); // Отладка
+
+        try {
+            const token = localStorage.getItem('authToken');
+            if (!token) {
+                throw new Error('Authentication token not found. Please log in again.');
+            }
+
+            // Отладка перед fetch
+            console.log(`[EXPLORER] Sending request to /api/files/move with body:`, {
+                items: itemsToMove,
+                destination: targetPath
+            });
+
+            const response = await fetch('/api/files/move', {
+                method: 'PUT', // Используем PUT для обновления/перемещения
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    items: itemsToMove, // Массив путей к файлам/папкам
+                    destination: targetPath // Путь к целевой папке
+                })
+            });
+
+            // Отладка после fetch
+            console.log(`[EXPLORER] Server response status:`, response.status);
+            const data = await response.json();
+            console.log(`[EXPLORER] Server response body:`, data);
+
+            if (response.ok && data.success) {
+                showNotification(`Successfully moved ${itemsToMove.length} item(s).`, 'success');
+                // Обновляем оба списка после успешного перемещения
+                loadAndRenderExplorerForPath(currentExplorerPath);
+                loadAndRenderVideoListForPath(currentPlayerPath);
+                // Очищаем выбор после перемещения
+                selectedItems.clear();
+                updateExplorerSelection();
+                updateExplorerActions();
+                return true;
+            } else {
+                const errorMessage = data.error || data.message || 'Failed to move items';
+                console.error('[EXPLORER] Move operation failed:', errorMessage);
+                showNotification(`Error moving items: ${errorMessage}`, 'error');
+                return false;
+            }
+        } catch (error) {
+            console.error('[EXPLORER] Network error during move:', error);
+            showNotification(`Error moving items: ${error.message}`, 'error');
+            return false;
+        }
+    }
+
+    // --- ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ: Перемещение через drag-and-drop ---
+    async function moveItemsViaDragDrop(draggedPaths, targetPath) {
+        // Проверяем, что целевая папка не находится внутри перемещаемого элемента (цикл)
+        // Это сложнее проверить на клиенте, обычно делается на сервере.
+        // Для простоты, доверим проверку серверу.
+        return await moveItems(draggedPaths, targetPath);
+    }
+    // --- /НОВАЯ ФУНКЦИЯ ---
+    // === ИНИЦИАЛИЗАЦИЯ ПРОВОДНИКА ПОСЛЕ ЗАГРУЗКИ DOM ===
+    window.addEventListener('DOMContentLoaded', () => {
+        // Элементы модального окна создания папки
+        const createFolderModal = document.getElementById('createFolderModal');
+        const createFolderBtnExplorer = document.getElementById('createFolderBtnExplorer'); // Кнопка в проводнике
+        const closeModalBtn = document.querySelector('.close-modal');
+        const cancelCreateFolderBtn = document.getElementById('cancelCreateFolder');
+        const confirmCreateFolderBtn = document.getElementById('confirmCreateFolder');
+        const newFolderNameInput = document.getElementById('newFolderName');
+        const currentModalPathInput = document.getElementById('currentModalPath');
+        // Открытие модального окна создания папки
+        createFolderBtnExplorer.addEventListener('click', () => {
+            currentModalPathInput.value = currentExplorerPath; // Передаем текущий путь
+            newFolderNameInput.value = '';
+            createFolderModal.style.display = 'flex';
+            newFolderNameInput.focus();
+        });
+        // Закрытие модального окна (кнопка X)
+        closeModalBtn.addEventListener('click', () => {
+            createFolderModal.style.display = 'none';
+        });
+        // Закрытие модального окна (кнопка Cancel)
+        cancelCreateFolderBtn.addEventListener('click', () => {
+            createFolderModal.style.display = 'none';
+        });
+        // Закрытие модального окна при клике вне его содержимого
+        window.addEventListener('click', (event) => {
+            if (event.target === createFolderModal) {
+                createFolderModal.style.display = 'none';
+            }
+        });
+        // Создание папки (кнопка Create в модальном окне)
+        confirmCreateFolderBtn.addEventListener('click', async () => {
+            const folderName = newFolderNameInput.value.trim();
+            const basePath = currentModalPathInput.value;
+            if (!folderName) {
+                showNotification('Please enter a folder name', 'error');
+                return;
+            }
+            if (/[<>:"/\\|?*\x00-\x1F]/.test(folderName)) {
+                showNotification('Folder name contains invalid characters', 'error');
+                return;
+            }
+            confirmCreateFolderBtn.disabled = true;
+            confirmCreateFolderBtn.textContent = 'Creating...';
+            try {
+                const fullFolderPath = basePath ? `${basePath}/${folderName}` : folderName;
+                const token = localStorage.getItem('authToken');
+                if (!token) {
+                    throw new Error('Authentication required. Please log in.');
+                }
+                const response = await fetch('/api/files/create-folder', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ path: fullFolderPath })
+                });
+                const data = await response.json();
+                if (response.ok && data.success) {
+                    showNotification(`Folder '${folderName}' created successfully`, 'success');
+                    createFolderModal.style.display = 'none';
+                    loadAndRenderExplorerForPath(currentExplorerPath); // Обновляем текущую папку в проводнике
+                    loadAndRenderVideoListForPath(currentPlayerPath); // Обновляем плеер
+                } else {
+                    const errorMessage = data.error || data.message || 'Failed to create folder';
+                    console.error('[CREATE FOLDER] Server error:', errorMessage);
+                    showNotification(`Error: ${errorMessage}`, 'error');
+                }
+            } catch (error) {
+                console.error('[CREATE FOLDER] Network or other error:', error);
+                showNotification(`Error creating folder: ${error.message}`, 'error');
+            } finally {
+                confirmCreateFolderBtn.disabled = false;
+                confirmCreateFolderBtn.textContent = 'Create';
+            }
+        });
+        // Обработчики для других кнопок проводника
+        document.getElementById('refreshExplorerBtn').addEventListener('click', () => {
+            loadAndRenderExplorerForPath(currentExplorerPath);
+        });
+        // Обработчик кнопки "Move Selected"
+        document.getElementById('moveItemsBtn').addEventListener('click', async () => {
+            if (selectedItems.size === 0) {
+                console.warn('[EXPLORER] No items selected to move via button.');
+                return;
+            }
+            const itemsToMove = Array.from(selectedItems);
+            const targetPath = currentExplorerPath; // Перемещаем в текущую папку (папку, откуда идет перемещение)
+
+            console.log(`[EXPLORER] Button move clicked. Items:`, itemsToMove, "Target:", targetPath);
+
+            // Проверяем, не пытаемся ли переместить в текущую папку, где они уже находятся
+            // (Это не ошибка, но можно просто сбросить выбор)
+            let allInSameFolder = true;
+            for (const itemPath of itemsToMove) {
+                const parentPath = itemPath.split('/').slice(0, -1).join('/');
+                if (parentPath !== targetPath) {
+                    allInSameFolder = false;
+                    break;
+                }
+            }
+            if (allInSameFolder) {
+                console.log('[EXPLORER] Items are already in the target folder.');
+                showNotification('Items are already in this folder.', 'info');
+                selectedItems.clear();
+                updateExplorerSelection();
+                updateExplorerActions();
+                return;
+            }
+
+            // --- Вызов функции перемещения ---
+            await moveItems(itemsToMove, targetPath);
+            // --- /Вызов функции перемещения ---
+        });
+        document.getElementById('deleteItemsBtn').addEventListener('click', async () => {
+            if (selectedItems.size === 0) return;
+            const itemsToDelete = Array.from(selectedItems);
+            const itemCount = itemsToDelete.length;
+            const itemNames = itemsToDelete.map(p => p.split('/').pop()).join(', ');
+            if (!confirm(`Are you sure you want to delete ${itemCount} item(s)?
+${itemNames}`)) {
+                return;
+            }
+            let successCount = 0;
+            let failCount = 0;
+            for (const itemPath of itemsToDelete) {
+                try {
+                    const token = localStorage.getItem('authToken');
+                    if (!token) throw new Error('Not authenticated');
+                    const response = await fetch('/api/files/delete', {
+                        method: 'DELETE',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({ path: itemPath })
+                    });
+                    const data = await response.json();
+                    if (response.ok && data.success) {
+                        successCount++;
+                    } else {
+                        failCount++;
+                        console.error(`[DELETE] Failed to delete ${itemPath}:`, data.error || data.message);
+                    }
+                } catch (err) {
+                    failCount++;
+                    console.error(`[DELETE] Network error deleting ${itemPath}:`, err);
+                }
+            }
+            if (failCount === 0) {
+                showNotification(`Successfully deleted ${successCount} item(s)`, 'success');
+            } else {
+                showNotification(`Deleted ${successCount} item(s). Failed to delete ${failCount} item(s).`, 'warning');
+            }
+            // Сбрасываем выбор и обновляем
+            selectedItems.clear();
+            updateExplorerSelection();
+            updateExplorerActions();
+            loadAndRenderExplorerForPath(currentExplorerPath);
+            loadAndRenderVideoListForPath(currentPlayerPath);
+        });
+    });
+    // ===========================================================================
+    // === КОНЕЦ ЛОГИКИ ПРОВОДНИКА ===============================================
+    // ===========================================================================
   </script>
 </body>
 </html>

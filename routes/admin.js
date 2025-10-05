@@ -1,78 +1,234 @@
 // routes/admin.js
 const express = require('express');
 const router = express.Router();
-const { authenticateToken, isLocalhostOnly } = require('../middleware/auth');
-const AdminService = require('../services/adminService'); // Предполагаем, что сервис будет создан
+const jwt = require('jsonwebtoken');
+const config = require('../config');
 
-const adminService = new AdminService(); // Создаём экземпляр сервиса
+// Middleware для проверки админских прав
+const authenticateAdmin = (req, res, next) => {
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    
+    if (!token) {
+        return res.status(401).json({ success: false, error: 'Токен отсутствует' });
+    }
 
-// --- ЗАЩИЩЁННЫЕ МАРШРУТЫ ---
-// Все маршруты ниже требуют JWT токен в заголовке Authorization
+    try {
+        const decoded = jwt.verify(token, config.jwtSecret);
+        
+        // Проверяем, что пользователь администратор
+        if (decoded.role !== 'admin') {
+            return res.status(403).json({ success: false, error: 'Недостаточно прав' });
+        }
+        
+        req.user = decoded;
+        next();
+    } catch (error) {
+        return res.status(401).json({ success: false, error: 'Неверный токен' });
+    }
+};
 
-// Маршрут для получения общей информации/статистики для администратора
-router.get('/stats', authenticateToken, (req, res) => {
-  console.log(`[ADMIN API] Запрос статистики от пользователя: ${req.user.username}`);
-  try {
-    // Пример: получить статистику из AdminService
-    const stats = adminService.getStats();
-    res.json({ success: true, stats });
-  } catch (error) {
-    console.error('[ADMIN API] Ошибка получения статистики:', error);
-    res.status(500).json({ success: false, error: 'Ошибка сервера при получении статистики' });
-  }
+// Аутентификация администратора
+router.post('/auth/login', (req, res) => {
+    const { username, password } = req.body;
+    
+    // Простая проверка - в реальном приложении используйте базу данных
+    if (username === 'admin' && password === 'admin') {
+        const token = jwt.sign(
+            { 
+                id: 1, 
+                username: 'admin', 
+                role: 'admin' 
+            }, 
+            config.jwtSecret, 
+            { expiresIn: '24h' }
+        );
+        
+        res.json({
+            success: true,
+            token,
+            user: {
+                id: 1,
+                username: 'admin',
+                role: 'admin'
+            }
+        });
+    } else {
+        res.status(401).json({
+            success: false,
+            error: 'Неверные учетные данные'
+        });
+    }
 });
 
-// Маршрут для получения списка пользователей (требует аутентификации)
-router.get('/users', authenticateToken, (req, res) => {
-  console.log(`[ADMIN API] Запрос списка пользователей от пользователя: ${req.user.username}`);
-  try {
-    // Пример: получить список пользователей из AdminService (или AuthService)
-    // const users = adminService.getUsers(); // или authService.getUsersList();
-    // res.json({ success: true, users });
-    res.json({ success: true, users: [], message: 'Получение списка пользователей не реализовано в этом примере.' });
-  } catch (error) {
-    console.error('[ADMIN API] Ошибка получения списка пользователей:', error);
-    res.status(500).json({ success: false, error: 'Ошибка сервера при получении списка пользователей' });
-  }
+// Получение профиля
+router.get('/auth/profile', authenticateAdmin, (req, res) => {
+    res.json({
+        success: true,
+        user: req.user
+    });
 });
 
-// --- МАРШРУТЫ, ОГРАНИЧЕННЫЕ ТОЛЬКО ДЛЯ LOCALHOST ---
-// Эти маршруты требуют, чтобы запрос пришёл с localhost (127.0.0.1 или ::1)
-// Они могут НЕ требовать JWT токена, если доступны только с localhost, но часто требуют оба.
-
-// Маршрут для получения чувствительной информации (например, активных сессий, подробной статистики)
-// Обычно требует оба: аутентификации и localhost
-router.get('/sensitive-info', authenticateToken, isLocalhostOnly, (req, res) => {
-  console.log(`[ADMIN API] Запрос чувствительной информации от пользователя ${req.user.username} с localhost`);
-  try {
-    // Пример: получить чувствительную информацию
-    const sensitiveInfo = adminService.getSensitiveInfo();
-    res.json({ success: true, sensitiveInfo });
-  } catch (error) {
-    console.error('[ADMIN API] Ошибка получения чувствительной информации:', error);
-    res.status(500).json({ success: false, error: 'Ошибка сервера при получении чувствительной информации' });
-  }
+// Статистика системы
+router.get('/admin/stats', authenticateAdmin, (req, res) => {
+    // Здесь должна быть реальная статистика из вашей системы
+    res.json({
+        success: true,
+        stats: {
+            rooms: {
+                active: 5,
+                total: 12
+            },
+            users: {
+                active: 42,
+                registered: 150
+            },
+            transcode: {
+                activeJobs: 2,
+                totalJobs: 45,
+                templates: 3
+            },
+            system: {
+                uptime: process.uptime(),
+                memory: {
+                    heapUsed: process.memoryUsage().heapUsed,
+                    heapTotal: process.memoryUsage().heapTotal
+                }
+            }
+        }
+    });
 });
 
-// Маршрут для выполнения чувствительной операции (например, перезапуск части сервиса, очистка кэша)
-// Обычно требует оба: аутентификации и localhost
-router.post('/perform-sensitive-action', authenticateToken, isLocalhostOnly, (req, res) => {
-  const { action } = req.body;
-  console.log(`[ADMIN API] Запрос выполнения чувствительного действия "${action}" от пользователя ${req.user.username} с localhost`);
-  try {
-    // Пример: выполнить действие через AdminService
-    const result = adminService.performAction(action);
-    res.json({ success: true, result });
-  } catch (error) {
-    console.error(`[ADMIN API] Ошибка выполнения действия "${action}":`, error);
-    res.status(500).json({ success: false, error: `Ошибка сервера при выполнении действия "${action}": ${error.message}` });
-  }
+// Список комнат
+router.get('/admin/rooms', authenticateAdmin, (req, res) => {
+    // Заглушка - замените на реальные данные
+    res.json({
+        success: true,
+        rooms: [
+            {
+                id: 'room-1',
+                name: 'Тестовая комната',
+                users: 3,
+                currentVideo: 'video1.mp4',
+                createdAt: new Date().toISOString()
+            },
+            {
+                id: 'room-2', 
+                name: 'Кино вечер',
+                users: 0,
+                currentVideo: null,
+                createdAt: new Date(Date.now() - 86400000).toISOString()
+            }
+        ]
+    });
 });
 
-// --- ОБЫЧНЫЙ МАРШРУТ (НЕ ЗАЩИЩЁННЫЙ) ---
-// Пример маршрута, который не требует аутентификации (например, проверка состояния)
-// router.get('/health', (req, res) => {
-//   res.json({ status: 'OK' });
-// });
+// Удаление комнаты
+router.delete('/admin/rooms/:id', authenticateAdmin, (req, res) => {
+    const roomId = req.params.id;
+    // Реализуйте удаление комнаты
+    res.json({
+        success: true,
+        message: `Комната ${roomId} удалена`
+    });
+});
+
+// Список пользователей
+router.get('/admin/users', authenticateAdmin, (req, res) => {
+    // Заглушка - замените на реальные данные
+    res.json({
+        success: true,
+        users: [
+            {
+                id: 'user-1',
+                username: 'testuser',
+                email: 'test@example.com',
+                role: 'user',
+                createdAt: new Date().toISOString()
+            },
+            {
+                id: 'user-2',
+                username: 'admin',
+                email: 'admin@example.com', 
+                role: 'admin',
+                createdAt: new Date().toISOString()
+            }
+        ]
+    });
+});
+
+// Очередь транскодирования
+router.get('/admin/transcode/queue', authenticateAdmin, (req, res) => {
+    res.json({
+        success: true,
+        queue: [
+            {
+                id: 'job-1',
+                fileId: 'video123.mp4',
+                templateId: '720p',
+                status: 'processing',
+                progress: 65,
+                createdAt: new Date().toISOString()
+            },
+            {
+                id: 'job-2',
+                fileId: 'movie456.mkv', 
+                templateId: '1080p',
+                status: 'pending',
+                progress: 0,
+                createdAt: new Date().toISOString()
+            }
+        ]
+    });
+});
+
+// Шаблоны транскодирования
+router.get('/admin/transcode/templates', authenticateAdmin, (req, res) => {
+    res.json({
+        success: true,
+        templates: [
+            {
+                id: '720p',
+                name: 'HD 720p',
+                description: 'Высокое качество 720p',
+                command: 'ffmpeg -i input.mp4 -c:v libx264 -preset medium -crf 23 -c:a aac -b:a 128k output.mp4',
+                createdAt: new Date().toISOString()
+            },
+            {
+                id: '1080p',
+                name: 'Full HD 1080p',
+                description: 'Полное HD 1080p',
+                command: 'ffmpeg -i input.mp4 -c:v libx264 -preset slow -crf 20 -c:a aac -b:a 192k output.mp4',
+                createdAt: new Date().toISOString()
+            }
+        ]
+    });
+});
+
+// Системные метрики
+router.get('/metrics/performance', authenticateAdmin, (req, res) => {
+    const memUsage = process.memoryUsage();
+    
+    res.json({
+        success: true,
+        metrics: {
+            responseTime: {
+                average: 45,
+                min: 12,
+                max: 230
+            },
+            memory: {
+                heapUsed: Math.round(memUsage.heapUsed / 1024 / 1024),
+                heapTotal: Math.round(memUsage.heapTotal / 1024 / 1024),
+                rss: Math.round(memUsage.rss / 1024 / 1024)
+            },
+            system: {
+                uptime: process.uptime(),
+                nodeVersion: process.version,
+                platform: process.platform,
+                activeConnections: 15
+            }
+        }
+    });
+});
 
 module.exports = router;
