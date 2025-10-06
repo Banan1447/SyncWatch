@@ -976,19 +976,34 @@
     });
     video.addEventListener('play', () => {
       if (isVideoReady) {
+        // --- ИЗМЕНЕНО: Отправляем play-video на сервер ---
+        socket.emit('play-video', { roomId: joinedRoom, time: video.currentTime });
+        // --- /ИЗМЕНЕНО ---
+        // --- ИЗМЕНЕНО: Отправляем video-command другим клиентам ---
         socket.emit('video-command', { type: 'play', roomId: joinedRoom });
+        // --- /ИЗМЕНЕНО ---
       }
     });
     video.addEventListener('pause', () => {
       if (isVideoReady) {
+        // --- ИЗМЕНЕНО: Отправляем pause-video на сервер ---
+        socket.emit('pause-video', { roomId: joinedRoom, time: video.currentTime });
+        // --- /ИЗМЕНЕНО ---
+        // --- ИЗМЕНЕНО: Отправляем video-command другим клиентам ---
         socket.emit('video-command', { type: 'pause', roomId: joinedRoom });
+        // --- /ИЗМЕНЕНО ---
       }
     });
     video.addEventListener('seeked', () => {
       if (isVideoReady) {
         const now = Date.now();
         if (now - lastSeekSent > 500) {
+          // --- ИЗМЕНЕНО: Отправляем seek-video на сервер ---
+          socket.emit('seek-video', { roomId: joinedRoom, time: video.currentTime });
+          // --- /ИЗМЕНЕНО ---
+          // --- ИЗМЕНЕНО: Отправляем video-command другим клиентам ---
           socket.emit('video-command', { type: 'seek', time: video.currentTime, roomId: joinedRoom });
+          // --- /ИЗМЕНЕНО ---
           lastSeekSent = now;
         }
       }
@@ -1116,7 +1131,8 @@
         usersList.appendChild(div);
         div.querySelector('.kick-btn').addEventListener('click', () => {
           if (confirm(`Kick user "${displayName}" from room?`)) {
-            socket.emit('kick-user', { userId, roomId: joinedRoom }, res => {
+            // --- ИСПРАВЛЕНО: Правильная структура данных для kick-user ---
+            socket.emit('kick-user', { userId: userId, roomId: joinedRoom }, res => {
               if (res && res.success) {
                 showNotification(`User kicked: ${displayName}`, 'success');
               } else {
