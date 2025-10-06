@@ -193,50 +193,6 @@
       filter: none;
       color: white;
     }
-    .quality-menu {
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      z-index: 10;
-    }
-    .quality-btn-player {
-      background: rgba(0, 0, 0, 0.6);
-      color: white;
-      border: none;
-      padding: 0.5rem 1rem;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 0.9rem;
-      transition: background 0.2s ease;
-    }
-    .quality-btn-player:hover {
-      background: rgba(0, 0, 0, 0.8);
-    }
-    .dropdown-content {
-      display: none;
-      position: absolute;
-      top: 100%;
-      right: 0;
-      background: var(--bg-darker);
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      box-shadow: 0 4px 12px var(--shadow);
-      min-width: 120px;
-      z-index: 100;
-    }
-    .dropdown-content.show {
-      display: block;
-    }
-    .dropdown-content a {
-      display: block;
-      padding: 0.75rem 1rem;
-      color: var(--text);
-      text-decoration: none;
-      transition: background 0.2s ease;
-    }
-    .dropdown-content a:hover {
-      background: var(--hover-bg);
-    }
     .upload-section {
       display: flex;
       flex-direction: column;
@@ -298,28 +254,6 @@
     }
     #leaveRoomBtn:hover {
       background: #c82333;
-    }
-    .right-panel h3 {
-      margin-bottom: 1rem;
-      font-size: 1.2rem;
-      color: var(--primary);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .manage-videos-link {
-      color: var(--accent);
-      text-decoration: none;
-      font-size: 0.9rem;
-      font-weight: normal;
-      padding: 0.25rem 0.5rem;
-      border-radius: 4px;
-      transition: all 0.2s ease;
-    }
-    .manage-videos-link:hover {
-      background: rgba(0, 123, 255, 0.1);
-      color: #fff;
-      text-decoration: none;
     }
     /* Стиль для хлебных крошек */
     .breadcrumb {
@@ -638,14 +572,7 @@
       .video-container {
         aspect-ratio: 16 / 9;
       }
-      .quality-menu {
-        top: 5px;
-        right: 5px;
-      }
       .upload-section {
-        padding: 0.75rem;
-      }
-      .comments-section {
         padding: 0.75rem;
       }
       .right-panel {
@@ -711,14 +638,6 @@
           <button id="leaveRoomBtn">Выйти из комнаты</button>
           <div class="video-container">
             <video id="videoPlayer" width="100%" controls></video>
-            <div class="quality-menu">
-              <button id="qualityBtn" class="quality-btn-player">Settings</button>
-              <div id="qualityDropdown" class="dropdown-content">
-                <a href="#" data-quality="original">Original</a>
-                <a href="#" data-quality="low">Low (240p)</a>
-                <a href="#" data-quality="medium">Medium (720p)</a>
-              </div>
-            </div>
           </div>
           <div class="upload-section">
             <button id="uploadBtn"><i class="fas fa-upload"></i> Upload Video</button>
@@ -730,15 +649,6 @@
           <div id="status">Status: Not connected</div>
         </div>
         <div class="right-panel">
-          <h3>
-            Videos
-            <a href="javascript:void(0)" class="manage-videos-link" id="manageVideosLink">Manage Videos</a>
-          </h3>
-          <!-- Хлебные крошки для навигации по папкам -->
-          <div class="breadcrumb" id="videoBreadcrumb">
-            <!-- Хлебные крошки будут здесь -->
-          </div>
-          <div id="videoList"></div>
           <!-- Список пользователей -->
           <div class="users-section">
             <h3>Users Online</h3>
@@ -759,9 +669,9 @@
             </div>
         </div>
          <!-- Хлебные крошки для навигации по папкам в проводнике -->
-        <div class="breadcrumb" id="explorerBreadcrumb">
+         <div class="breadcrumb" id="explorerBreadcrumb">
             <!-- Хлебные крошки будут здесь -->
-        </div>
+         </div>
         <div id="explorerList"></div>
     </div>
   </div>
@@ -808,8 +718,7 @@
         } else {
           joinedRoom = roomId;
           userName = res.room.name;
-          updateVideoBreadcrumb();
-          loadAndRenderVideoListForPath('');
+          updateExplorerBreadcrumb(); // Обновляем хлебные крошки для проводника
           loadAndRenderExplorerForPath(''); // Загружаем проводник
         }
       });
@@ -824,26 +733,13 @@
     // === ELEMENTS ===
     const video = document.getElementById('videoPlayer');
     const statusEl = document.getElementById('status');
-    const videoList = document.getElementById('videoList');
     const userNameInput = document.getElementById('userName');
     const saveNameBtn = document.getElementById('saveNameBtn');
     const uploadBtn = document.getElementById('uploadBtn');
     const uploadInput = document.getElementById('uploadInput');
-    const qualityBtn = document.getElementById('qualityBtn');
-    const qualityDropdown = document.getElementById('qualityDropdown');
     const leaveRoomBtn = document.getElementById('leaveRoomBtn');
     const usersList = document.getElementById('usersList');
-    const videoBreadcrumb = document.getElementById('videoBreadcrumb');
-    const manageVideosLink = document.getElementById('manageVideosLink');
-    // === MANAGE VIDEOS LINK WITH ROOM REMEMBER ===
-    manageVideosLink.addEventListener('click', () => {
-      if (roomId) {
-        localStorage.setItem('lastRoomId', roomId);
-        window.location.href = `/files?room=${roomId}`;
-      } else {
-        window.location.href = '/files';
-      }
-    });
+    const explorerBreadcrumb = document.getElementById('explorerBreadcrumb');
     // === NAME INPUT ===
     if (localStorage.getItem('userName')) {
       userNameInput.value = localStorage.getItem('userName');
@@ -854,40 +750,6 @@
         localStorage.setItem('userName', name);
         socket.emit('set-name', name);
       }
-    });
-    // === QUALITY MENU ===
-    qualityBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      qualityDropdown.classList.toggle('show');
-    });
-    document.addEventListener('click', (e) => {
-      if (!qualityBtn.contains(e.target) && !qualityDropdown.contains(e.target)) {
-        qualityDropdown.classList.remove('show');
-      }
-    });
-    qualityDropdown.querySelectorAll('a').forEach(item => {
-      item.addEventListener('click', (e) => {
-        e.preventDefault();
-        const quality = item.dataset.quality;
-        if (!currentVideoFile) return;
-        if (quality === 'original') {
-          socket.emit('select-video', currentVideoFile);
-          qualityDropdown.classList.remove('show');
-          return;
-        }
-        fetch(`/api/check-quality/${currentVideoFile}/${quality}`)
-          .then(res => res.json())
-          .then(data => {
-            if (data.exists) {
-              socket.emit('select-video', data.filename);
-              qualityDropdown.classList.remove('show');
-            } else {
-              if (confirm(`Quality ${quality} not available. Start transcoding?`)) {
-                window.location.href = '/transcode';
-              }
-            }
-          });
-      });
     });
     // === UPLOAD VIDEO ===
     uploadBtn.addEventListener('click', () => {
@@ -915,7 +777,6 @@
               showNotification(`Video uploaded: ${data.file}`, 'success');
               progressBar.style.display = 'none';
               progressBarFill.style.width = '0';
-              loadAndRenderVideoListForPath(currentPlayerPath);
               loadAndRenderExplorerForPath(currentExplorerPath); // Обновляем проводник
             } else {
               showNotification('Upload failed', 'error');
@@ -1023,8 +884,7 @@
       statusEl.innerHTML = `Video loaded: ${filename.split('/').pop()}`;
       currentVideoFile = filename;
       isVideoReady = false;
-      highlightSelectedVideo(filename);
-      loadAndRenderVideoListForPath(currentPlayerPath);
+      highlightSelectedVideo(filename); // Вызываем highlightSelectedVideo
       loadAndRenderExplorerForPath(currentExplorerPath); // Обновляем проводник
     });
     // === GLOBAL ROOM STATE ===
@@ -1049,11 +909,10 @@
              }
           }
         }
-        highlightSelectedVideo(state.currentVideo);
+        highlightSelectedVideo(state.currentVideo); // Вызываем highlightSelectedVideo
       }
       document.getElementById('onlineCount').textContent = Object.keys(state.users).length;
       renderUsersList(); // Обновляем список пользователей
-      loadAndRenderVideoListForPath(currentPlayerPath);
       loadAndRenderExplorerForPath(currentExplorerPath); // Обновляем проводник
     });
     // === USERS LIST ===
@@ -1073,7 +932,7 @@
         usersList.appendChild(div);
         div.querySelector('.kick-btn').addEventListener('click', () => {
           if (confirm(`Kick user "${displayName}" from room?`)) {
-            socket.emit('kick-user', { userId, roomId }, res => {
+            socket.emit('kick-user', { userId, roomId: joinedRoom }, res => {
               if (res && res.success) {
                 showNotification(`User kicked: ${displayName}`, 'success');
               } else {
@@ -1082,179 +941,6 @@
             });
           }
         });
-      });
-    }
-    // === NAVIGATION LOGIC FOR PLAYER PANEL ===
-    let currentPlayerPath = '';
-    async function navigatePlayerToFolder(folderPath) {
-        currentPlayerPath = folderPath;
-        updateVideoBreadcrumb();
-        await loadAndRenderVideoListForPath(folderPath);
-    }
-    function updateVideoBreadcrumb() {
-      videoBreadcrumb.innerHTML = '';
-      const homeSpan = document.createElement('span');
-      homeSpan.style.cursor = 'pointer';
-      homeSpan.style.color = 'var(--accent)';
-      homeSpan.textContent = 'Home';
-      homeSpan.addEventListener('click', () => navigatePlayerToFolder(''));
-      videoBreadcrumb.appendChild(homeSpan);
-      if (currentPlayerPath === '') return;
-      const parts = currentPlayerPath.split('/');
-      let pathSoFar = '';
-      parts.forEach((part, index) => {
-        const separator = document.createElement('span');
-        separator.className = 'separator';
-        separator.textContent = ' / ';
-        separator.style.margin = '0 0.25rem';
-        videoBreadcrumb.appendChild(separator);
-        pathSoFar = pathSoFar ? pathSoFar + '/' + part : part;
-        const partSpan = document.createElement('span');
-        partSpan.style.cursor = 'pointer';
-        partSpan.style.color = 'var(--accent)';
-        partSpan.textContent = part;
-        partSpan.addEventListener('click', () => navigatePlayerToFolder(pathSoFar));
-        videoBreadcrumb.appendChild(partSpan);
-      });
-    }
-    async function loadAndRenderVideoListForPath(path) {
-        console.log(`[PLAYER] Запрашиваем содержимое папки: '${path}'`);
-        try {
-             const token = localStorage.getItem('authToken');
-             if (!token) {
-                 throw new Error('Authentication token not found. Please log in again.');
-             }
-             const structRes = await fetch('/api/files/list', {
-                 headers: {
-                     'Authorization': `Bearer ${token}`
-                 }
-             });
-             const structData = await structRes.json();
-             if (!structData.success) throw new Error(structData.error || 'Failed to load structure');
-             const findContents = (items, targetPath) => {
-               if (targetPath === '') return items;
-               for (const item of items) {
-                 if (item.type === 'folder' && item.path === targetPath) {
-                   return item.children || [];
-                 }
-                 if (item.type === 'folder' && item.children) {
-                   const found = findContents(item.children, targetPath);
-                   if (found) return found;
-                 }
-               }
-               return [];
-             };
-             const contentsAtPath = findContents(structData.structure, path);
-             const itemsToRender = contentsAtPath;
-             const allVideosRes = await fetch('/api/videos', {
-                 headers: {
-                     'Authorization': `Bearer ${token}`
-                 }
-             });
-             const allVideosData = await allVideosRes.json();
-             const videosInFolder = allVideosData.filter(videoObj => {
-                 const videoPath = videoObj.name;
-                 if (path === '') {
-                     return !videoPath.includes('/');
-                 } else {
-                     return videoPath.startsWith(path + '/');
-                 }
-             });
-             console.log(`[PLAYER] Загружено ${videosInFolder.length} видео из папки: ${path || 'Root'}`);
-             renderVideoListItems(itemsToRender, videosInFolder);
-        } catch (err) {
-             console.error('[PLAYER] Ошибка загрузки списка видео из папки:', err);
-             showNotification('Failed to load video list: ' + err.message, 'error');
-             videoList.innerHTML = '<div class="video-item">Error loading videos</div>';
-        }
-    }
-    function highlightSelectedVideo(videoPath) {
-        document.querySelectorAll('.video-item, .folder-item-grid').forEach(item => {
-            item.style.border = '1px solid var(--border)';
-        });
-        const selectedItem = document.querySelector(`.video-item[data-path="${videoPath}"], .folder-item-grid[data-path="${videoPath}"]`);
-        if (selectedItem) {
-            selectedItem.style.border = '2px solid var(--primary)';
-        }
-    }
-    function renderVideoListItems(contents, videoMetadata = []) {
-      videoList.innerHTML = '';
-      const homeItem = document.createElement('div');
-      homeItem.className = 'video-item';
-      homeItem.innerHTML = `
-        <i class="fas fa-home"></i>
-        <div class="video-info">
-          <div class="video-title">..</div>
-          <div class="video-meta">Go to parent/root folder</div>
-        </div>
-        <i class="fas fa-arrow-circle-up preview-icon"></i>
-      `;
-      homeItem.addEventListener('click', () => {
-        if (currentPlayerPath === '') {
-          console.log('[PLAYER] Already at root folder');
-        } else {
-          const parentPath = currentPlayerPath.split('/').slice(0, -1).join('/');
-          navigatePlayerToFolder(parentPath);
-        }
-      });
-      videoList.appendChild(homeItem);
-      if (contents.length === 0) {
-        videoList.innerHTML += '<div class="video-item" style="justify-content: center; opacity: 0.7;"><i class="fas fa-info-circle"></i><span>Folder is empty</span></div>';
-        return;
-      }
-      contents.forEach(item => {
-        const div = document.createElement('div');
-        if (item.type === 'folder') {
-          div.className = 'folder-item-grid';
-          div.dataset.path = item.path;
-          div.innerHTML = `
-            <i class="fas fa-folder"></i>
-            <div class="folder-name">${item.name}</div>
-          `;
-          div.addEventListener('click', () => {
-            navigatePlayerToFolder(item.path);
-          });
-        } else {
-          const fileName = item.name.split('/').pop();
-          const ext = fileName.split('.').pop().toLowerCase();
-          const supportedFormats = ['mp4', 'webm', 'ogg'];
-          const isSupported = supportedFormats.includes(ext);
-          div.className = 'video-item';
-          div.dataset.path = item.name;
-          let videoInfoHtml = `
-            <div class="video-info">
-              <strong class="video-title">${fileName}</strong><br>
-              <small class="video-meta">${item.resolution || 'N/A'} | ${item.bitrate || 'N/A'}</small>
-          `;
-          if (!isSupported) {
-            videoInfoHtml += `
-              <div class="unsupported-warning">
-                <i class="fas fa-exclamation-triangle"></i>
-                Требуется конвертация
-              </div>
-            `;
-          }
-          videoInfoHtml += `
-            </div>
-          `;
-          div.innerHTML = videoInfoHtml + `
-            <i class="fas fa-play-circle preview-icon"></i>
-          `;
-          div.addEventListener('click', () => {
-            if (!isSupported) {
-              if (!confirm(`Формат видео "${fileName}" может не воспроизводиться в браузере. Продолжить?`)) {
-                return;
-              }
-            }
-            highlightSelectedVideo(item.name);
-            video.src = `/videos/${item.name}`;
-            statusEl.innerHTML = `Video loaded: ${fileName}`;
-            currentVideoFile = item.name;
-            isVideoReady = false;
-            socket.emit('select-video', item.name);
-          });
-        }
-        videoList.appendChild(div);
       });
     }
     // ===========================================================================
@@ -1270,12 +956,6 @@
     }
     // === ОБНОВЛЕНИЕ ХЛЕБНЫХ КРОШЕК ПРОВОДНИКА ===
     function updateExplorerBreadcrumb() {
-        // Обновляем хлебные крошки проводника
-        const explorerBreadcrumb = document.getElementById('explorerBreadcrumb');
-        if (!explorerBreadcrumb) {
-            console.error('[EXPLORER] Explorer breadcrumb element not found.');
-            return;
-        }
         explorerBreadcrumb.innerHTML = '';
         const homeSpan = document.createElement('span');
         homeSpan.style.cursor = 'pointer';
@@ -1287,18 +967,18 @@
         const parts = currentExplorerPath.split('/');
         let pathSoFar = '';
         parts.forEach((part, index) => {
-            const separator = document.createElement('span');
-            separator.className = 'separator';
-            separator.textContent = ' / ';
-            separator.style.margin = '0 0.25rem';
-            explorerBreadcrumb.appendChild(separator);
-            pathSoFar = pathSoFar ? pathSoFar + '/' + part : part;
-            const partSpan = document.createElement('span');
-            partSpan.style.cursor = 'pointer';
-            partSpan.style.color = 'var(--accent)';
-            partSpan.textContent = part;
-            partSpan.addEventListener('click', () => navigateExplorerToFolder(pathSoFar));
-            explorerBreadcrumb.appendChild(partSpan);
+          const separator = document.createElement('span');
+          separator.className = 'separator';
+          separator.textContent = ' / ';
+          separator.style.margin = '0 0.25rem';
+          explorerBreadcrumb.appendChild(separator);
+          pathSoFar = pathSoFar ? pathSoFar + '/' + part : part;
+          const partSpan = document.createElement('span');
+          partSpan.style.cursor = 'pointer';
+          partSpan.style.color = 'var(--accent)';
+          partSpan.textContent = part;
+          partSpan.addEventListener('click', () => navigateExplorerToFolder(pathSoFar));
+          explorerBreadcrumb.appendChild(partSpan);
         });
     }
     // === ЗАГРУЗКА И ОТРИСОВКА СОДЕРЖИМОГО ПРОВОДНИКА ===
@@ -1342,11 +1022,10 @@
             explorerList.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 2rem; opacity: 0.7;">Error loading folder contents</div>';
         }
     }
-    // === ОТРИСОВКА ЭЛЕМЕНТОВ ПРОВОДНИКА (ИСПРАВЛЕННАЯ) ===
+    // === ОТРИСОВКА ЭЛЕМЕНТОВ ПРОВОДНИКА (ОБНОВЛЁННАЯ С ИСПРАВЛЕНИЕМ ДЛЯ ПУСТОЙ ПАПКИ) ===
     function renderExplorerItems(contents) {
         const explorerList = document.getElementById('explorerList');
         explorerList.innerHTML = ''; // Очищаем
-
         // Добавляем элемент ".." для возврата в родительскую папку, если не в корне
         // ВАЖНО: Это должно быть ДО проверки contents.length
         if (currentExplorerPath !== '') {
@@ -1355,38 +1034,31 @@
             parentItem.dataset.path = '..'; // Уникальный путь для элемента родителя
             parentItem.dataset.type = 'folder';
             parentItem.draggable = false; // ".." не перетаскиваем
-
             parentItem.innerHTML = `
                 <i class="fas fa-level-up-alt folder-icon"></i> <!-- Альтернативная иконка -->
                 <div class="item-name">..</div>
             `;
-
             // Обработчик клика для перехода наверх
             parentItem.addEventListener('click', (e) => {
                  // Игнорируем клик по кнопкам действий (их тут нет, но на всякий случай)
                  if (e.target.closest('.item-actions')) return;
-
                  // Обычный клик: снять выделение со всех, выделить только этот (..)
                  selectedItems.clear();
                  selectedItems.add('..');
                  updateExplorerSelection(); // Обновляем визуальное выделение
                  updateExplorerActions(); // Обновляем состояние кнопок
-
                  // Переходим в родительскую папку
                  const parentPath = currentExplorerPath.split('/').slice(0, -1).join('/');
                  navigateExplorerToFolder(parentPath);
             });
-
             // Обработчик двойного клика для перехода наверх
             parentItem.addEventListener('dblclick', (e) => {
-                 // Игнорируем клик по кнопкам действий (их тут нет, но на всякий случай)
+                 // Игнорируем клик по кнопкам действий (их тут нет, но на всякий случае)
                  if (e.target.closest('.item-actions')) return;
-
                  // Переходим в родительскую папку
                  const parentPath = currentExplorerPath.split('/').slice(0, -1).join('/');
                  navigateExplorerToFolder(parentPath);
             });
-
             // --- НОВОЕ: Обработчик dragover для ".." (позволяем перетаскивать сюда) ---
             parentItem.addEventListener('dragover', (e) => {
                 e.preventDefault(); // Обязательно для drop
@@ -1396,7 +1068,6 @@
                     parentItem.classList.add('drag-over');
                 }
             });
-
             // --- НОВОЕ: Обработчик dragleave для ".." ---
             parentItem.addEventListener('dragleave', (e) => {
                 const rect = parentItem.getBoundingClientRect();
@@ -1406,65 +1077,55 @@
                     parentItem.classList.remove('drag-over');
                 }
             });
-
             // --- НОВОЕ: Обработчик drop для ".." (перемещение в родительскую папку) ---
             parentItem.addEventListener('drop', (e) => {
                 e.preventDefault();
                 parentItem.classList.remove('drag-over');
-
                 const draggedPath = e.dataTransfer.getData('text/plain');
                 if (!draggedPath) return; // Был drag, а не drop из списка
-
                 console.log(`[EXPLORER] Dropped ${draggedPath} onto .. (parent folder)`);
-
                 // Определяем родительскую папку
                 const parentPath = currentExplorerPath.split('/').slice(0, -1).join('/') || ''; // Если уже в корне, то ''
-
                 // Проверяем, не пытаемся ли перетащить саму папку ".."
                 if (draggedPath === '..') {
                     console.log('[EXPLORER] Cannot drop ".." onto itself.');
                     return;
                 }
-
                 // Проверяем, не пытаемся ли перетащить в ту же папку (в корне это невозможно, но на всякий случай)
                 if (draggedPath.split('/').slice(0, -1).join('/') === parentPath) {
                     console.log('[EXPLORER] Item is already in the target parent folder.');
                     return;
                 }
-
                 // Вызываем функцию перемещения
                 moveItemsViaDragDrop([draggedPath], parentPath);
             });
             // --- /НОВОЕ ---
-
             explorerList.appendChild(parentItem);
         }
-
-
         if (contents.length === 0) {
             // ВАЖНО: Создаем элемент, а не используем innerHTML +=, чтобы не затереть ..
-            const emptyMessage = document.createElement('div');
-            emptyMessage.style.gridColumn = '1 / -1';
-            emptyMessage.style.textAlign = 'center';
-            emptyMessage.style.padding = '2rem';
-            emptyMessage.style.opacity = '0.7';
-            emptyMessage.innerHTML = '<i class="fas fa-info-circle"></i> Folder is empty';
-            explorerList.appendChild(emptyMessage); // Добавляем сообщение ОБ ИСТОЧНИКЕ
+            const emptyDiv = document.createElement('div');
+            emptyDiv.style.gridColumn = '1 / -1';
+            emptyDiv.style.textAlign = 'center';
+            emptyDiv.style.padding = '2rem';
+            emptyDiv.style.opacity = '0.7';
+            emptyDiv.innerHTML = '<i class="fas fa-info-circle"></i> Folder is empty';
+            explorerList.appendChild(emptyDiv); // Добавляем сообщение ОБ ИСТОЧНИКЕ
             return;
         }
-
         contents.forEach(item => {
             const div = document.createElement('div');
             div.className = 'explorer-item';
             div.dataset.path = item.path; // Полный путь
             div.dataset.type = item.type; // 'folder' или 'file'
             div.draggable = true; // Делаем элемент перетаскиваемым
-
             if (item.type === 'folder') {
                 div.innerHTML = `
                     <i class="fas fa-folder folder-icon"></i>
                     <div class="item-name">${item.name}</div>
-                    <!-- УБРАЛИ КНОПКУ УДАЛЕНИЯ -->
+                    <div class="item-actions">
+                        <button class="delete-item-btn" title="Delete Folder"><i class="fas fa-trash"></i></button>
+                    </div>
                 `;
             } else {
                 // Определяем иконку по расширению
@@ -1482,17 +1143,17 @@
                 div.innerHTML = `
                     <i class="${iconClass} file-icon"></i>
                     <div class="item-name">${item.name.split('/').pop()}</div>
-                    <!-- УБРАЛИ КНОПКУ УДАЛЕНИЯ -->
+                    <div class="item-actions">
+                        <button class="delete-item-btn" title="Delete File"><i class="fas fa-trash"></i></button>
+                    </div>
                 `;
             }
-
             // === DRAG START ===
             div.addEventListener('dragstart', (e) => {
                 e.dataTransfer.setData('text/plain', item.path); // Передаем путь
                 e.dataTransfer.effectAllowed = 'move';
                 console.log(`[EXPLORER] Drag started for: ${item.path}`);
             });
-
             // === DRAG OVER (для drop targets) ===
             div.addEventListener('dragover', (e) => {
                 e.preventDefault(); // Обязательно для drop
@@ -1501,7 +1162,6 @@
                     div.classList.add('drag-over');
                 }
             });
-
             // === DRAG LEAVE (для drop targets) ===
             div.addEventListener('dragleave', (e) => {
                 // Проверяем, действительно ли курсор покинул элемент
@@ -1513,7 +1173,6 @@
                     div.classList.remove('drag-over');
                 }
             });
-
             // === DROP (на папки) ===
             div.addEventListener('drop', (e) => {
                 e.preventDefault();
@@ -1521,44 +1180,59 @@
                 if (item.type !== 'folder') return; // Только на папки
                 const draggedPath = e.dataTransfer.getData('text/plain');
                 if (!draggedPath || draggedPath === item.path) return; // Не перетаскиваем в себя
-
                 console.log(`[EXPLORER] Dropped ${draggedPath} onto folder ${item.path}`);
-
                 // --- Вызов функции перемещения ---
                 moveItemsViaDragDrop([draggedPath], item.path);
                 // --- /Вызов функции перемещения ---
             });
-
             // === CLICK для выбора/отмены выбора ===
             div.addEventListener('click', (e) => {
                 // Игнорируем клик по кнопкам действий
                 if (e.target.closest('.item-actions')) return;
-                if (e.ctrlKey || e.metaKey) {
+
+                const isCtrlClick = e.ctrlKey || e.metaKey;
+                const isShiftClick = e.shiftKey;
+                const itemPath = item.path;
+
+                if (isCtrlClick) {
                     // Ctrl/Cmd+Click для множественного выбора
-                    if (selectedItems.has(item.path)) {
-                        selectedItems.delete(item.path);
+                    if (selectedItems.has(itemPath)) {
+                        selectedItems.delete(itemPath);
                     } else {
-                        selectedItems.add(item.path);
+                        selectedItems.add(itemPath);
                     }
-                } else if (e.shiftKey) {
+                } else if (isShiftClick) {
                     // Shift+Click для выбора диапазона (упрощенная реализация)
                     // Для простоты, будем выбирать всё между первым выбранным и текущим
                     // Более сложная логика требует отслеживания последнего кликнутого элемента
                     // Пока просто добавим/удалим
-                    if (selectedItems.has(item.path)) {
-                        selectedItems.delete(item.path);
+                    if (selectedItems.has(itemPath)) {
+                        selectedItems.delete(itemPath);
                     } else {
-                        selectedItems.add(item.path);
+                        selectedItems.add(itemPath);
                     }
                 } else {
                     // Обычный клик: снять выделение со всех, выделить только этот
                     selectedItems.clear();
-                    selectedItems.add(item.path);
+                    selectedItems.add(itemPath);
                 }
+
                 updateExplorerSelection(); // Обновляем визуальное выделение
                 updateExplorerActions(); // Обновляем состояние кнопок
-            });
 
+                // === СИНХРОНИЗАЦИЯ ВЫБОРА ВИДЕО ===
+                if (item.type !== 'folder') {
+                    // Если кликнули по файлу (видео), отправляем событие на сервер
+                    highlightSelectedVideo(item.path); // <-- ВАЖНО: Вызываем highlightSelectedVideo
+                    video.src = `/videos/${item.name}`;
+                    statusEl.innerHTML = `Video loaded: ${item.name.split('/').pop()}`;
+                    currentVideoFile = item.name;
+                    isVideoReady = false;
+                    // ИСПРАВЛЕНО: Отправляем объект с roomId и filename
+                    socket.emit('select-video', { roomId: joinedRoom, filename: item.name });
+                }
+                // === /СИНХРОНИЗАЦИЯ ВЫБОРА ВИДЕО ===
+            });
             // === DOUBLE CLICK для открытия/воспроизведения ===
             div.addEventListener('dblclick', (e) => {
                  // Игнорируем клик по кнопкам действий
@@ -1578,22 +1252,52 @@
                        }
                      }
                      // Устанавливаем видео в основном плеере
+                     highlightSelectedVideo(item.path); // <-- ВАЖНО: Вызываем highlightSelectedVideo
                      video.src = `/videos/${item.name}`;
                      statusEl.innerHTML = `Video loaded: ${fileName}`;
                      currentVideoFile = item.name;
                      isVideoReady = false;
-                     socket.emit('select-video', item.name);
-                     // Выделяем в списке плеера
-                     highlightSelectedVideo(item.name);
+                     // ИСПРАВЛЕНО: Отправляем объект с roomId и filename
+                     socket.emit('select-video', { roomId: joinedRoom, filename: item.name });
                  }
             });
-
             // === CONTEXT MENU (ПКМ) - Упрощённый вариант через кнопки действий ===
-            // Кнопка удаления УБРАНА
-
+            // Кнопка удаления
+            const deleteBtn = div.querySelector('.delete-item-btn');
+            if (deleteBtn) {
+                deleteBtn.addEventListener('click', (e) => {
+                    e.stopPropagation(); // Предотвращаем всплытие клика на элемент
+                    const itemType = item.type === 'folder' ? 'folder' : 'file';
+                    const itemName = item.name.split('/').pop();
+                    if (confirm(`Are you sure you want to delete this ${itemType}?
+"${itemName}"`)) {
+                        // Логика удаления будет реализована позже на сервере
+                        // Пока просто показываем уведомление
+                        showNotification(`Would delete '${itemName}' (server-side action needed)`, 'info');
+                    }
+                });
+            }
             explorerList.appendChild(div);
         });
         updateExplorerSelection(); // Обновляем визуальное выделение после рендеринга
+    }
+    // === ФУНКЦИЯ СИНХРОНИЗАЦИИ ВЫБОРА ВИДЕО (ОБНОВЛЁННАЯ) ===
+    function highlightSelectedVideo(videoPath) {
+        // Снимаем выделение со всех элементов в explorerList
+        document.querySelectorAll('#explorerList .explorer-item').forEach(item => {
+            item.classList.remove('selected');
+        });
+        if (!videoPath) return;
+        // Находим элемент в explorerList по data-path и выделяем его
+        const selectedItemInExplorer = document.querySelector(`#explorerList .explorer-item[data-path="${videoPath}"]`);
+        if (selectedItemInExplorer) {
+            selectedItemInExplorer.classList.add('selected');
+            // Также обновляем Set selectedItems, чтобы кнопки действий работали
+            selectedItems.clear();
+            selectedItems.add(videoPath);
+            updateExplorerSelection();
+            updateExplorerActions();
+        }
     }
     // === ОБНОВЛЕНИЕ ВИЗУАЛЬНОГО ВЫДЕЛЕНИЯ В ПРОВОДНИКЕ ===
     function updateExplorerSelection() {
@@ -1626,22 +1330,18 @@
             showNotification('Invalid target path for move operation.', 'error');
             return false;
         }
-
         console.log(`[EXPLORER] Attempting to move items to: "${targetPath}"`); // Отладка
         console.log(`[EXPLORER] Items to move:`, itemsToMove); // Отладка
-
         try {
             const token = localStorage.getItem('authToken');
             if (!token) {
                 throw new Error('Authentication token not found. Please log in again.');
             }
-
             // Отладка перед fetch
             console.log(`[EXPLORER] Sending request to /api/files/move with body:`, {
                 items: itemsToMove,
                 destination: targetPath
             });
-
             const response = await fetch('/api/files/move', {
                 method: 'PUT', // Используем PUT для обновления/перемещения
                 headers: {
@@ -1653,17 +1353,14 @@
                     destination: targetPath // Путь к целевой папке
                 })
             });
-
             // Отладка после fetch
             console.log(`[EXPLORER] Server response status:`, response.status);
             const data = await response.json();
             console.log(`[EXPLORER] Server response body:`, data);
-
             if (response.ok && data.success) {
                 showNotification(`Successfully moved ${itemsToMove.length} item(s).`, 'success');
-                // Обновляем оба списка после успешного перемещения
+                // Обновляем проводник после успешного перемещения
                 loadAndRenderExplorerForPath(currentExplorerPath);
-                loadAndRenderVideoListForPath(currentPlayerPath);
                 // Очищаем выбор после перемещения
                 selectedItems.clear();
                 updateExplorerSelection();
@@ -1681,7 +1378,6 @@
             return false;
         }
     }
-
     // --- ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ: Перемещение через drag-and-drop ---
     async function moveItemsViaDragDrop(draggedPaths, targetPath) {
         // Проверяем, что целевая папка не находится внутри перемещаемого элемента (цикл)
@@ -1754,7 +1450,6 @@
                     showNotification(`Folder '${folderName}' created successfully`, 'success');
                     createFolderModal.style.display = 'none';
                     loadAndRenderExplorerForPath(currentExplorerPath); // Обновляем текущую папку в проводнике
-                    loadAndRenderVideoListForPath(currentPlayerPath); // Обновляем плеер
                 } else {
                     const errorMessage = data.error || data.message || 'Failed to create folder';
                     console.error('[CREATE FOLDER] Server error:', errorMessage);
@@ -1780,9 +1475,7 @@
             }
             const itemsToMove = Array.from(selectedItems);
             const targetPath = currentExplorerPath; // Перемещаем в текущую папку (папку, откуда идет перемещение)
-
             console.log(`[EXPLORER] Button move clicked. Items:`, itemsToMove, "Target:", targetPath);
-
             // Проверяем, не пытаемся ли переместить в текущую папку, где они уже находятся
             // (Это не ошибка, но можно просто сбросить выбор)
             let allInSameFolder = true;
@@ -1801,7 +1494,6 @@
                 updateExplorerActions();
                 return;
             }
-
             // --- Вызов функции перемещения ---
             await moveItems(itemsToMove, targetPath);
             // --- /Вызов функции перемещения ---
@@ -1851,7 +1543,6 @@ ${itemNames}`)) {
             updateExplorerSelection();
             updateExplorerActions();
             loadAndRenderExplorerForPath(currentExplorerPath);
-            loadAndRenderVideoListForPath(currentPlayerPath);
         });
     });
     // ===========================================================================

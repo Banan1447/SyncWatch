@@ -1,36 +1,24 @@
 [
   {
-    "id": "g9eh699f2",
+    "id": "k3v9tszjp",
     "name": "1",
-    "ownerId": "H4IL4xN2AcYnu6T8AAAD",
+    "ownerId": "3WtXGTGDcC2p9gs6AAAL",
     "users": {
-      "PAAQBya22oQ8msOWAAAF": {
+      "KhQICmzYSOPM_TDQAAAR": {
         "name": "Artur",
-        "socketId": "PAAQBya22oQ8msOWAAAF"
+        "socketId": "KhQICmzYSOPM_TDQAAAR"
       },
-      "ixRH2kqSi3M2u9i3AAAD": {
+      "ISK9nwmyix9byUGbAAAZ": {
         "name": "Artur",
-        "socketId": "ixRH2kqSi3M2u9i3AAAD"
+        "socketId": "ISK9nwmyix9byUGbAAAZ"
       },
-      "BgEo6xyUCYMIQeq8AAAB": {
+      "aRS5gBMGBPJ5MwB1AAAP": {
         "name": "Artur",
-        "socketId": "BgEo6xyUCYMIQeq8AAAB"
+        "socketId": "aRS5gBMGBPJ5MwB1AAAP"
       },
-      "-xN9SYoyB1MdlUorAAAJ": {
+      "NM8OKwEFj-P3Vp-lAAAV": {
         "name": "Artur",
-        "socketId": "-xN9SYoyB1MdlUorAAAJ"
-      },
-      "MLChsbzQgbp_EpfAAAAB": {
-        "name": "Artur",
-        "socketId": "MLChsbzQgbp_EpfAAAAB"
-      },
-      "rXDyAELrVtiL0aXOAAAP": {
-        "name": "Artur",
-        "socketId": "rXDyAELrVtiL0aXOAAAP"
-      },
-      "M9BRfud-U6ZWmAmiAAAB": {
-        "name": "Artur",
-        "socketId": "M9BRfud-U6ZWmAmiAAAB"
+        "socketId": "NM8OKwEFj-P3Vp-lAAAV"
       }
     },
     "state": {
