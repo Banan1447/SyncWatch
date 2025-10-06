@@ -1,25 +1,33 @@
-// middleware/logging.js
+const ignoredPaths = [
+  '/api/system/health',
+  '/api/system/status',
+  '/favicon.ico',
+];
 
 function logRequests(req, res, next) {
-  // Временная метка
+  // Пропускаем игнорируемые маршруты
+  if (ignoredPaths.includes(req.path)) {
+    return next();
+  }
+
   const timestamp = new Date().toISOString();
-  // Метод HTTP и URL
   const method = req.method;
-  const url = req.url;
-  // IP-адрес клиента (с учётом возможных прокси)
-  const clientIP = req.ip || req.connection.remoteAddress || req.socket.remoteAddress || (req.headers && req.headers['x-forwarded-for']);
+  const path = req.path; // Без query-параметров
 
-  console.log(`[LOG ${timestamp}] ${method} ${url} - IP: ${clientIP}`);
+  // IP-адрес: учитываем прокси
+  const forwarded = req.headers['x-forwarded-for'];
+  const clientIP = Array.isArray(forwarded)
+    ? forwarded[0].split(',')[0].trim()
+    : forwarded?.split(',')[0].trim() || req.ip;
 
-  // Передаём управление следующему middleware
+  console.log(`[LOG ${timestamp}] ${method} ${path} - IP: ${clientIP}`);
+
   next();
 }
 
-// Добавляем функцию logClientRequest
 function logClientRequest(clientIP, socketId, action, details) {
   const timestamp = new Date().toISOString();
-  console.log(`[LOG ${timestamp}] ${action} - IP: ${clientIP}, Socket: ${socketId}. Details: ${details}`);
+  console.log(`[WS ${timestamp}] ${action} - IP: ${clientIP}, Socket: ${socketId}. Details: ${details}`);
 }
 
-// Экспортируем обе функции
 module.exports = { logRequests, logClientRequest };

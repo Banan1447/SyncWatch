@@ -1,28 +1,42 @@
-// app.js
 const express = require('express');
 const path = require('path');
+const cors = require('cors');
 const config = require('./config');
-const adminRoutes = require('./routes/admin'); // Добавьте эту строку
+const { logRequests } = require('./middleware/logging'); // Подключаем логирование
+const { authenticateToken, isAdmin } = require('./middleware/auth');
 
 const app = express();
 
+// Настройки
+app.set('trust proxy', true); // Если за reverse proxy
+
 // Middleware
+app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
+app.use(logRequests); // Подключаем логирование запросов
 
-// Маршруты
-app.use('/api', adminRoutes); // Добавьте эту строку
+// Маршруты API
+const adminRoutes = require('./routes/admin');
+app.use('/api', adminRoutes);
 
-// Обслуживание admin.html
-app.get('/admin', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'admin.html'));
-});
-
+// Обслуживание HTML-файлов
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-app.listen(config.port, () => {
-    console.log(`Server running on port ${config.port}`);
-    console.log(`Admin panel available at http://localhost:${config.port}/admin`);
+app.get('/admin', authenticateToken, isAdmin, (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+});
+
+// Глобальный обработчик ошибок
+app.use((err, req, res, next) => {
+    console.error('Unhandled error:', err);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+});
+
+const port = config.port || 3000;
+app.listen(port, () => {
+    console.log(`Server running on port ${port}`);
+    console.log(`Admin panel available at http://localhost:${port}/admin`);
 });

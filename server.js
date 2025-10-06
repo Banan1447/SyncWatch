@@ -233,10 +233,10 @@ class SyncWatchServer {
         console.log(`[FILES API] Запрос на перемещение ${items.length} элементов в папку: "${destination}" от пользователя:`, req.user?.username);
         console.log(`[FILES API] Элементы для перемещения:`, items);
 
-        const token = localStorage.getItem('authToken');
-        if (!token) {
-            throw new Error('Authentication token not found. Please log in again.');
-        }
+        // const token = localStorage.getItem('authToken'); // <-- УДАЛЕНО: localStorage не существует на сервере
+        // if (!token) {
+        //     throw new Error('Authentication token not found. Please log in again.');
+        // }
 
         let successCount = 0;
         let failCount = 0;
@@ -279,17 +279,27 @@ class SyncWatchServer {
     });
     // --- /НОВОЕ ---
 
-    // Загрузка файлов
+    // --- ИСПРАВЛЕНО: Конфигурация multer для поля 'video' ---
     const upload = multer({ 
       dest: config.videoDirectory,
       limits: {
-        fileSize: 2 * 1024 * 1024 * 1024 // 2GB
+        fileSize: 100 * 1024 * 1024 * 1024 // 100GB
+      },
+      // Указываем multer, что он должен принимать файл под именем 'video'
+      fileFilter: (req, file, cb) => {
+         if (file.fieldname === 'video') {
+             cb(null, true); // Принять файл
+         } else {
+             cb(new Error('Unexpected field'), false); // Отклонить файл
+         }
       }
     });
 
-    this.app.post('/upload', upload.single('file'), (req, res) => {
+    // Или можно использовать upload.single('video') в маршруте
+    this.app.post('/upload', upload.single('video'), (req, res) => {
       if (!req.file) {
-        return res.status(400).json({ success: false, error: 'No file uploaded' });
+        console.error('Upload error: No file received or file filter rejected it.');
+        return res.status(400).json({ success: false, error: 'No file uploaded or invalid field name. Expected field "video".' });
       }
 
       const finalPath = path.join(config.videoDirectory, req.file.originalname);
@@ -309,6 +319,7 @@ class SyncWatchServer {
         });
       });
     });
+    // --- /ИСПРАВЛЕНО ---
 
     // Статические страницы
     this.app.get('/admin', (req, res) => {
@@ -387,6 +398,7 @@ class SyncWatchServer {
         // Убедитесь, что data.roomId передается клиентом
         if (data.roomId) {
           console.log(`[SOCKET] Broadcasting video-command to room ${data.roomId}`); // <-- Добавить лог
+          // Отправляем команду ВСЕМ в комнате, кроме отправителя
           socket.to(data.roomId).emit('video-command', data);
         } else {
           console.warn(`[SOCKET] video-command received without roomId from ${socket.id}`); // <-- Добавить лог
@@ -394,19 +406,22 @@ class SyncWatchServer {
       });
       // === КОНЕЦ НОВЫХ ОБРАБОТЧИКОВ ===
 
-      // === НОВОЕ: ОБРАБОТЧИК ВЫБОРА ВИДЕО (select-video) ===
+      // === ИСПРАВЛЕНО/ОБНОВЛЕНО: ОБРАБОТЧИК ВЫБОРА ВИДЕО (select-video) ===
       socket.on('select-video', (data) => {
         console.log(`[SOCKET] Received select-video from ${socket.id}:`, data); // <-- Добавить лог
         // Убедитесь, что data.roomId и data.filename передаются клиентом
         if (data.roomId && data.filename) {
           console.log(`[SOCKET] Broadcasting video-updated to room ${data.roomId} with file ${data.filename}`); // <-- Добавить лог
-          // Отправляем событие обновления видео всем в комнате, включая отправителя
+          // Отправляем событие обновления видео ВСЕМ в комнате, включая отправителя
+          // Это позволяет всем обновить src видео и выделить элемент в проводнике
           this.io.in(data.roomId).emit('video-updated', data.filename);
+          // Также обновляем состояние комнаты на сервере
+          this.roomService.updateRoomState(data.roomId, { currentVideo: data.filename });
         } else {
           console.warn(`[SOCKET] select-video received without roomId or filename from ${socket.id}`); // <-- Добавить лог
         }
       });
-      // === КОНЕЦ НОВОГО ОБРАБОТЧИКА ===
+      // === КОНЕЦ ИСПРАВЛЕНИЯ ===
 
       // Комнаты
       socket.on('create-room', (data, callback) => {
@@ -464,7 +479,7 @@ class SyncWatchServer {
         }
       });
 
-      // Синхронизация видео
+      // Синхронизация видео (устаревшие обработчики, можно удалить)
       socket.on('play-video', (data) => {
         this.roomService.updateRoomState(data.roomId, { isPlaying: true });
         socket.to(data.roomId).emit('video-play', data);
