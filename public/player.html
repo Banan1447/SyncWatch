@@ -784,9 +784,78 @@
           userName = res.room.name;
           updateExplorerBreadcrumb();
           loadAndRenderExplorerForPath('');
+
+          // --- НОВОЕ: Загрузка состояния комнаты из rooms.json при успешном входе ---
+          loadAndApplyRoomStateFromJson(roomId);
+          // --- /НОВОЕ ---
         }
       });
     }
+
+    // --- НОВАЯ ФУНКЦИЯ: Загрузка и применение состояния комнаты из JSON ---
+    async function loadAndApplyRoomStateFromJson(roomId) {
+      try {
+        console.log(`[PLAYER] Запрашиваю rooms.json для инициализации состояния комнаты ${roomId}`);
+        const response = await fetch('/json/rooms.json');
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const roomsData = await response.json();
+        console.log(`[PLAYER] Получены данные rooms.json:`, roomsData);
+
+        const roomInfo = roomsData.find(r => r.id === roomId);
+        if (roomInfo) {
+          console.log(`[PLAYER] Найдено состояние комнаты ${roomId} в JSON:`, roomInfo);
+          // Проверяем, есть ли активное видео
+          if (roomInfo.currentVideo) {
+            console.log(`[PLAYER] Применяю видео из JSON: ${roomInfo.currentVideo}, время: ${roomInfo.currentTime}, воспроизводится: ${roomInfo.isPlaying}`);
+
+            // Устанавливаем источник видео
+            video.src = `/videos/${roomInfo.currentVideo}`;
+            statusEl.innerHTML = `Video loaded from state: ${roomInfo.currentVideo.split('/').pop()}`;
+            currentVideoFile = roomInfo.currentVideo;
+            isVideoReady = false; // Сброс, пока метаданные не загружены
+
+            // Ждем, пока метаданные загрузятся, чтобы установить время
+            video.addEventListener('loadedmetadata', function onLoadedMetadata() {
+              video.removeEventListener('loadedmetadata', onLoadedMetadata); // Удаляем слушатель, чтобы он сработал только один раз
+              isVideoReady = true;
+              console.log(`[PLAYER] Метаданные загружены, устанавливаю время: ${roomInfo.currentTime}s`);
+              video.currentTime = roomInfo.currentTime || 0; // Устанавливаем время из JSON
+
+              // Если видео в комнате воспроизводится, пробуем воспроизвести
+              if (roomInfo.isPlaying) {
+                const playPromise = video.play();
+                if (playPromise !== undefined) {
+                  playPromise.then(() => {
+                    console.log(`[PLAYER] Плеер синхронизирован: воспроизведение с ${roomInfo.currentTime}s`);
+                  }).catch(error => {
+                    console.warn(`[PLAYER] Браузер заблокировал автовоспроизведение при синхронизации: ${error}`);
+                    // Показать пользователю кнопку для запуска воспроизведения, если нужно
+                  });
+                }
+              } else {
+                 // Если видео в комнате на паузе, оставляем на паузе
+                 console.log(`[PLAYER] Плеер синхронизирован: пауза на ${roomInfo.currentTime}s`);
+                 // video.pause(); // pause() не нужен, так как плеер изначально на паузе, если не нажата кнопка play
+              }
+
+              // Визуально выделяем видео в проводнике
+              highlightSelectedVideo(roomInfo.currentVideo);
+            }, { once: true }); // { once: true } гарантирует, что слушатель сработает только один раз
+          } else {
+            console.log(`[PLAYER] В комнате ${roomId} нет активного видео.`);
+          }
+        } else {
+          console.warn(`[PLAYER] Информация о комнате ${roomId} не найдена в rooms.json при инициализации.`);
+        }
+      } catch (error) {
+        console.error('[PLAYER] Ошибка при загрузке или применении состояния комнаты из JSON:', error);
+        showNotification(`Ошибка синхронизации с комнатой: ${error.message}`, 'error');
+      }
+    }
+    // --- /НОВАЯ ФУНКЦИЯ ---
+
     // === DOM LOADED ===
     window.addEventListener('DOMContentLoaded', () => {
       if (!roomId) {
@@ -1010,6 +1079,18 @@
                      video.currentTime = state.currentTime;
                      console.log(`SyncWatch: Syncing time to ${state.currentTime}s`);
                  }
+             }
+
+             // Синхронизация состояния воспроизведения (play/pause)
+             if (state.isPlaying && video.paused) {
+                 const playPromise = video.play();
+                 if (playPromise !== undefined) {
+                   playPromise.then(() => {}).catch(error => {
+                     console.warn('Play command from room-state blocked by browser:', error);
+                   });
+                 }
+             } else if (!state.isPlaying && !video.paused) {
+                 video.pause();
              }
           }
         }

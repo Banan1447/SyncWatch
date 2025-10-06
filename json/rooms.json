@@ -1,98 +1,10 @@
 [
   {
-    "id": "e8hgoc927",
+    "id": "sb9xleo7h",
     "name": "1",
-    "ownerId": "YGqu7LNG7AfrwGuoAAAD",
-    "users": {
-      "e811GhiQTJvVzCM2AAAL": {
-        "name": "Artur",
-        "socketId": "e811GhiQTJvVzCM2AAAL"
-      },
-      "Rdzxi_grFiSCtHNlAAAN": {
-        "name": "Artur",
-        "socketId": "Rdzxi_grFiSCtHNlAAAN"
-      },
-      "KPglqj0vrYefEwuhAAAF": {
-        "name": "Artur",
-        "socketId": "KPglqj0vrYefEwuhAAAF"
-      },
-      "jfzmcQ0Y3GEv6aPFAAAH": {
-        "name": "Artur",
-        "socketId": "jfzmcQ0Y3GEv6aPFAAAH"
-      },
-      "AICkSsWwzvrGxH49AAAH": {
-        "name": "Artur",
-        "socketId": "AICkSsWwzvrGxH49AAAH"
-      },
-      "KG1Rjt5ktSkaT2JDAAAJ": {
-        "name": "Artur",
-        "socketId": "KG1Rjt5ktSkaT2JDAAAJ"
-      },
-      "ju9MN6IenFIXnupaAAAN": {
-        "name": "Artur",
-        "socketId": "ju9MN6IenFIXnupaAAAN"
-      },
-      "NFqlYvkLEM6TNjp9AAAP": {
-        "name": "Artur",
-        "socketId": "NFqlYvkLEM6TNjp9AAAP"
-      },
-      "IK6-70TfUVHz4569AAAF": {
-        "name": "Artur",
-        "socketId": "IK6-70TfUVHz4569AAAF"
-      },
-      "XfR-XzW1-J7UfsdbAAAH": {
-        "name": "Artur",
-        "socketId": "XfR-XzW1-J7UfsdbAAAH"
-      },
-      "cRCs3Khm0SdGZS4XAAAh": {
-        "name": "Artur",
-        "socketId": "cRCs3Khm0SdGZS4XAAAh"
-      },
-      "b35spDBLfR8vaWPIAAAj": {
-        "name": "Artur",
-        "socketId": "b35spDBLfR8vaWPIAAAj"
-      },
-      "jogQbr5Bu7a17TUJAAAJ": {
-        "name": "Artur",
-        "socketId": "jogQbr5Bu7a17TUJAAAJ"
-      }
-    },
-    "state": {
-      "currentVideo": "Solo_Leveling_Ep02.mp4",
-      "currentTime": 0,
-      "isPlaying": false
-    }
-  }
-]
-      "currentVideo": "Solo_Leveling_Ep02.mp4",
-      "currentTime": 0,
-      "isPlaying": false
-    },
+    "users": 2,
     "currentVideo": "Alien.Earth.S01E04.WEB-DLRip.RGzsRutracker_max_fast.mp4",
-    "currentTime": 674.081588,
-    "isPlaying": false
-  },
-  {
-    "id": "wczo1unpd",
-    "name": "2",
-    "ownerId": "P9RIwtBN6uBytAl1AAAH",
-    "users": {
-      "Mjf9VSqGGtoR-XEtAAAT": {
-        "name": "Artur",
-        "socketId": "Mjf9VSqGGtoR-XEtAAAT"
-      }
-    },
-    "currentVideo": "Alien.Earth.S01E04.WEB-DLRip.RGzsRutracker_max_fast.mp4",
-    "currentTime": 0,
-    "isPlaying": false
-  },
-  {
-    "id": "zaxxc0lwq",
-    "name": "3",
-    "ownerId": "PHbXJ2ih61SSbC3dAAAN",
-    "users": {},
-    "currentVideo": "Alien.Earth.S01E04.WEB-DLRip.RGzsRutracker_max_speed.mp4",
-    "currentTime": 0,
+    "currentTime": 700,
     "isPlaying": false
   }
 ]
