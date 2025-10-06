@@ -109,6 +109,32 @@
       background: var(--bg-darker);
       border-bottom: 1px solid var(--border);
     }
+    .controls label {
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+    }
+    .controls input {
+      padding: 0.5rem;
+      border: 1px solid var(--border);
+      background: var(--secondary);
+      color: var(--text);
+      border-radius: 4px;
+      font-size: 0.9rem;
+      width: 150px;
+    }
+    .controls button {
+      padding: 0.5rem 1rem;
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: background 0.2s ease;
+    }
+    .controls button:hover {
+      background: #0056b3;
+    }
     .status-line {
       font-size: 0.9rem;
       color: var(--text-secondary);
@@ -120,61 +146,27 @@
       padding: 1rem 2rem;
       min-height: calc(100vh - 180px);
     }
+    .top-panel {
+        display: flex;
+        flex-direction: column; /* Для left-panel */
+        gap: 1rem;
+        flex: 3; /* Занимает 3/4 ширины main-container */
+    }
     .left-panel {
-      flex: 2;
+      flex: 3;
       display: flex;
       flex-direction: column;
       gap: 1rem;
-      /* Перемещаем сюда список пользователей */
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
     }
-    .users-section {
+    .right-panel {
+      flex: 1;
       background: var(--secondary);
       border-radius: 8px;
       box-shadow: 0 4px 12px var(--shadow);
       padding: 1rem;
-      margin-bottom: 1rem;
-    }
-    .users-section h3 {
-      margin-bottom: 1rem;
-      font-size: 1.2rem;
-      color: var(--primary);
-    }
-    #usersList {
+      overflow-y: auto;
       display: flex;
       flex-direction: column;
-      gap: 0.5rem;
-    }
-    .user-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 0.75rem;
-      background: var(--bg-darker);
-      border-radius: 4px;
-      border: 1px solid var(--border);
-    }
-    .user-name {
-      font-size: 0.9rem;
-      color: var(--text);
-    }
-    .kick-btn {
-      background: #dc3545;
-      color: white;
-      border: none;
-      width: 32px;
-      height: 32px;
-      border-radius: 4px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      transition: background 0.2s ease;
-    }
-    .kick-btn:hover {
-      background: #c82333;
     }
     .video-container {
       position: relative;
@@ -546,15 +538,49 @@
       background: var(--text-secondary);
       cursor: not-allowed;
     }
-    .right-panel {
-      flex: 1;
-      background: var(--secondary);
-      border-radius: 8px;
-      box-shadow: 0 4px 12px var(--shadow);
-      padding: 1rem;
-      overflow-y: auto;
+    .users-section {
+      margin-top: 2rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border);
+    }
+    .users-section h3 {
+      margin-bottom: 1rem;
+      font-size: 1.2rem;
+      color: var(--primary);
+    }
+    #usersList {
       display: flex;
       flex-direction: column;
+      gap: 0.5rem;
+    }
+    .user-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.75rem;
+      background: var(--bg-darker);
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+    .user-name {
+      font-size: 0.9rem;
+      color: var(--text);
+    }
+    .kick-btn {
+      background: #dc3545;
+      color: white;
+      border: none;
+      width: 32px;
+      height: 32px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+    .kick-btn:hover {
+      background: #c82333;
     }
     #notifications {
       position: fixed;
@@ -652,58 +678,62 @@
     </div>
   </div>
   <div class="controls">
+    <label for="userName">Your Name:</label>
+    <input type="text" id="userName" placeholder="Enter your name">
+    <button id="saveNameBtn">Save Name</button>
     <div class="status-line">
       В сети: <span id="onlineCount">0</span>
     </div>
   </div>
   <div class="main-container">
-    <div class="left-panel">
-      <button id="leaveRoomBtn">Выйти из комнаты</button>
-      <!-- Список пользователей -->
-      <div class="users-section">
-        <h3>Users Online</h3>
-        <div id="usersList"></div>
-      </div>
-      <div class="video-container">
-        <video id="videoPlayer" width="100%" controls></video>
-        <div class="quality-menu">
-          <button id="qualityBtn" class="quality-btn-player">Settings</button>
-          <div id="qualityDropdown" class="dropdown-content">
-            <a href="#" data-quality="original">Original</a>
-            <a href="#" data-quality="low">Low (240p)</a>
-            <a href="#" data-quality="medium">Medium (720p)</a>
-          </div>
-        </div>
-      </div>
-      <div class="upload-section">
-        <button id="uploadBtn"><i class="fas fa-upload"></i> Upload Video</button>
-        <input type="file" id="uploadInput" accept="video/*" style="display:none;">
-        <div class="progress-bar" style="display:none;">
-          <div class="progress-bar-fill"></div>
-        </div>
-      </div>
-      <div id="status">Status: Not connected</div>
-    </div>
-    <div class="right-panel">
-      <!-- НОВОЕ: Проводник файлов справа -->
-      <div class="explorer-container">
-          <div class="explorer-header">
-              <span>File Explorer</span>
-              <div class="explorer-actions">
-                  <button id="uploadBtnExplorer" title="Upload Video"><i class="fas fa-upload"></i></button>
-                  <button id="createFolderBtnExplorer" title="Create New Folder"><i class="fas fa-folder-plus"></i></button>
-                  <button id="refreshExplorerBtn" title="Refresh"><i class="fas fa-sync-alt"></i></button>
-                  <!-- Кнопки перемещения и удаления появятся при выборе -->
-                  <button id="moveItemsBtn" title="Move Selected" disabled><i class="fas fa-arrow-right"></i></button>
-                  <button id="deleteItemsBtn" title="Delete Selected" disabled><i class="fas fa-trash-alt"></i></button>
+    <div class="top-panel">
+        <div class="left-panel">
+          <button id="leaveRoomBtn">Выйти из комнаты</button>
+          <div class="video-container">
+            <video id="videoPlayer" width="100%" controls></video>
+            <div class="quality-menu">
+              <button id="qualityBtn" class="quality-btn-player">Settings</button>
+              <div id="qualityDropdown" class="dropdown-content">
+                <a href="#" data-quality="original">Original</a>
+                <a href="#" data-quality="low">Low (240p)</a>
+                <a href="#" data-quality="medium">Medium (720p)</a>
               </div>
+            </div>
           </div>
-           <!-- Хлебные крошки для навигации по папкам в проводнике -->
-           <div class="breadcrumb" id="explorerBreadcrumb">
-              <!-- Хлебные крошки будут здесь -->
-           </div>
-          <div id="explorerList"></div>
-      </div>
+          <div class="upload-section">
+            <button id="uploadBtn"><i class="fas fa-upload"></i> Upload Video</button>
+            <input type="file" id="uploadInput" accept="video/*" style="display:none;">
+            <div class="progress-bar" style="display:none;">
+              <div class="progress-bar-fill"></div>
+            </div>
+          </div>
+          <div id="status">Status: Not connected</div>
+        </div>
+        <div class="right-panel">
+          <div class="users-section">
+            <h3>Users Online</h3>
+            <div id="usersList"></div>
+          </div>
+          <!-- НОВОЕ: Проводник файлов справа -->
+          <div class="explorer-container">
+              <div class="explorer-header">
+                  <span>File Explorer</span>
+                  <div class="explorer-actions">
+                      <button id="uploadBtnExplorer" title="Upload Video"><i class="fas fa-upload"></i></button>
+                      <button id="createFolderBtnExplorer" title="Create New Folder"><i class="fas fa-folder-plus"></i></button>
+                      <button id="refreshExplorerBtn" title="Refresh"><i class="fas fa-sync-alt"></i></button>
+                      <!-- Кнопки перемещения и удаления появятся при выборе -->
+                      <button id="moveItemsBtn" title="Move Selected" disabled><i class="fas fa-arrow-right"></i></button>
+                      <button id="deleteItemsBtn" title="Delete Selected" disabled><i class="fas fa-trash-alt"></i></button>
+                  </div>
+              </div>
+               <!-- Хлебные крошки для навигации по папкам в проводнике -->
+               <div class="breadcrumb" id="explorerBreadcrumb">
+                  <!-- Хлебные крошки будут здесь -->
+               </div>
+              <div id="explorerList"></div>
+          </div>
+        </div>
     </div>
   </div>
   <div id="notifications"></div>
@@ -771,11 +801,26 @@
     // === ELEMENTS ===
     const video = document.getElementById('videoPlayer');
     const statusEl = document.getElementById('status');
+    const userNameInput = document.getElementById('userName');
+    const saveNameBtn = document.getElementById('saveNameBtn');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const uploadInput = document.getElementById('uploadInput');
     const qualityBtn = document.getElementById('qualityBtn');
     const qualityDropdown = document.getElementById('qualityDropdown');
     const leaveRoomBtn = document.getElementById('leaveRoomBtn');
     const usersList = document.getElementById('usersList');
     const explorerBreadcrumb = document.getElementById('explorerBreadcrumb');
+    // === NAME INPUT ===
+    if (localStorage.getItem('userName')) {
+      userNameInput.value = localStorage.getItem('userName');
+    }
+    saveNameBtn.addEventListener('click', () => {
+      const name = userNameInput.value.trim();
+      if (name) {
+        localStorage.setItem('userName', name);
+        socket.emit('set-name', name);
+      }
+    });
     // === QUALITY MENU ===
     qualityBtn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -792,7 +837,7 @@
         const quality = item.dataset.quality;
         if (!currentVideoFile) return;
         if (quality === 'original') {
-          socket.emit('select-video', { roomId: joinedRoom, filename: currentVideoFile });
+          socket.emit('select-video', currentVideoFile);
           qualityDropdown.classList.remove('show');
           return;
         }
@@ -800,7 +845,7 @@
           .then(res => res.json())
           .then(data => {
             if (data.exists) {
-              socket.emit('select-video', { roomId: joinedRoom, filename: data.filename });
+              socket.emit('select-video', data.filename);
               qualityDropdown.classList.remove('show');
             } else {
               if (confirm(`Quality ${quality} not available. Start transcoding?`)) {
@@ -811,8 +856,6 @@
       });
     });
     // === UPLOAD VIDEO ===
-    const uploadBtn = document.getElementById('uploadBtn');
-    const uploadInput = document.getElementById('uploadInput');
     uploadBtn.addEventListener('click', () => {
       uploadInput.click();
     });
@@ -835,7 +878,7 @@
           if (xhr.status === 200) {
             const data = JSON.parse(xhr.responseText);
             if (data.success) {
-              showNotification(`Video uploaded: ${data.filename}`, 'success');
+              showNotification(`Video uploaded: ${data.file}`, 'success');
               progressBar.style.display = 'none';
               progressBarFill.style.width = '0';
               loadAndRenderExplorerForPath(currentExplorerPath);
@@ -854,7 +897,7 @@
     });
     // === LEAVE ROOM ===
     leaveRoomBtn.addEventListener('click', () => {
-      socket.emit('leave-room', { roomId: joinedRoom }, () => {
+      socket.emit('leave-room', () => {
         window.location.href = '/select-room.html';
       });
     });
@@ -946,7 +989,7 @@
       currentVideoFile = filename;
       isVideoReady = false;
       highlightSelectedVideo(filename); // <-- ВАЖНО: Вызываем highlightSelectedVideo
-      // loadAndRenderExplorerForPath(currentExplorerPath); // Не вызываем здесь, чтобы не перезагружать проводник при смене видео
+      loadAndRenderExplorerForPath(currentExplorerPath);
     });
     // === GLOBAL ROOM STATE ===
     let roomState = null;
@@ -973,15 +1016,15 @@
         highlightSelectedVideo(state.currentVideo); // <-- ВАЖНО: Вызываем highlightSelectedVideo
       }
       document.getElementById('onlineCount').textContent = Object.keys(state.users).length;
-      renderUsersList(state.users); // <-- ИСПРАВЛЕНО: Передаем users из state
-      // loadAndRenderExplorerForPath(currentExplorerPath); // Не вызываем здесь, чтобы не перезагружать проводник при обновлении состояния комнаты
+      renderUsersList();
+      loadAndRenderExplorerForPath(currentExplorerPath);
     });
     // === USERS LIST ===
-    function renderUsersList(users) { // <-- ИСПРАВЛЕНО: Принимаем users как аргумент
-      if (!users) return; // <-- Добавлено условие на случай, если users не определен
+    function renderUsersList() {
+      if (!roomState || !roomState.users) return;
       usersList.innerHTML = '';
-      Object.keys(users).forEach(userId => { // <-- ИСПРАВЛЕНО: Проходим по переданному объекту users
-        const user = users[userId]; // <-- ИСПРАВЛЕНО: Получаем пользователя из переданного объекта
+      Object.keys(roomState.users).forEach(userId => {
+        const user = roomState.users[userId];
         const div = document.createElement('div');
         div.className = 'user-item';
         const displayName = user.name || user.displayName || `User-${userId.substring(0, 8)}`;
@@ -1383,7 +1426,7 @@
                   if (xhr.status === 200) {
                     const data = JSON.parse(xhr.responseText);
                     if (data.success) {
-                      showNotification(`Video uploaded: ${data.filename}`, 'success');
+                      showNotification(`Video uploaded: ${data.file}`, 'success');
                       progressBar.style.display = 'none';
                       progressBarFill.style.width = '0';
                       loadAndRenderExplorerForPath(currentExplorerPath);

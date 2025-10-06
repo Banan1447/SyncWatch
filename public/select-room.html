@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Select Room</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css  ">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <style>
     :root {
       --primary: #4a90e2;
@@ -63,7 +63,7 @@
       width: 40px;
       height: 40px;
       border-radius: 50%;
-      background: linear-gradient(135deg, #4a90e2, #8e44ad); /* Сине-фиолетовый */
+      background: linear-gradient(135deg, #4a90e2, #8e44ad);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -73,7 +73,7 @@
     }
 
     .logo-svg {
-      width: 80%; /* Занимает 80% круга */
+      width: 80%;
       height: 80%;
       display: flex;
       align-items: center;
@@ -107,11 +107,10 @@
       color: var(--accent);
     }
 
-    /* Добавлен стиль для ссылки на профиль */
     .profile-link {
       color: var(--text-secondary);
       text-decoration: none;
-      margin-right: 1rem; /* Отступ от кнопки "Выйти" */
+      margin-right: 1rem;
       transition: color 0.2s ease;
     }
 
@@ -171,8 +170,7 @@
     }
 
     .auth-forms {
-      display: none; /* Скрыто по умолчанию */
-      margin-bottom: 1.5rem;
+      display: none;
     }
 
     .form-group {
@@ -268,7 +266,7 @@
     .room-item {
       display: flex;
       justify-content: space-between;
-      align-items: center;
+      align-items: flex-start; /* чтобы кнопка не тянула по центру */
       padding: 1rem;
       background: var(--bg-dark);
       border-radius: 4px;
@@ -291,14 +289,17 @@
       color: var(--text);
     }
 
-    .room-users {
-      font-size: 0.9rem;
+    .room-users, .room-video, .room-time {
+      font-size: 0.85rem;
       color: var(--text-secondary);
+      margin-top: 0.25rem;
     }
 
     .room-actions {
       display: flex;
       gap: 0.5rem;
+      margin-top: auto;
+      margin-bottom: auto;
     }
 
     .action-btn {
@@ -385,18 +386,13 @@
       <div class="logo-icon">
         <div class="logo-svg">
           <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-            <!-- Градиент -->
             <defs>
               <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stop-color="#4a90e2" />
                 <stop offset="100%" stop-color="#8e44ad" />
               </linearGradient>
             </defs>
-
-            <!-- Круговой фон -->
             <circle cx="50" cy="50" r="48" fill="url(#logoGradient)" />
-
-            <!-- Буква S -->
             <text 
               x="50" 
               y="50" 
@@ -405,8 +401,6 @@
               fill="white" 
               text-anchor="middle" 
               dominant-baseline="middle"
-              alignment-baseline="middle"
-              style="paint-order: stroke; stroke: #000; stroke-width: 1px;"
             >
               S
             </text>
@@ -416,9 +410,7 @@
       <h1>SyncWatch</h1>
     </div>
     <div class="auth-section">
-      <div id="authControls">
-        <!-- Секция аутентификации будет обновляться скриптом -->
-      </div>
+      <div id="authControls"></div>
     </div>
   </div>
 
@@ -479,33 +471,41 @@
 
   <script src="/socket.io/socket.io.js"></script>
   <script>
-    // Проверка авторизации при загрузке страницы
+    // Глобальная переменная для хранения данных из rooms.json
+    let roomsData = null;
+    const roomStates = {}; // { roomId: { videoId, currentTime } }
+
+    // Загрузка rooms.json
+    async function loadRoomsJson() {
+      if (roomsData) return;
+      try {
+        const response = await fetch('/json/rooms.json');
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        roomsData = await response.json();
+        console.log('rooms.json успешно загружен:', roomsData);
+      } catch (err) {
+        console.error('Не удалось загрузить rooms.json:', err);
+        showNotification('Не удалось загрузить данные видео. Некоторые функции могут быть недоступны.', 'error');
+      }
+    }
+
     window.addEventListener('load', () => {
       const token = localStorage.getItem('authToken');
       if (!token) {
         console.log('Нет токена, перенаправляем на страницу входа');
-        // Если нет токена, перенаправить на страницу входа
         window.location.href = '/login.html';
         return;
       }
-      
-      console.log('Проверяем валидность токена...');
-      // Проверить валидность токена
+
       fetch('/api/auth/profile', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        headers: { 'Authorization': `Bearer ${token}` }
       })
       .then(response => {
         if (!response.ok) {
-          console.log('Токен недействителен, перенаправляем на вход');
-          // Если токен недействителен, перенаправить на вход
           localStorage.removeItem('authToken');
           localStorage.removeItem('user');
           window.location.href = '/login.html';
         } else {
-          console.log('Токен валидный, загружаем страницу');
-          // Если токен валидный, продолжаем загрузку
           initializePage();
         }
       })
@@ -521,259 +521,226 @@
     let authToken = localStorage.getItem('authToken');
 
     function initializePage() {
-      // Инициализируем сокет только после проверки токена
       socket = io();
-      
-      // Ждем, пока сокет подключится, прежде чем обновлять UI
+
       socket.on('connect', () => {
         console.log('Сокет подключен');
         updateAuthUI();
-        
+        loadRoomsJson();
+
         const urlParams = new URLSearchParams(window.location.search);
         const roomId = urlParams.get('room');
-        
         if (roomId) {
-          // Если есть комната в URL — автопереход на плеер
-          window.location.href = `/player.html?room=${roomId}`;
+          redirectToPlayerWithTime(roomId);
           return;
         }
-        
-        // Загружаем список комнат при подключении
+
         loadRoomList();
       });
 
-      // Обработчик получения списка комнат от сервера
       socket.on('room-list', (rooms) => {
-        console.log('Получен обновленный список комнат от сервера:', rooms);
-        // Обновляем список комнат без вызова loadRoomList() снова,
-        // чтобы избежать дублирования запроса
         updateRoomListDisplay(rooms);
+      });
+
+      // НОВОЕ: обработка обновлений комнат
+      socket.on('room-update', (update) => {
+        if (update.roomId && (update.videoId !== undefined || update.currentTime !== undefined)) {
+          roomStates[update.roomId] = {
+            ...roomStates[update.roomId],
+            videoId: update.videoId,
+            currentTime: update.currentTime
+          };
+          updateRoomDisplay(update.roomId);
+        }
       });
 
       socket.on('disconnect', () => {
-          console.log('Соединение с сервером потеряно.');
+        console.log('Соединение с сервером потеряно.');
       });
 
       socket.on('reconnect', () => {
-          console.log('Соединение с сервером восстановлено.');
-          // Повторно загружаем список комнат после переподключения
-          loadRoomList();
+        console.log('Соединение восстановлено.');
+        loadRoomList();
+        loadRoomsJson();
       });
     }
 
-    // Функция для отправки API-запросов с токеном
+    function redirectToPlayerWithTime(roomId) {
+      let url = `/player.html?room=${roomId}`;
+      if (roomsData) {
+        const roomConfig = roomsData.find(r => r.id === roomId);
+        if (roomConfig && typeof roomConfig.startTime === 'number') {
+          url += `&time=${roomConfig.startTime}`;
+        }
+      }
+      window.location.href = url;
+    }
+
     function apiCall(endpoint, method = 'GET', data = null) {
-        const headers = {
-            'Content-Type': 'application/json',
-        };
-        if (authToken) {
-            headers['Authorization'] = `Bearer ${authToken}`;
-        }
+      const headers = { 'Content-Type': 'application/json' };
+      if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
 
-        const config = {
-            method,
-            headers,
-        };
-
-        if (data) {
-            config.body = JSON.stringify(data);
-        }
-
-        return fetch(`/api${endpoint}`, config)
-            .then(response => {
-                if (!response.ok) {
-                    // Проверяем, не связан ли статус с аутентификацией
-                    if (response.status === 401 || response.status === 403) {
-                        // Токен недействителен, очищаем его
-                        console.error('Токен недействителен, очищаем.');
-                        handleLogout(); // Вызываем функцию выхода
-                        throw new Error('Сессия истекла. Пожалуйста, войдите снова.');
-                    }
-                    return response.json().then(err => { throw err; });
-                }
-                return response.json();
-            });
+      return fetch(`/api${endpoint}`, { method, headers, body: data ? JSON.stringify(data) : null })
+        .then(response => {
+          if (!response.ok) {
+            if (response.status === 401 || response.status === 403) {
+              handleLogout();
+              throw new Error('Сессия истекла. Пожалуйста, войдите снова.');
+            }
+            return response.json().then(err => { throw err; });
+          }
+          return response.json();
+        });
     }
 
-    // Функция для обновления UI аутентификации
     function updateAuthUI() {
-        const authControls = document.getElementById('authControls');
-        const authForms = document.getElementById('authForms');
+      const authControls = document.getElementById('authControls');
+      const authForms = document.getElementById('authForms');
 
-        if (authToken) {
-            // Проверим валидность токена, запросив профиль
-            apiCall('/auth/profile', 'GET')
-                .then(data => {
-                    if (data.success) {
-                        // Обновляем UI с именем пользователя и кнопкой "Выйти"
-                        // Также добавляем ссылку на профиль
-                        authControls.innerHTML = `
-                            <div class="user-info">
-                                <a href="/user-profile.html" class="profile-link">${data.user.username}</a>
-                                <button class="logout-btn" onclick="handleLogout()">Выйти</button>
-                            </div>
-                        `;
-                        authForms.style.display = 'none'; // Скрываем формы
-                    } else {
-                        // Токен недействителен
-                        console.error('Токен не прошёл проверку профиля, очищаем.');
-                        handleLogout();
-                    }
-                })
-                .catch(err => {
-                    console.error('Ошибка проверки токена при обновлении UI:', err);
-                    handleLogout(); // Если ошибка, очищаем токен
-                });
-        } else {
-            authControls.innerHTML = `
-                <button class="login-btn" onclick="showAuthForm('login')">Войти</button>
-                <button class="register-btn" onclick="showAuthForm('register')">Регистрация</button>
-            `;
-            authForms.style.display = 'none'; // Скрываем формы по умолчанию
-        }
+      if (authToken) {
+        apiCall('/auth/profile', 'GET')
+          .then(data => {
+            if (data.success) {
+              authControls.innerHTML = `
+                <div class="user-info">
+                  <a href="/user-profile.html" class="profile-link">${data.user.username}</a>
+                  <button class="logout-btn" onclick="handleLogout()">Выйти</button>
+                </div>
+              `;
+              authForms.style.display = 'none';
+            } else {
+              handleLogout();
+            }
+          })
+          .catch(err => {
+            console.error('Ошибка проверки токена:', err);
+            handleLogout();
+          });
+      } else {
+        authControls.innerHTML = `
+          <button class="login-btn" onclick="showAuthForm('login')">Войти</button>
+          <button class="register-btn" onclick="showAuthForm('register')">Регистрация</button>
+        `;
+        authForms.style.display = 'none';
+      }
     }
 
-    // Функция для отображения формы (login или register)
     function showAuthForm(formType) {
-        const loginForm = document.getElementById('loginForm');
-        const registerForm = document.getElementById('registerForm');
-        const authForms = document.getElementById('authForms');
+      const loginForm = document.getElementById('loginForm');
+      const registerForm = document.getElementById('registerForm');
+      const authForms = document.getElementById('authForms');
 
-        if (formType === 'login') {
-            loginForm.style.display = 'block';
-            registerForm.style.display = 'none';
-        } else if (formType === 'register') {
-            loginForm.style.display = 'none';
-            registerForm.style.display = 'block';
-        }
-        authForms.style.display = 'block'; // Показываем блок с формами
+      if (formType === 'login') {
+        loginForm.style.display = 'block';
+        registerForm.style.display = 'none';
+      } else {
+        loginForm.style.display = 'none';
+        registerForm.style.display = 'block';
+      }
+      authForms.style.display = 'block';
     }
 
-    // Функция для обработки входа
     async function handleLogin() {
-        const username = document.getElementById('loginUsername').value.trim();
-        const password = document.getElementById('loginPassword').value;
+      const username = document.getElementById('loginUsername').value.trim();
+      const password = document.getElementById('loginPassword').value;
+      if (!username || !password) {
+        showNotification('Введите имя и пароль', 'error');
+        return;
+      }
 
-        if (!username || !password) {
-            showNotification('Введите имя пользователя и пароль', 'error');
-            return;
+      try {
+        const response = await apiCall('/auth/login', 'POST', { username, password });
+        if (response.success && response.token) {
+          localStorage.setItem('authToken', response.token);
+          authToken = response.token;
+          showNotification('Успешный вход', 'success');
+          updateAuthUI();
+          document.getElementById('authForms').style.display = 'none';
+          window.location.href = '/user-profile.html';
+        } else {
+          showNotification(response.error || 'Ошибка входа', 'error');
         }
-
-        try {
-            const response = await apiCall('/auth/login', 'POST', { username, password });
-            if (response.success && response.token) {
-                localStorage.setItem('authToken', response.token); // Сохраняем токен
-                authToken = response.token;
-                showNotification('Успешный вход', 'success');
-                updateAuthUI(); // Обновляем UI
-                // Скрываем формы после входа
-                document.getElementById('authForms').style.display = 'none';
-
-                // Перенаправляем на user-profile.html после успешного входа
-                window.location.href = '/user-profile.html';
-            } else {
-                showNotification(response.error || 'Ошибка входа', 'error');
-            }
-        } catch (err) {
-            console.error('Ошибка входа:', err);
-            showNotification(err.message || 'Ошибка входа', 'error');
-        }
+      } catch (err) {
+        showNotification(err.message || 'Ошибка входа', 'error');
+      }
     }
 
-    // Функция для обработки регистрации
     async function handleRegister() {
-        const username = document.getElementById('registerUsername').value.trim();
-        const password = document.getElementById('registerPassword').value;
+      const username = document.getElementById('registerUsername').value.trim();
+      const password = document.getElementById('registerPassword').value;
+      if (!username || !password) {
+        showNotification('Введите имя и пароль', 'error');
+        return;
+      }
+      if (password.length < 6) {
+        showNotification('Пароль должен быть не менее 6 символов', 'error');
+        return;
+      }
 
-        if (!username || !password) {
-            showNotification('Введите имя пользователя и пароль', 'error');
-            return;
+      try {
+        const response = await apiCall('/auth/register', 'POST', { username, password });
+        if (response.success) {
+          showNotification('Регистрация успешна', 'success');
+          showAuthForm('login');
+        } else {
+          showNotification(response.error || 'Ошибка регистрации', 'error');
         }
-
-        if (password.length < 6) {
-            showNotification('Пароль должен быть не менее 6 символов', 'error');
-            return;
-        }
-
-        try {
-            const response = await apiCall('/auth/register', 'POST', { username, password });
-            if (response.success) {
-                showNotification(response.message || 'Регистрация успешна', 'success');
-                // Можно автоматически переключиться на форму входа
-                showAuthForm('login');
-            } else {
-                showNotification(response.error || 'Ошибка регистрации', 'error');
-            }
-        } catch (err) {
-            console.error('Ошибка регистрации:', err);
-            showNotification(err.message || 'Ошибка регистрации', 'error');
-        }
+      } catch (err) {
+        showNotification(err.message || 'Ошибка регистрации', 'error');
+      }
     }
 
-    // Функция для обработки выхода
     function handleLogout() {
-        localStorage.removeItem('authToken');
-        localStorage.removeItem('user');
-        authToken = null;
-        updateAuthUI(); // Обновляем UI
-        showNotification('Вы вышли из системы', 'success');
-        // Скрываем формы при выходе
-        document.getElementById('authForms').style.display = 'none';
-        // Перенаправляем на страницу входа
-        window.location.href = '/login.html';
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('user');
+      authToken = null;
+      updateAuthUI();
+      showNotification('Вы вышли из системы', 'success');
+      document.getElementById('authForms').style.display = 'none';
+      window.location.href = '/login.html';
     }
 
-    // === CREATE ROOM AND JOIN ===
     document.getElementById('createRoomBtn').addEventListener('click', () => {
       const roomName = document.getElementById('roomName').value.trim();
       if (!roomName) {
-          showNotification('Введите название комнаты', 'error');
-          return;
+        showNotification('Введите название комнаты', 'error');
+        return;
       }
 
-      console.log('Отправляем запрос на создание комнаты:', roomName);
       socket.emit('create-room', { name: roomName }, (res) => {
-        console.log('Получен ответ на создание комнаты:', res);
         if (res && res.success && res.id) {
-          console.log('Переход в комнату:', res.id);
           window.location.href = `/player.html?room=${res.id}`;
         } else {
-          showNotification('Failed to create room: ' + (res?.error || 'Unknown error'), 'error');
+          showNotification('Не удалось создать комнату: ' + (res?.error || 'Неизвестная ошибка'), 'error');
         }
       });
     });
 
-    // === CREATE ROOM WITHOUT JOINING ===
     document.getElementById('createRoomNoJoinBtn').addEventListener('click', () => {
       const roomName = document.getElementById('roomName').value.trim();
       if (!roomName) {
-          showNotification('Введите название комнаты', 'error');
-          return;
+        showNotification('Введите название комнаты', 'error');
+        return;
       }
 
       socket.emit('create-room', { name: roomName }, (res) => {
         if (res && res.success && res.id) {
-          showNotification(`Room created: ${res.name}`, 'success');
-          // loadRoomList(); // Не нужно вызывать, сервер отправит room-list
+          showNotification(`Комната создана: ${res.name}`, 'success');
         } else {
-          showNotification('Failed to create room: ' + (res?.error || 'Unknown error'), 'error');
+          showNotification('Не удалось создать комнату: ' + (res?.error || 'Неизвестная ошибка'), 'error');
         }
       });
     });
 
-    // === LOAD ROOM LIST ===
     function loadRoomList() {
-      console.log('Запрашиваем список комнат с сервера...');
       socket.emit('get-rooms', (rooms) => {
-        console.log('Получили список комнат от сервера через callback:', rooms);
         updateRoomListDisplay(rooms);
       });
     }
 
-    // === UPDATE ROOM LIST DISPLAY ===
     function updateRoomListDisplay(rooms) {
       const roomList = document.getElementById('roomList');
-      roomList.innerHTML = ''; // Очищаем предыдущий список
+      roomList.innerHTML = '';
 
       if (!rooms || rooms.length === 0) {
         roomList.innerHTML = '<div class="room-item">Нет доступных комнат</div>';
@@ -783,12 +750,16 @@
       rooms.forEach(room => {
         const div = document.createElement('div');
         div.className = 'room-item';
-        // Добавляем отображение количества пользователей из "живых"
-        const userCount = room.users ? Object.keys(room.users).length : 0; // Изменено: теперь users - объект
+        div.dataset.roomId = room.id;
+
+        const userCount = room.users ? Object.keys(room.users).length : 0;
+
         div.innerHTML = `
           <div class="room-info">
             <div class="room-name">${room.name}</div>
             <div class="room-users">${userCount} пользователей</div>
+            <div class="room-video">Видео: <span class="video-title">—</span></div>
+            <div class="room-time">Время: <span class="current-time">0</span> сек</div>
           </div>
           <div class="room-actions">
             <button class="action-btn delete-btn" data-id="${room.id}"><i class="fas fa-trash"></i></button>
@@ -796,35 +767,59 @@
         `;
         roomList.appendChild(div);
 
-        // === CLICK ON ROOM BLOCK - JOIN ROOM ===
+        // Клик по комнате → редирект
         div.addEventListener('click', (e) => {
-          if (!e.target.closest('.delete-btn')) {
-            window.location.href = `/player.html?room=${room.id}`;
+          if (e.target.closest('.delete-btn')) return;
+          let url = `/player.html?room=${room.id}`;
+          if (roomsData) {
+            const roomConfig = roomsData.find(r => r.id === room.id);
+            if (roomConfig && typeof roomConfig.startTime === 'number') {
+              url += `&time=${roomConfig.startTime}`;
+            }
           }
+          window.location.href = url;
         });
 
-        // === DELETE ROOM ===
+        // Удаление
         div.querySelector('.delete-btn').addEventListener('click', (e) => {
-          e.stopPropagation(); // ❗ Don't trigger room click
+          e.stopPropagation();
           if (confirm(`Удалить комнату "${room.name}"?`)) {
             socket.emit('delete-room', { roomId: room.id }, (res) => {
-              console.log('[CLIENT] Получен ответ на удаление комнаты через callback:', res);
-              if (res && res.success) {
-                console.log('[CLIENT] Удаление комнаты подтверждено сервером');
-                // Уведомление показываем после получения обновленного списка через room-list
-                // showNotification(`Комната удалена: ${room.name}`, 'success');
-              } else {
-                console.log('[CLIENT] Ошибка удаления комнаты в callback:', res?.message || res?.error || 'Unknown error');
-                const errorMessage = res?.message || res?.error || 'Unknown error';
-                showNotification('Delete failed: ' + errorMessage, 'error');
+              if (!(res && res.success)) {
+                const msg = res?.message || res?.error || 'Неизвестная ошибка';
+                showNotification('Не удалось удалить комнату: ' + msg, 'error');
               }
             });
           }
         });
+
+        // Обновить отображение, если данные уже есть
+        if (roomStates[room.id]) {
+          updateRoomDisplay(room.id);
+        }
       });
     }
 
-    // === NOTIFICATIONS ===
+    function updateRoomDisplay(roomId) {
+      const roomElement = document.querySelector(`.room-item[data-room-id="${roomId}"]`);
+      if (!roomElement) return;
+
+      const state = roomStates[roomId] || {};
+      const videoTitleEl = roomElement.querySelector('.video-title');
+      const timeEl = roomElement.querySelector('.current-time');
+
+      let videoTitle = '—';
+      if (state.videoId && roomsData) {
+        const video = roomsData.find(v => v.id === state.videoId);
+        videoTitle = video ? (video.title || video.id) : state.videoId;
+      } else if (state.videoId) {
+        videoTitle = state.videoId;
+      }
+
+      videoTitleEl.textContent = videoTitle;
+      timeEl.textContent = state.currentTime != null ? Math.floor(state.currentTime) : '0';
+    }
+
     function showNotification(message, type) {
       const notification = document.createElement('div');
       notification.className = `notification ${type}`;
@@ -833,12 +828,8 @@
         <button class="notification-close" onclick="this.parentElement.remove()">&times;</button>
       `;
       document.getElementById('notifications').appendChild(notification);
-
-      // Автоматически удаляем уведомление через 5 секунд
       setTimeout(() => {
-        if (notification.parentNode) { // Проверяем, не было ли уже удалено вручную
-            notification.remove();
-        }
+        if (notification.parentNode) notification.remove();
       }, 5000);
     }
   </script>
