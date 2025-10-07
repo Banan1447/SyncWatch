@@ -1,14 +1,13 @@
 // services/roomService.js
 const fs = require('fs');
 const path = require('path');
-const config = require('../config');
 
 class RoomService {
   constructor() {
     this.rooms = new Map();
     this.roomsFilePath = path.join(__dirname, '..', 'json', 'rooms.json');
     this.loadRoomsFromFile();
-    this.saveRoomsToFile();
+    // ❌ УДАЛЁН: this.saveRoomsToFile() — он не нужен при старте
   }
 
   loadRoomsFromFile() {
@@ -16,30 +15,39 @@ class RoomService {
       if (fs.existsSync(this.roomsFilePath)) {
         const data = fs.readFileSync(this.roomsFilePath, 'utf8');
         const roomsData = JSON.parse(data);
+
         if (Array.isArray(roomsData)) {
           roomsData.forEach(roomData => {
+            // Восстанавливаем пользователей как Map
             const usersMap = new Map();
-            if (roomData.users && typeof roomData.users === 'object') {
+            if (roomData.users && typeof roomData.users === 'object' && !Array.isArray(roomData.users)) {
               Object.entries(roomData.users).forEach(([socketId, userData]) => {
                 usersMap.set(socketId, userData);
               });
             }
-            const room = {
-              ...roomData,
-              users: usersMap
-            };
-            this.rooms.set(room.id, room);
+
+            // ВАЖНО: копируем ВСЕ поля из файла, включая currentVideo, currentTime, isPlaying
+            this.rooms.set(roomData.id, {
+              id: roomData.id,
+              name: roomData.name,
+              ownerId: roomData.ownerId,
+              users: usersMap,
+              currentVideo: roomData.currentVideo || null,
+              currentTime: typeof roomData.currentTime === 'number' ? roomData.currentTime : 0,
+              isPlaying: !!roomData.isPlaying
+            });
           });
+
           console.log(`[RoomService] Загружено ${this.rooms.size} комнат из файла.`);
         } else {
-          console.warn(`[RoomService] Файл ${this.roomsFilePath} содержит некорректные данные.`);
+          console.warn(`[RoomService] Файл rooms.json содержит некорректные данные (ожидается массив).`);
         }
       } else {
-        console.log(`[RoomService] Файл ${this.roomsFilePath} не найден.`);
+        console.log(`[RoomService] Файл rooms.json не найден — будет создан при первой записи.`);
       }
     } catch (error) {
-      console.error(`[RoomService] Ошибка загрузки комнат:`, error.message);
-      this.rooms = new Map();
+      console.error(`[RoomService] Ошибка при загрузке комнат из файла:`, error.message);
+      this.rooms = new Map(); // сбрасываем в пустое состояние при ошибке
     }
   }
 
@@ -55,15 +63,22 @@ class RoomService {
         room.users.forEach((userData, socketId) => {
           usersObject[socketId] = userData;
         });
+
         return {
-          ...room,
-          users: usersObject
+          id: room.id,
+          name: room.name,
+          ownerId: room.ownerId,
+          users: usersObject,
+          currentVideo: room.currentVideo,
+          currentTime: room.currentTime,
+          isPlaying: room.isPlaying
         };
       });
 
-      fs.writeFileSync(this.roomsFilePath, JSON.stringify(roomsArray, null, 2));
+      fs.writeFileSync(this.roomsFilePath, JSON.stringify(roomsArray, null, 2), 'utf8');
+      console.log(`[RoomService] Сохранено ${roomsArray.length} комнат в файл.`);
     } catch (error) {
-      console.error(`[RoomService] Ошибка сохранения комнат:`, error.message);
+      console.error(`[RoomService] Ошибка при сохранении комнат в файл:`, error.message);
     }
   }
 
@@ -77,8 +92,13 @@ class RoomService {
     });
 
     return {
-      ...room,
-      users: usersObject
+      id: room.id,
+      name: room.name,
+      ownerId: room.ownerId,
+      users: usersObject,
+      currentVideo: room.currentVideo,
+      currentTime: room.currentTime,
+      isPlaying: room.isPlaying
     };
   }
 
@@ -89,10 +109,15 @@ class RoomService {
       room.users.forEach((userData, socketId) => {
         usersObject[socketId] = userData;
       });
-      
+
       allRooms.push({
-        ...room,
-        users: usersObject
+        id: room.id,
+        name: room.name,
+        ownerId: room.ownerId,
+        users: usersObject,
+        currentVideo: room.currentVideo,
+        currentTime: room.currentTime,
+        isPlaying: room.isPlaying
       });
     }
     return allRooms;
@@ -120,13 +145,16 @@ class RoomService {
     }
   }
 
-  // 🔑 ИСПРАВЛЕНО: обновление полей на верхнем уровне комнаты
+  // ✅ КЛЮЧЕВОЙ МЕТОД: сохраняет изменения на диск
   updateRoomState(roomId, updates) {
     const room = this.rooms.get(roomId);
     if (room) {
-      // Обновляем поля напрямую в объекте комнаты
-      Object.assign(room, updates);
-      // Не сохраняем файл здесь — таймер сам сохраняет каждую секунду
+      // Обновляем только разрешённые поля
+      if (updates.hasOwnProperty('currentVideo')) room.currentVideo = updates.currentVideo;
+      if (updates.hasOwnProperty('currentTime')) room.currentTime = updates.currentTime;
+      if (updates.hasOwnProperty('isPlaying')) room.isPlaying = updates.isPlaying;
+
+      this.saveRoomsToFile(); // 🔥 Сохраняем сразу!
     }
   }
 
@@ -135,24 +163,22 @@ class RoomService {
     if (room && room.users.has(socketId)) {
       const user = room.users.get(socketId);
       Object.assign(user, updates);
+      // Состояние пользователя — временное, не сохраняем в файл
     }
   }
 
   joinRoom(roomId, socketId, name) {
-    let room = this.rooms.get(roomId);
-    if (!room) {
-      return null;
-    }
-    
+    const room = this.rooms.get(roomId);
+    if (!room) return null;
+
     room.users.set(socketId, {
       name: name,
       socketId: socketId
     });
-    
+
     return room;
   }
 
-  // 🔑 ИСПРАВЛЕНО: состояние на верхнем уровне
   createRoom(name, ownerSocketId) {
     const id = this.generateRoomId();
     const newRoom = {
@@ -160,7 +186,6 @@ class RoomService {
       name,
       ownerId: ownerSocketId,
       users: new Map(),
-      // 🔑 Состояние синхронизации на верхнем уровне!
       currentVideo: null,
       currentTime: 0,
       isPlaying: false
@@ -172,7 +197,7 @@ class RoomService {
   }
 
   generateRoomId() {
-    return Math.random().toString(36).substr(2, 9);
+    return Math.random().toString(36).substring(2, 11);
   }
 
   shutdown() {
