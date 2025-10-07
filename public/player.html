@@ -4,13 +4,13 @@
   <meta charset="UTF-8">
   <title>SyncWatch Player</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-  <!-- Подключаем Socket.IO для синхронизации -->
   <script src="/socket.io/socket.io.js"></script>
   <style>
     :root {
       --primary: #4a90e2;
       --secondary: #343a40;
-      --accent: #007bff;
+      --accent-start: #4a90e2;
+      --accent-end: #8e44ad;
       --bg-dark: #121212;
       --bg-darker: #0d0d0d;
       --text: #ffffff;
@@ -19,7 +19,7 @@
       --shadow: rgba(0, 0, 0, 0.5);
       --hover-bg: #1e1e1e;
       --progress-bg: #2c2c2c;
-      --progress-fill: #007bff;
+      --progress-fill: #4a90e2;
       --success: #28a745;
       --warning: #ffc107;
       --danger: #dc3545;
@@ -47,6 +47,25 @@
       border-bottom: 1px solid var(--border);
       box-shadow: 0 2px 10px var(--shadow);
     }
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    #leaveRoomBtn {
+      padding: 0.5rem 1rem;
+      background: linear-gradient(135deg, var(--accent-start), var(--accent-end));
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: opacity 0.2s ease;
+      font-size: 0.95rem;
+    }
+    #leaveRoomBtn:hover {
+      opacity: 0.9;
+    }
     .logo-container {
       display: flex;
       align-items: center;
@@ -61,7 +80,7 @@
       width: 40px;
       height: 40px;
       border-radius: 50%;
-      background: linear-gradient(135deg, #4a90e2, #8e44ad);
+      background: linear-gradient(135deg, var(--accent-start), var(--accent-end));
       display: flex;
       align-items: center;
       justify-content: center;
@@ -90,7 +109,7 @@
       gap: 1rem;
     }
     .manage-link {
-      color: var(--accent);
+      color: var(--primary);
       text-decoration: none;
       font-weight: 500;
       padding: 0.5rem 1rem;
@@ -98,7 +117,7 @@
       transition: all 0.2s ease;
     }
     .manage-link:hover {
-      background: rgba(0, 123, 255, 0.1);
+      background: rgba(74, 144, 226, 0.15);
       color: #fff;
     }
     .controls {
@@ -109,64 +128,111 @@
       background: var(--bg-darker);
       border-bottom: 1px solid var(--border);
     }
-    .controls label {
+    .status-line {
       font-size: 0.9rem;
       color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
     }
-    .controls input {
-      padding: 0.5rem;
-      border: 1px solid var(--border);
-      background: var(--secondary);
-      color: var(--text);
-      border-radius: 4px;
+    .users-dropdown {
+      position: relative;
+      display: inline-block;
+    }
+    .users-toggle {
+      background: none;
+      border: none;
+      color: var(--text-secondary);
+      cursor: pointer;
       font-size: 0.9rem;
-      width: 150px;
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
     }
-    .controls button {
-      padding: 0.5rem 1rem;
-      background: var(--accent);
+    .users-toggle:hover {
+      color: var(--primary);
+    }
+    .users-list-dropdown {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      background: var(--bg-darker);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      box-shadow: 0 4px 12px var(--shadow);
+      z-index: 100;
+      min-width: 200px;
+      max-height: 300px;
+      overflow-y: auto;
+      display: none;
+    }
+    .users-list-dropdown.show {
+      display: block;
+    }
+    .user-item-dropdown {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.6rem 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .user-item-dropdown:last-child {
+      border-bottom: none;
+    }
+    .user-name-dropdown {
+      font-size: 0.9rem;
+      color: var(--text);
+    }
+    .kick-btn-dropdown {
+      background: var(--danger);
+      color: white;
+      border: none;
+      width: 24px;
+      height: 24px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+    .kick-btn-dropdown:hover {
+      background: #c82333;
+    }
+    #kickAllBtn {
+      margin-top: 0.5rem;
+      padding: 0.4rem;
+      background: var(--danger);
       color: white;
       border: none;
       border-radius: 4px;
       cursor: pointer;
-      font-weight: 500;
-      transition: background 0.2s ease;
+      font-size: 0.85rem;
+      width: 100%;
     }
-    .controls button:hover {
-      background: #0056b3;
-    }
-    .status-line {
-      font-size: 0.9rem;
-      color: var(--text-secondary);
+    #kickAllBtn:hover {
+      background: #c82333;
     }
     .main-container {
       display: flex;
-      flex-direction: row; /* Изменено на row для горизонтального расположения */
+      flex-direction: row;
       gap: 1rem;
       padding: 1rem 2rem;
       min-height: calc(100vh - 180px);
     }
-    .top-panel {
-        display: flex;
-        flex-direction: column; /* Для left-panel */
-        gap: 1rem;
-        flex: 3; /* Занимает 3/4 ширины main-container */
-    }
     .left-panel {
-      flex: 3;
+      flex: 2;
       display: flex;
       flex-direction: column;
-      gap: 1rem;
+      gap: 0.5rem;
     }
-    .right-panel {
-      flex: 1;
+    .video-status {
+      padding: 0.5rem 1rem;
       background: var(--secondary);
-      border-radius: 8px;
-      box-shadow: 0 4px 12px var(--shadow);
-      padding: 1rem;
-      overflow-y: auto;
-      display: flex;
-      flex-direction: column;
+      border-radius: 4px;
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+      text-align: center;
     }
     .video-container {
       position: relative;
@@ -175,6 +241,7 @@
       background: var(--secondary);
       box-shadow: 0 4px 12px var(--shadow);
       aspect-ratio: 16 / 9;
+      max-height: 60vh;
     }
     #videoPlayer {
       width: 100%;
@@ -195,50 +262,6 @@
       filter: none;
       color: white;
     }
-    .quality-menu {
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      z-index: 10;
-    }
-    .quality-btn-player {
-      background: rgba(0, 0, 0, 0.6);
-      color: white;
-      border: none;
-      padding: 0.5rem 1rem;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 0.9rem;
-      transition: background 0.2s ease;
-    }
-    .quality-btn-player:hover {
-      background: rgba(0, 0, 0, 0.8);
-    }
-    .dropdown-content {
-      display: none;
-      position: absolute;
-      top: 100%;
-      right: 0;
-      background: var(--bg-darker);
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      box-shadow: 0 4px 12px var(--shadow);
-      min-width: 120px;
-      z-index: 100;
-    }
-    .dropdown-content.show {
-      display: block;
-    }
-    .dropdown-content a {
-      display: block;
-      padding: 0.75rem 1rem;
-      color: var(--text);
-      text-decoration: none;
-      transition: background 0.2s ease;
-    }
-    .dropdown-content a:hover {
-      background: var(--hover-bg);
-    }
     .upload-section {
       display: flex;
       flex-direction: column;
@@ -253,16 +276,16 @@
       align-items: center;
       gap: 0.5rem;
       padding: 0.75rem 1.5rem;
-      background: var(--accent);
+      background: linear-gradient(135deg, var(--accent-start), var(--accent-end));
       color: white;
       border: none;
-      border-radius: 4px;
+      border-radius: 6px;
       cursor: pointer;
-      font-weight: 500;
-      transition: background 0.2s ease;
+      font-weight: 600;
+      transition: opacity 0.2s ease;
     }
     #uploadBtn:hover {
-      background: #0056b3;
+      opacity: 0.9;
     }
     .progress-bar {
       width: 100%;
@@ -279,50 +302,44 @@
       width: 0%;
       transition: width 0.3s ease;
     }
-    #status {
-      padding: 0.75rem;
+    .right-panel {
+      flex: 1;
       background: var(--secondary);
-      border-radius: 4px;
-      font-size: 0.9rem;
-      color: var(--text-secondary);
-      text-align: center;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px var(--shadow);
+      padding: 1rem;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
     }
-    #leaveRoomBtn {
-      padding: 0.5rem 1rem;
-      background: #dc3545;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      font-weight: 500;
-      transition: background 0.2s ease;
-      margin-bottom: 1rem;
-    }
-    #leaveRoomBtn:hover {
-      background: #c82333;
-    }
-    /* Стиль для хлебных крошек */
-    .breadcrumb {
+    .breadcrumb-panel {
+      background: var(--bg-darker);
+      padding: 0.6rem 1rem;
+      border-radius: 6px;
+      margin: 0.5rem 0;
+      font-size: 0.95rem;
       display: flex;
       align-items: center;
-      gap: 0.5rem;
-      margin-bottom: 1rem;
-      padding-bottom: 0.5rem;
-      border-bottom: 1px solid var(--border);
-      font-size: 0.9rem;
+      flex-wrap: wrap;
+      gap: 0.4rem;
     }
-    .breadcrumb span {
-      cursor: pointer;
-      color: var(--accent);
-    }
-    .breadcrumb span:hover {
-      text-decoration: underline;
-    }
-    .breadcrumb .separator {
+    .breadcrumb-item {
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
       color: var(--text-secondary);
-      cursor: default;
     }
-    /* Стиль для проводника файлов */
+    .breadcrumb-item.active {
+      color: var(--primary);
+      font-weight: 600;
+    }
+    .breadcrumb-item i {
+      font-size: 0.9em;
+    }
+    .breadcrumb-separator {
+      color: var(--text-secondary);
+      opacity: 0.7;
+    }
     .explorer-container {
       flex-grow: 1;
       display: flex;
@@ -348,16 +365,16 @@
     }
     .explorer-actions button {
         padding: 0.25rem 0.5rem;
-        background: var(--accent);
+        background: linear-gradient(135deg, var(--accent-start), var(--accent-end));
         color: white;
         border: none;
-        border-radius: 3px;
+        border-radius: 4px;
         cursor: pointer;
         font-size: 0.8rem;
-        transition: background 0.2s ease;
+        transition: opacity 0.2s ease;
     }
     .explorer-actions button:hover {
-      background: #0056b3;
+      opacity: 0.9;
     }
     .explorer-actions button:disabled {
         background: var(--text-secondary);
@@ -366,24 +383,29 @@
     #explorerList {
       flex-grow: 1;
       overflow-y: auto;
-      padding: 0.5rem;
+      padding: 0.75rem;
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-      gap: 0.75rem;
+      gap: 1rem;
+      justify-items: center;
     }
     .explorer-item {
+      width: 120px;
+      height: 120px;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 0.75rem 0.5rem;
+      padding: 0.5rem;
       background: var(--bg-dark);
-      border-radius: 4px;
+      border-radius: 6px;
       border: 1px solid var(--border);
       cursor: pointer;
       transition: all 0.2s ease;
-      position: relative; /* Для drag handle и контекстного меню */
-      user-select: none; /* Предотвращает выделение текста при перетаскивании */
+      position: relative;
+      user-select: none;
+      text-align: center;
+      -webkit-user-drag: element;
     }
     .explorer-item:hover {
       background: var(--hover-bg);
@@ -395,18 +417,17 @@
         border: 1px dashed var(--primary);
     }
     .explorer-item i.folder-icon {
-      font-size: 2.5rem;
+      font-size: 2rem;
       margin-bottom: 0.4rem;
       color: var(--warning);
     }
     .explorer-item i.file-icon {
-      font-size: 2.5rem;
+      font-size: 2rem;
       margin-bottom: 0.4rem;
       color: var(--primary);
     }
     .explorer-item .item-name {
       font-size: 0.8rem;
-      text-align: center;
       word-break: break-word;
       width: 100%;
       overflow: hidden;
@@ -416,19 +437,19 @@
       -webkit-box-orient: vertical;
     }
     .explorer-item.selected {
-        border: 2px solid var(--primary) !important; /* Приоритет для перезаписи hover */
+        border: 2px solid var(--primary) !important;
         background: var(--hover-bg);
     }
     .explorer-item .item-actions {
         position: absolute;
-        top: 2px;
-        right: 2px;
-        display: none; /* Скрываем по умолчанию */
+        top: 4px;
+        right: 4px;
+        display: none;
         background: rgba(0, 0, 0, 0.5);
         border-radius: 3px;
     }
     .explorer-item:hover .item-actions {
-        display: flex; /* Показываем при наведении */
+        display: flex;
     }
     .explorer-item .item-actions button {
         background: none;
@@ -442,7 +463,6 @@
     .explorer-item .item-actions button:hover {
         color: var(--danger);
     }
-    /* Стили для модального окна создания папки */
     .modal {
       display: none;
       position: fixed;
@@ -517,7 +537,7 @@
       border-radius: 4px;
       cursor: pointer;
       font-weight: 500;
-      transition: background 0.2s ease;
+      transition: opacity 0.2s ease;
     }
     .btn-cancel {
       background: var(--secondary);
@@ -528,59 +548,15 @@
       background: var(--hover-bg);
     }
     .btn-create {
-      background: var(--accent);
+      background: linear-gradient(135deg, var(--accent-start), var(--accent-end));
       color: white;
     }
     .btn-create:hover {
-      background: #0056b3;
+      opacity: 0.9;
     }
     .btn-create:disabled {
       background: var(--text-secondary);
       cursor: not-allowed;
-    }
-    .users-section {
-      margin-top: 2rem;
-      padding-top: 1rem;
-      border-top: 1px solid var(--border);
-    }
-    .users-section h3 {
-      margin-bottom: 1rem;
-      font-size: 1.2rem;
-      color: var(--primary);
-    }
-    #usersList {
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-    }
-    .user-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 0.75rem;
-      background: var(--bg-darker);
-      border-radius: 4px;
-      border: 1px solid var(--border);
-    }
-    .user-name {
-      font-size: 0.9rem;
-      color: var(--text);
-    }
-    .kick-btn {
-      background: #dc3545;
-      color: white;
-      border: none;
-      width: 32px;
-      height: 32px;
-      border-radius: 4px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      transition: background 0.2s ease;
-    }
-    .kick-btn:hover {
-      background: #c82333;
     }
     #notifications {
       position: fixed;
@@ -593,7 +569,7 @@
       padding: 1rem;
       margin-bottom: 0.5rem;
       background: var(--secondary);
-      border-left: 4px solid var(--accent);
+      border-left: 4px solid var(--primary);
       border-radius: 4px;
       box-shadow: 0 4px 12px var(--shadow);
       animation: slideIn 0.3s ease-out;
@@ -610,67 +586,66 @@
     }
     @media (max-width: 768px) {
       .main-container {
-        flex-direction: column; /* На мобильных устройствах снова вертикально */
+        flex-direction: column;
       }
       .header, .controls {
         padding: 1rem;
       }
       .video-container {
+        max-height: none;
         aspect-ratio: 16 / 9;
       }
-      .quality-menu {
-        top: 5px;
-        right: 5px;
+      #explorerList {
+        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
       }
-      .upload-section {
-        padding: 0.75rem;
+      .explorer-item {
+        width: 100px;
+        height: 100px;
       }
-      .comments-section {
-        padding: 0.75rem;
-      }
-      .right-panel {
-        padding: 0.75rem;
-      }
-      .manage-links {
-        flex-direction: column;
-        gap: 0.5rem;
-      }
-      .top-panel {
-          flex-direction: column;
+      .users-list-dropdown {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 90%;
+        max-height: 80vh;
       }
     }
   </style>
 </head>
 <body>
   <div class="header">
-    <div class="logo-container" onclick="window.location.href='/select-room.html'">
-      <div class="logo-icon">
-        <div class="logo-svg">
-          <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stop-color="#4a90e2" />
-                <stop offset="100%" stop-color="#8e44ad" />
-              </linearGradient>
-            </defs>
-            <circle cx="50" cy="50" r="48" fill="url(#logoGradient)" />
-            <text 
-              x="50" 
-              y="50" 
-              font-family="Arial, sans-serif" 
-              font-size="40" 
-              fill="white" 
-              text-anchor="middle" 
-              dominant-baseline="middle"
-              alignment-baseline="middle"
-              style="paint-order: stroke; stroke: #000; stroke-width: 1px;"
-            >
-              S
-            </text>
-          </svg>
+    <div class="header-left">
+      <button id="leaveRoomBtn">Выйти из комнаты</button>
+      <div class="logo-container" onclick="window.location.href='/select-room.html'">
+        <div class="logo-icon">
+          <div class="logo-svg">
+            <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#4a90e2" />
+                  <stop offset="100%" stop-color="#8e44ad" />
+                </linearGradient>
+              </defs>
+              <circle cx="50" cy="50" r="48" fill="url(#logoGradient)" />
+              <text 
+                x="50" 
+                y="50" 
+                font-family="Arial, sans-serif" 
+                font-size="40" 
+                fill="white" 
+                text-anchor="middle" 
+                dominant-baseline="middle"
+                alignment-baseline="middle"
+                style="paint-order: stroke; stroke: #000; stroke-width: 1px;"
+              >
+                S
+              </text>
+            </svg>
+          </div>
         </div>
+        <h1>SyncWatch</h1>
       </div>
-      <h1>SyncWatch</h1>
     </div>
     <div class="manage-links">
       <a href="/select-room.html" class="manage-link">Select Room</a>
@@ -678,66 +653,48 @@
     </div>
   </div>
   <div class="controls">
-    <label for="userName">Your Name:</label>
-    <input type="text" id="userName" placeholder="Enter your name">
-    <button id="saveNameBtn">Save Name</button>
     <div class="status-line">
       В сети: <span id="onlineCount">0</span>
+      <div class="users-dropdown">
+        <button class="users-toggle" id="usersToggle">
+          <i class="fas fa-users"></i>
+        </button>
+        <div class="users-list-dropdown" id="usersDropdown"></div>
+      </div>
     </div>
   </div>
   <div class="main-container">
-    <div class="top-panel">
-        <div class="left-panel">
-          <button id="leaveRoomBtn">Выйти из комнаты</button>
-          <div class="video-container">
-            <video id="videoPlayer" width="100%" controls></video>
-            <div class="quality-menu">
-              <button id="qualityBtn" class="quality-btn-player">Settings</button>
-              <div id="qualityDropdown" class="dropdown-content">
-                <a href="#" data-quality="original">Original</a>
-                <a href="#" data-quality="low">Low (240p)</a>
-                <a href="#" data-quality="medium">Medium (720p)</a>
-              </div>
-            </div>
-          </div>
-          <div class="upload-section">
-            <button id="uploadBtn"><i class="fas fa-upload"></i> Upload Video</button>
-            <input type="file" id="uploadInput" accept="video/*" style="display:none;">
-            <div class="progress-bar" style="display:none;">
-              <div class="progress-bar-fill"></div>
-            </div>
-          </div>
-          <div id="status">Status: Not connected</div>
+    <div class="left-panel">
+      <div class="video-status" id="status">Status: Not connected</div>
+      <div class="video-container">
+        <video id="videoPlayer" width="100%" controls></video>
+      </div>
+      <div class="upload-section">
+        <button id="uploadBtn"><i class="fas fa-upload"></i> Upload Video</button>
+        <input type="file" id="uploadInput" accept="video/*" style="display:none;">
+        <div class="progress-bar" style="display:none;">
+          <div class="progress-bar-fill"></div>
         </div>
-        <div class="right-panel">
-          <div class="users-section">
-            <h3>Users Online</h3>
-            <div id="usersList"></div>
-          </div>
-          <!-- НОВОЕ: Проводник файлов справа -->
-          <div class="explorer-container">
-              <div class="explorer-header">
-                  <span>File Explorer</span>
-                  <div class="explorer-actions">
-                      <button id="uploadBtnExplorer" title="Upload Video"><i class="fas fa-upload"></i></button>
-                      <button id="createFolderBtnExplorer" title="Create New Folder"><i class="fas fa-folder-plus"></i></button>
-                      <button id="refreshExplorerBtn" title="Refresh"><i class="fas fa-sync-alt"></i></button>
-                      <!-- Кнопки перемещения и удаления появятся при выборе -->
-                      <button id="moveItemsBtn" title="Move Selected" disabled><i class="fas fa-arrow-right"></i></button>
-                      <button id="deleteItemsBtn" title="Delete Selected" disabled><i class="fas fa-trash-alt"></i></button>
-                  </div>
-              </div>
-               <!-- Хлебные крошки для навигации по папкам в проводнике -->
-               <div class="breadcrumb" id="explorerBreadcrumb">
-                  <!-- Хлебные крошки будут здесь -->
-               </div>
-              <div id="explorerList"></div>
+      </div>
+    </div>
+    <div class="right-panel">
+      <div class="explorer-container">
+        <div class="explorer-header">
+          <span>File Explorer</span>
+          <div class="explorer-actions">
+            <button id="uploadBtnExplorer" title="Upload Video"><i class="fas fa-upload"></i></button>
+            <button id="createFolderBtnExplorer" title="Create New Folder"><i class="fas fa-folder-plus"></i></button>
+            <button id="refreshExplorerBtn" title="Refresh"><i class="fas fa-sync-alt"></i></button>
+            <button id="moveItemsBtn" title="Move Selected" disabled><i class="fas fa-arrow-right"></i></button>
+            <button id="deleteItemsBtn" title="Delete Selected" disabled><i class="fas fa-trash-alt"></i></button>
           </div>
         </div>
+        <div class="breadcrumb-panel" id="explorerBreadcrumb"></div>
+        <div id="explorerList"></div>
+      </div>
     </div>
   </div>
   <div id="notifications"></div>
-  <!-- НОВОЕ: Модальное окно создания папки -->
   <div id="createFolderModal" class="modal">
     <div class="modal-content">
       <div class="modal-header">
@@ -747,7 +704,7 @@
       <div class="modal-body">
         <label for="newFolderName">Folder Name:</label>
         <input type="text" id="newFolderName" placeholder="Enter folder name">
-        <input type="hidden" id="currentModalPath" value=""> <!-- Для передачи текущего пути -->
+        <input type="hidden" id="currentModalPath" value="">
       </div>
       <div class="modal-footer">
         <button class="btn-cancel" id="cancelCreateFolder">Cancel</button>
@@ -755,24 +712,23 @@
       </div>
     </div>
   </div>
-  <!-- Скрытый input для загрузки файлов через проводник -->
   <input type="file" id="uploadInputExplorer" accept="video/*" style="display:none;">
   <script>
-    // === SOCKET CONNECTION ===
     const socket = io();
     let joinedRoom = null;
     let currentVideoFile = null;
     let isVideoReady = false;
     let lastSeekSent = 0;
     let userName = localStorage.getItem('userName') || `User${Math.floor(Math.random()*10000)}`;
-    // === URL PARAMS ===
     const urlParams = new URLSearchParams(window.location.search);
     const roomId = urlParams.get('room');
-    // === ПРОВЕРКА ROOM ID ===
     if (!roomId) {
         window.location.href = '/select-room.html';
     }
-    // === ROOM JOIN LOGIC ===
+
+    // === НОВАЯ ГЛОБАЛЬНАЯ ПЕРЕМЕННАЯ ===
+    let moveBuffer = null;
+
     function joinRoom() {
       const name = localStorage.getItem('userName') || '';
       socket.emit('join-room', { roomId, name }, res => {
@@ -784,298 +740,165 @@
           userName = res.room.name;
           updateExplorerBreadcrumb();
           loadAndRenderExplorerForPath('');
-
-          // --- НОВОЕ: Загрузка состояния комнаты из rooms.json при успешном входе ---
           loadAndApplyRoomStateFromJson(roomId);
-          // --- /НОВОЕ ---
         }
       });
     }
 
-    // --- НОВАЯ ФУНКЦИЯ: Загрузка и применение состояния комнаты из JSON ---
     async function loadAndApplyRoomStateFromJson(roomId) {
       try {
-        console.log(`[PLAYER] Запрашиваю rooms.json для инициализации состояния комнаты ${roomId}`);
         const response = await fetch('/json/rooms.json');
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const roomsData = await response.json();
-        console.log(`[PLAYER] Получены данные rooms.json:`, roomsData);
-
         const roomInfo = roomsData.find(r => r.id === roomId);
-        if (roomInfo) {
-          console.log(`[PLAYER] Найдено состояние комнаты ${roomId} в JSON:`, roomInfo);
-          // Проверяем, есть ли активное видео
-          if (roomInfo.currentVideo) {
-            console.log(`[PLAYER] Применяю видео из JSON: ${roomInfo.currentVideo}, время: ${roomInfo.currentTime}, воспроизводится: ${roomInfo.isPlaying}`);
-
-            // Устанавливаем источник видео
-            video.src = `/videos/${roomInfo.currentVideo}`;
-            statusEl.innerHTML = `Video loaded from state: ${roomInfo.currentVideo.split('/').pop()}`;
-            currentVideoFile = roomInfo.currentVideo;
-            isVideoReady = false; // Сброс, пока метаданные не загружены
-
-            // Ждем, пока метаданные загрузятся, чтобы установить время
-            video.addEventListener('loadedmetadata', function onLoadedMetadata() {
-              video.removeEventListener('loadedmetadata', onLoadedMetadata); // Удаляем слушатель, чтобы он сработал только один раз
-              isVideoReady = true;
-              console.log(`[PLAYER] Метаданные загружены, устанавливаю время: ${roomInfo.currentTime}s`);
-              video.currentTime = roomInfo.currentTime || 0; // Устанавливаем время из JSON
-
-              // Если видео в комнате воспроизводится, пробуем воспроизвести
-              if (roomInfo.isPlaying) {
-                const playPromise = video.play();
-                if (playPromise !== undefined) {
-                  playPromise.then(() => {
-                    console.log(`[PLAYER] Плеер синхронизирован: воспроизведение с ${roomInfo.currentTime}s`);
-                  }).catch(error => {
-                    console.warn(`[PLAYER] Браузер заблокировал автовоспроизведение при синхронизации: ${error}`);
-                    // Показать пользователю кнопку для запуска воспроизведения, если нужно
-                  });
-                }
-              } else {
-                 // Если видео в комнате на паузе, оставляем на паузе
-                 console.log(`[PLAYER] Плеер синхронизирован: пауза на ${roomInfo.currentTime}s`);
-                 // video.pause(); // pause() не нужен, так как плеер изначально на паузе, если не нажата кнопка play
+        if (roomInfo && roomInfo.currentVideo) {
+          video.src = `/videos/${roomInfo.currentVideo}`;
+          statusEl.innerHTML = `Video loaded from state: ${roomInfo.currentVideo.split('/').pop()}`;
+          currentVideoFile = roomInfo.currentVideo;
+          isVideoReady = false;
+          video.addEventListener('loadedmetadata', function onLoadedMetadata() {
+            video.removeEventListener('loadedmetadata', onLoadedMetadata);
+            isVideoReady = true;
+            video.currentTime = roomInfo.currentTime || 0;
+            if (roomInfo.isPlaying) {
+              const playPromise = video.play();
+              if (playPromise !== undefined) {
+                playPromise.catch(error => console.warn('Autoplay blocked:', error));
               }
-
-              // Визуально выделяем видео в проводнике
-              highlightSelectedVideo(roomInfo.currentVideo);
-            }, { once: true }); // { once: true } гарантирует, что слушатель сработает только один раз
-          } else {
-            console.log(`[PLAYER] В комнате ${roomId} нет активного видео.`);
-          }
-        } else {
-          console.warn(`[PLAYER] Информация о комнате ${roomId} не найдена в rooms.json при инициализации.`);
+            }
+            highlightSelectedVideo(roomInfo.currentVideo);
+          }, { once: true });
         }
       } catch (error) {
-        console.error('[PLAYER] Ошибка при загрузке или применении состояния комнаты из JSON:', error);
-        showNotification(`Ошибка синхронизации с комнатой: ${error.message}`, 'error');
+        console.error('[PLAYER] Ошибка при загрузке состояния комнаты:', error);
+        showNotification(`Ошибка синхронизации: ${error.message}`, 'error');
       }
     }
-    // --- /НОВАЯ ФУНКЦИЯ ---
 
-    // === DOM LOADED ===
     window.addEventListener('DOMContentLoaded', () => {
-      if (!roomId) {
-          window.location.href = '/select-room.html';
-          return;
-      }
-      if (roomId) {
-        localStorage.setItem('lastRoomId', roomId);
-      }
+      if (!roomId) return window.location.href = '/select-room.html';
+      localStorage.setItem('lastRoomId', roomId);
       joinRoom();
     });
-    // === ELEMENTS ===
+
     const video = document.getElementById('videoPlayer');
     const statusEl = document.getElementById('status');
-    const userNameInput = document.getElementById('userName');
-    const saveNameBtn = document.getElementById('saveNameBtn');
-    const uploadBtn = document.getElementById('uploadBtn');
-    const uploadInput = document.getElementById('uploadInput');
-    const qualityBtn = document.getElementById('qualityBtn');
-    const qualityDropdown = document.getElementById('qualityDropdown');
     const leaveRoomBtn = document.getElementById('leaveRoomBtn');
-    const usersList = document.getElementById('usersList');
-    const explorerBreadcrumb = document.getElementById('explorerBreadcrumb');
-    // === NAME INPUT ===
-    if (localStorage.getItem('userName')) {
-      userNameInput.value = localStorage.getItem('userName');
-    }
-    saveNameBtn.addEventListener('click', () => {
-      const name = userNameInput.value.trim();
-      if (name) {
-        localStorage.setItem('userName', name);
-        socket.emit('set-name', name);
-      }
-    });
-    // === QUALITY MENU ===
-    qualityBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      qualityDropdown.classList.toggle('show');
-    });
-    document.addEventListener('click', (e) => {
-      if (!qualityBtn.contains(e.target) && !qualityDropdown.contains(e.target)) {
-        qualityDropdown.classList.remove('show');
-      }
-    });
-    qualityDropdown.querySelectorAll('a').forEach(item => {
-      item.addEventListener('click', (e) => {
-        e.preventDefault();
-        const quality = item.dataset.quality;
-        if (!currentVideoFile) return;
-        if (quality === 'original') {
-          socket.emit('select-video', currentVideoFile);
-          qualityDropdown.classList.remove('show');
-          return;
-        }
-        fetch(`/api/check-quality/${currentVideoFile}/${quality}`)
-          .then(res => res.json())
-          .then(data => {
-            if (data.exists) {
-              socket.emit('select-video', data.filename);
-              qualityDropdown.classList.remove('show');
-            } else {
-              if (confirm(`Quality ${quality} not available. Start transcoding?`)) {
-                window.location.href = '/transcode';
-              }
-            }
-          });
-      });
-    });
-    // === UPLOAD VIDEO ===
-    uploadBtn.addEventListener('click', () => {
-      uploadInput.click();
-    });
-    uploadInput.addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (file) {
-        const formData = new FormData();
-        formData.append('video', file);
-        const progressBar = document.querySelector('.progress-bar');
-        progressBar.style.display = 'block';
-        const progressBarFill = document.querySelector('.progress-bar-fill');
-        const xhr = new XMLHttpRequest();
-        xhr.upload.addEventListener('progress', (e) => {
-          if (e.lengthComputable) {
-            const percentComplete = (e.loaded / e.total) * 100;
-            progressBarFill.style.width = `${percentComplete}%`;
-          }
-        });
-        xhr.addEventListener('load', () => {
-          if (xhr.status === 200) {
-            const data = JSON.parse(xhr.responseText);
-            if (data.success) {
-              showNotification(`Video uploaded: ${data.file}`, 'success');
-              progressBar.style.display = 'none';
-              progressBarFill.style.width = '0';
-              loadAndRenderExplorerForPath(currentExplorerPath);
-            } else {
-              showNotification('Upload failed', 'error');
-              progressBar.style.display = 'none';
-            }
-          } else {
-            showNotification('Upload failed', 'error');
-            progressBar.style.display = 'none';
-          }
-        });
-        xhr.open('POST', '/upload');
-        xhr.send(formData);
-      }
-    });
-    // === LEAVE ROOM ===
+    const usersToggle = document.getElementById('usersToggle');
+    const usersDropdown = document.getElementById('usersDropdown');
+
     leaveRoomBtn.addEventListener('click', () => {
-      socket.emit('leave-room', () => {
+      socket.emit('leave-room', { roomId }, () => {
         window.location.href = '/select-room.html';
       });
     });
-    // === VIDEO EVENTS ===
-    video.addEventListener('loadedmetadata', () => {
-      isVideoReady = true;
+
+    usersToggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      usersDropdown.classList.toggle('show');
     });
+
+    document.addEventListener('click', (e) => {
+      if (!usersToggle.contains(e.target) && !usersDropdown.contains(e.target)) {
+        usersDropdown.classList.remove('show');
+      }
+    });
+
+    const uploadBtn = document.getElementById('uploadBtn');
+    const uploadInput = document.getElementById('uploadInput');
+    uploadBtn.addEventListener('click', () => uploadInput.click());
+    uploadInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const formData = new FormData();
+      formData.append('video', file);
+      const progressBar = document.querySelector('.progress-bar');
+      progressBar.style.display = 'block';
+      const progressBarFill = document.querySelector('.progress-bar-fill');
+      const xhr = new XMLHttpRequest();
+      xhr.upload.addEventListener('progress', (e) => {
+        if (e.lengthComputable) {
+          progressBarFill.style.width = `${(e.loaded / e.total) * 100}%`;
+        }
+      });
+      xhr.addEventListener('load', () => {
+        progressBar.style.display = 'none';
+        progressBarFill.style.width = '0';
+        if (xhr.status === 200) {
+          const data = JSON.parse(xhr.responseText);
+          if (data.success) {
+            showNotification(`Video uploaded: ${data.file}`, 'success');
+            loadAndRenderExplorerForPath(currentExplorerPath);
+          } else {
+            showNotification('Upload failed', 'error');
+          }
+        } else {
+          showNotification('Upload failed', 'error');
+        }
+      });
+      xhr.open('POST', '/upload');
+      xhr.send(formData);
+    });
+
+    video.addEventListener('loadedmetadata', () => isVideoReady = true);
     video.addEventListener('play', () => {
       if (isVideoReady) {
-        // --- ИЗМЕНЕНО: Отправляем play-video на сервер ---
-        socket.emit('play-video', { roomId: joinedRoom, time: video.currentTime });
-        // --- /ИЗМЕНЕНО ---
-        // --- ИЗМЕНЕНО: Отправляем video-command другим клиентам ---
         socket.emit('video-command', { type: 'play', roomId: joinedRoom });
-        // --- /ИЗМЕНЕНО ---
+        socket.emit('play-video', { roomId: joinedRoom, time: video.currentTime });
       }
     });
     video.addEventListener('pause', () => {
       if (isVideoReady) {
-        // --- ИЗМЕНЕНО: Отправляем pause-video на сервер ---
-        socket.emit('pause-video', { roomId: joinedRoom, time: video.currentTime });
-        // --- /ИЗМЕНЕНО ---
-        // --- ИЗМЕНЕНО: Отправляем video-command другим клиентам ---
         socket.emit('video-command', { type: 'pause', roomId: joinedRoom });
-        // --- /ИЗМЕНЕНО ---
+        socket.emit('pause-video', { roomId: joinedRoom, time: video.currentTime });
       }
     });
     video.addEventListener('seeked', () => {
       if (isVideoReady) {
         const now = Date.now();
         if (now - lastSeekSent > 500) {
-          // --- ИЗМЕНЕНО: Отправляем seek-video на сервер ---
-          socket.emit('seek-video', { roomId: joinedRoom, time: video.currentTime });
-          // --- /ИЗМЕНЕНО ---
-          // --- ИЗМЕНЕНО: Отправляем video-command другим клиентам ---
           socket.emit('video-command', { type: 'seek', time: video.currentTime, roomId: joinedRoom });
-          // --- /ИЗМЕНЕНО ---
+          socket.emit('seek-video', { roomId: joinedRoom, time: video.currentTime });
           lastSeekSent = now;
         }
       }
     });
-    // === RECEIVE VIDEO COMMAND FROM OTHER USERS ===
+
     socket.on('video-command', (data) => {
-      if (isVideoReady && video.readyState >= 1) {
-        if (data.type === 'play') {
-          if (video.paused) {
-            const playPromise = video.play();
-            if (playPromise !== undefined) {
-              playPromise.then(() => {}).catch(error => {
-                console.warn('Play command blocked by browser:', error);
-              });
-            }
-          }
-        } else if (data.type === 'pause') {
-          if (!video.paused) {
-            video.pause();
-          }
-        } else if (data.type === 'seek' && typeof data.time === 'number') {
-          if (Math.abs(video.currentTime - data.time) > 0.5) {
-            lastSeekSent = Date.now();
-            video.currentTime = data.time;
-            console.log(`SyncWatch: Received seek command to ${data.time}s`);
-          }
+      if (!isVideoReady || video.readyState < 1) return;
+      if (data.type === 'play' && video.paused) {
+        video.play().catch(() => {});
+      } else if (data.type === 'pause' && !video.paused) {
+        video.pause();
+      } else if (data.type === 'seek' && typeof data.time === 'number') {
+        if (Math.abs(video.currentTime - data.time) > 0.5) {
+          video.currentTime = data.time;
         }
       }
     });
-    // === PROGRESS BUFFER ===
-    video.addEventListener('progress', () => {
-      const buffered = video.buffered;
-      if (buffered.length > 0) {
-        const bufferedEnd = buffered.end(0);
-        const duration = video.duration;
-        const percent = (bufferedEnd / duration) * 100;
-        let bufferBar = document.querySelector('.buffer-progress');
-        if (!bufferBar) {
-          bufferBar = document.createElement('div');
-          bufferBar.className = 'buffer-progress';
-          bufferBar.innerHTML = '<div class="buffer-progress-fill"></div>';
-          video.parentNode.insertBefore(bufferBar, video.nextSibling);
-        }
-        bufferBar.querySelector('.buffer-progress-fill').style.width = `${percent}%`;
-      }
-    });
-    // === NOTIFICATION FUNCTION ===
+
     function showNotification(message, type) {
       const notification = document.createElement('div');
       notification.className = `notification ${type}`;
       notification.textContent = message;
       document.getElementById('notifications').appendChild(notification);
-      setTimeout(() => {
-        notification.remove();
-      }, 3000);
+      setTimeout(() => notification.remove(), 3000);
     }
-    // === USER KICKED ===
-    socket.on('kicked-from-room', (data) => {
-      alert(data.message || 'You have been kicked from the room');
+
+    socket.on('kicked-from-room', () => {
+      alert('You have been kicked from the room');
       window.location.href = '/select-room.html';
     });
-    // === VIDEO UPDATED (синхронизация выбора) ===
+
     socket.on('video-updated', (filename) => {
-      console.log(`SyncWatch: Video updated event received: ${filename}`);
       video.src = `/videos/${filename}`;
       statusEl.innerHTML = `Video loaded: ${filename.split('/').pop()}`;
       currentVideoFile = filename;
       isVideoReady = false;
-      highlightSelectedVideo(filename); // <-- ВАЖНО: Вызываем highlightSelectedVideo
+      highlightSelectedVideo(filename);
       loadAndRenderExplorerForPath(currentExplorerPath);
     });
-    // === GLOBAL ROOM STATE ===
+
     let roomState = null;
     socket.on('room-state', (state) => {
       roomState = state;
@@ -1085,125 +908,131 @@
           statusEl.innerHTML = `Video loaded: ${state.currentVideo.split('/').pop()}`;
           currentVideoFile = state.currentVideo;
           isVideoReady = false;
-          console.log(`[PLAYER] Video src changed to: ${state.currentVideo}`);
-        } else {
-          if (isVideoReady && video.readyState >= 1) {
-             if (Math.abs(video.currentTime - state.currentTime) > 0.5) {
-                 const now = Date.now();
-                 if (now - lastSeekSent > 1000) {
-                     video.currentTime = state.currentTime;
-                     console.log(`SyncWatch: Syncing time to ${state.currentTime}s`);
-                 }
-             }
-
-             // Синхронизация состояния воспроизведения (play/pause)
-             if (state.isPlaying && video.paused) {
-                 const playPromise = video.play();
-                 if (playPromise !== undefined) {
-                   playPromise.then(() => {}).catch(error => {
-                     console.warn('Play command from room-state blocked by browser:', error);
-                   });
-                 }
-             } else if (!state.isPlaying && !video.paused) {
-                 video.pause();
-             }
-          }
         }
-        highlightSelectedVideo(state.currentVideo); // <-- ВАЖНО: Вызываем highlightSelectedVideo
+        if (isVideoReady) {
+          applyRoomStateToVideo(state);
+        } else {
+          const onLoaded = () => {
+            isVideoReady = true;
+            video.removeEventListener('loadedmetadata', onLoaded);
+            applyRoomStateToVideo(state);
+          };
+          video.addEventListener('loadedmetadata', onLoaded);
+        }
+        highlightSelectedVideo(state.currentVideo);
       }
       document.getElementById('onlineCount').textContent = Object.keys(state.users).length;
-      renderUsersList();
+      renderUsersDropdown();
       loadAndRenderExplorerForPath(currentExplorerPath);
     });
-    // === USERS LIST ===
-    function renderUsersList() {
-      if (!roomState || !roomState.users) return;
-      usersList.innerHTML = '';
-      Object.keys(roomState.users).forEach(userId => {
-        const user = roomState.users[userId];
+
+    function applyRoomStateToVideo(state) {
+      if (Math.abs(video.currentTime - state.currentTime) > 0.5) {
+        video.currentTime = state.currentTime;
+      }
+      if (state.isPlaying && video.paused) {
+        video.play().catch(() => {});
+      } else if (!state.isPlaying && !video.paused) {
+        video.pause();
+      }
+    }
+
+    function renderUsersDropdown() {
+      if (!roomState || !roomState.users) {
+        usersDropdown.innerHTML = '<div style="padding: 0.75rem; color: var(--text-secondary);">No users</div>';
+        return;
+      }
+      usersDropdown.innerHTML = '';
+      Object.entries(roomState.users).forEach(([userId, user]) => {
         const div = document.createElement('div');
-        div.className = 'user-item';
+        div.className = 'user-item-dropdown';
         const displayName = user.name || user.displayName || `User-${userId.substring(0, 8)}`;
         div.innerHTML = `
-          <div class="user-name">${displayName}</div>
-          <button class="kick-btn" data-id="${userId}"><i class="fas fa-times"></i></button>
+          <div class="user-name-dropdown">${displayName}</div>
+          <button class="kick-btn-dropdown" data-id="${userId}"><i class="fas fa-times"></i></button>
         `;
-        usersList.appendChild(div);
-        div.querySelector('.kick-btn').addEventListener('click', () => {
-          if (confirm(`Kick user "${displayName}" from room?`)) {
-            // --- ИСПРАВЛЕНО: Правильная структура данных для kick-user ---
-            socket.emit('kick-user', { userId: userId, roomId: joinedRoom }, res => {
-              if (res && res.success) {
+        usersDropdown.appendChild(div);
+        div.querySelector('.kick-btn-dropdown').addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (confirm(`Kick user "${displayName}"?`)) {
+            socket.emit('kick-user', { roomId, targetUserId: userId }, (res) => {
+              if (res?.success) {
                 showNotification(`User kicked: ${displayName}`, 'success');
               } else {
-                showNotification('Kick failed: ' + (res?.error || 'Unknown error'), 'error');
+                showNotification('Kick failed: ' + (res?.error || 'unknown error'), 'error');
               }
             });
           }
         });
       });
+      const kickAllDiv = document.createElement('div');
+      kickAllDiv.style.padding = '0.5rem';
+      kickAllDiv.innerHTML = '<button id="kickAllBtn">Kick All Users</button>';
+      usersDropdown.appendChild(kickAllDiv);
+      kickAllDiv.querySelector('#kickAllBtn').addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (confirm('Kick all users from room?')) {
+          socket.emit('kick-all', { roomId }, (res) => {
+            if (res?.success) {
+              showNotification('All users kicked', 'success');
+            } else {
+              showNotification('Kick all failed: ' + (res?.error || 'unknown error'), 'error');
+            }
+          });
+        }
+      });
     }
-    // ===========================================================================
-    // === НОВОЕ: ЛОГИКА ПРОВОДНИКА ФАЙЛОВ (EXPLORER) ============================
-    // ===========================================================================
-    let currentExplorerPath = ''; // Текущий путь в проводнике
-    let selectedItems = new Set(); // Множество выбранных элементов (пути)
-    // === НАВИГАЦИЯ В ПРОВОДНИКЕ ===
+
+    let currentExplorerPath = '';
+    let selectedItems = new Set();
+    let draggedItem = null;
+
     async function navigateExplorerToFolder(folderPath) {
         currentExplorerPath = folderPath;
         updateExplorerBreadcrumb();
         await loadAndRenderExplorerForPath(folderPath);
     }
-    // === ОБНОВЛЕНИЕ ХЛЕБНЫХ КРОШЕК ПРОВОДНИКА ===
+
     function updateExplorerBreadcrumb() {
-        explorerBreadcrumb.innerHTML = '';
-        const homeSpan = document.createElement('span');
-        homeSpan.style.cursor = 'pointer';
-        homeSpan.style.color = 'var(--accent)';
-        homeSpan.textContent = 'Home';
-        homeSpan.addEventListener('click', () => navigateExplorerToFolder(''));
-        explorerBreadcrumb.appendChild(homeSpan);
-        if (currentExplorerPath === '') return;
-        const parts = currentExplorerPath.split('/');
-        let pathSoFar = '';
-        parts.forEach((part, index) => {
-          const separator = document.createElement('span');
-          separator.className = 'separator';
-          separator.textContent = ' / ';
-          separator.style.margin = '0 0.25rem';
-          explorerBreadcrumb.appendChild(separator);
-          pathSoFar = pathSoFar ? pathSoFar + '/' + part : part;
-          const partSpan = document.createElement('span');
-          partSpan.style.cursor = 'pointer';
-          partSpan.style.color = 'var(--accent)';
-          partSpan.textContent = part;
-          partSpan.addEventListener('click', () => navigateExplorerToFolder(pathSoFar));
-          explorerBreadcrumb.appendChild(partSpan);
+        const breadcrumb = document.getElementById('explorerBreadcrumb');
+        breadcrumb.innerHTML = '';
+        const parts = currentExplorerPath.split('/').filter(p => p);
+        const items = [{ name: 'Home', path: '' }, ...parts.map((part, i) => ({
+            name: part,
+            path: parts.slice(0, i + 1).join('/')
+        }))];
+        items.forEach((item, index) => {
+            const isLast = index === items.length - 1;
+            const span = document.createElement('div');
+            span.className = `breadcrumb-item ${isLast ? 'active' : ''}`;
+            span.innerHTML = `${index === 0 ? '<i class="fas fa-home"></i>' : '<i class="fas fa-folder"></i>'} <span>${item.name}</span>`;
+            if (!isLast) {
+                span.style.cursor = 'pointer';
+                span.addEventListener('click', () => navigateExplorerToFolder(item.path));
+            }
+            breadcrumb.appendChild(span);
+            if (!isLast) {
+                const sep = document.createElement('div');
+                sep.className = 'breadcrumb-separator';
+                sep.textContent = '/';
+                breadcrumb.appendChild(sep);
+            }
         });
     }
-    // === ЗАГРУЗКА И ОТРИСОВКА СОДЕРЖИМОГО ПРОВОДНИКА ===
+
     async function loadAndRenderExplorerForPath(path) {
-        console.log(`[EXPLORER] Запрашиваем содержимое папки: '${path}'`);
         const explorerList = document.getElementById('explorerList');
         explorerList.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 2rem; opacity: 0.7;">Loading...</div>';
         try {
             const token = localStorage.getItem('authToken');
-            if (!token) {
-                throw new Error('Authentication token not found. Please log in again.');
-            }
-            const structRes = await fetch('/api/files/list', {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
+            if (!token) throw new Error('Auth token missing');
+            const structRes = await fetch('/api/files/list', { headers: { 'Authorization': `Bearer ${token}` } });
             const structData = await structRes.json();
             if (!structData.success) throw new Error(structData.error || 'Failed to load structure');
             const findContents = (items, targetPath) => {
                 if (targetPath === '') return items;
                 for (const item of items) {
-                    if (item.type === 'folder' && item.path === targetPath) {
-                        return item.children || [];
-                    }
+                    if (item.type === 'folder' && item.path === targetPath) return item.children || [];
                     if (item.type === 'folder' && item.children) {
                         const found = findContents(item.children, targetPath);
                         if (found) return found;
@@ -1216,36 +1045,25 @@
             updateExplorerActions();
             renderExplorerItems(contentsAtPath);
         } catch (err) {
-            console.error('[EXPLORER] Ошибка загрузки содержимого папки:', err);
-            showNotification('Explorer failed to load: ' + err.message, 'error');
-            explorerList.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 2rem; opacity: 0.7;">Error loading folder contents</div>';
+            console.error('[EXPLORER] Error:', err);
+            showNotification('Explorer failed: ' + err.message, 'error');
+            explorerList.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 2rem; opacity: 0.7;">Error loading folder</div>';
         }
     }
-    // === ФУНКЦИЯ СИНХРОНИЗАЦИИ ВЫБОРА ВИДЕО (ОБНОВЛЁННАЯ) ===
+
     function highlightSelectedVideo(videoPath) {
-        // Снимаем выделение со всех элементов в explorerList
-        document.querySelectorAll('#explorerList .explorer-item').forEach(item => {
-            item.classList.remove('selected');
-        });
+        document.querySelectorAll('#explorerList .explorer-item').forEach(item => item.classList.remove('selected'));
         if (!videoPath) return;
-        // Находим элемент в explorerList по data-path и выделяем его
-        const selectedItemInExplorer = document.querySelector(`#explorerList .explorer-item[data-path="${videoPath}"]`);
-        if (selectedItemInExplorer) {
-            selectedItemInExplorer.classList.add('selected');
-        }
+        const el = document.querySelector(`#explorerList .explorer-item[data-path="${videoPath}"]`);
+        if (el) el.classList.add('selected');
     }
-    // === ОБНОВЛЕНИЕ ВИЗУАЛЬНОГО ВЫДЕЛЕНИЯ В ПРОВОДНИКЕ ===
+
     function updateExplorerSelection() {
         document.querySelectorAll('.explorer-item').forEach(el => {
-            const itemPath = el.dataset.path;
-            if (selectedItems.has(itemPath)) {
-                el.classList.add('selected');
-            } else {
-                el.classList.remove('selected');
-            }
+            el.classList.toggle('selected', selectedItems.has(el.dataset.path));
         });
     }
-    // === ОБНОВЛЕНИЕ СОСТОЯНИЯ КНОПОК ДЕЙСТВИЙ В ПРОВОДНИКЕ ===
+
     function updateExplorerActions() {
         const moveBtn = document.getElementById('moveItemsBtn');
         const deleteBtn = document.getElementById('deleteItemsBtn');
@@ -1253,46 +1071,75 @@
         moveBtn.disabled = !hasSelection;
         deleteBtn.disabled = !hasSelection;
     }
-    // === ОТРИСОВКА ЭЛЕМЕНТОВ ПРОВОДНИКА ===
+
     function renderExplorerItems(contents) {
         const explorerList = document.getElementById('explorerList');
         explorerList.innerHTML = '';
+
         if (currentExplorerPath !== '') {
             const parentItem = document.createElement('div');
             parentItem.className = 'explorer-item';
             parentItem.dataset.path = '..';
             parentItem.dataset.type = 'folder';
             parentItem.draggable = false;
-            parentItem.innerHTML = `
-                <i class="fas fa-level-up-alt folder-icon"></i>
-                <div class="item-name">..</div>
-            `;
+            parentItem.innerHTML = `<i class="fas fa-level-up-alt folder-icon"></i><div class="item-name">..</div>`;
+
+            // === CLICK: сброс moveBuffer и выделение ".." ===
             parentItem.addEventListener('click', (e) => {
-                 if (e.target.closest('.item-actions')) return;
-                 selectedItems.clear();
-                 selectedItems.add('..');
-                 updateExplorerSelection();
-                 updateExplorerActions();
-                 const parentPath = currentExplorerPath.split('/').slice(0, -1).join('/');
-                 navigateExplorerToFolder(parentPath);
+                if (e.target.closest('.item-actions')) return;
+
+                // Сброс буфера перемещения
+                if (moveBuffer) {
+                    moveBuffer = null;
+                    const btn = document.getElementById('moveItemsBtn');
+                    btn.innerHTML = '<i class="fas fa-arrow-right"></i>';
+                    btn.title = 'Move Selected';
+                }
+
+                selectedItems.clear();
+                selectedItems.add('..');
+                updateExplorerSelection();
+                updateExplorerActions();
             });
+
+            // === DOUBLE CLICK: переход в родительскую папку ===
             parentItem.addEventListener('dblclick', (e) => {
-                 if (e.target.closest('.item-actions')) return;
-                 const parentPath = currentExplorerPath.split('/').slice(0, -1).join('/');
-                 navigateExplorerToFolder(parentPath);
+                if (e.target.closest('.item-actions')) return;
+                const parentPath = currentExplorerPath.split('/').slice(0, -1).join('/');
+                navigateExplorerToFolder(parentPath);
             });
+
+            // === DRAG-AND-DROP НА ".." ===
+            parentItem.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+            });
+            parentItem.addEventListener('dragenter', (e) => {
+                e.preventDefault();
+                if (draggedItem) {
+                    parentItem.classList.add('drag-over');
+                }
+            });
+            parentItem.addEventListener('dragleave', () => {
+                parentItem.classList.remove('drag-over');
+            });
+            parentItem.addEventListener('drop', async (e) => {
+                e.preventDefault();
+                parentItem.classList.remove('drag-over');
+                if (!draggedItem) return;
+
+                const parentPath = currentExplorerPath.split('/').slice(0, -1).join('/');
+                await moveItems([draggedItem], parentPath);
+            });
+
             explorerList.appendChild(parentItem);
         }
+
         if (contents.length === 0) {
-            const emptyDiv = document.createElement('div');
-            emptyDiv.style.gridColumn = '1 / -1';
-            emptyDiv.style.textAlign = 'center';
-            emptyDiv.style.padding = '2rem';
-            emptyDiv.style.opacity = '0.7';
-            emptyDiv.innerHTML = '<i class="fas fa-info-circle"></i> Folder is empty';
-            explorerList.appendChild(emptyDiv);
+            explorerList.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 2rem; opacity: 0.7;"><i class="fas fa-info-circle"></i> Folder is empty</div>';
             return;
         }
+
         contents.forEach(item => {
             const div = document.createElement('div');
             div.className = 'explorer-item';
@@ -1300,324 +1147,339 @@
             div.dataset.type = item.type;
             div.draggable = true;
             if (item.type === 'folder') {
-                div.innerHTML = `
-                    <i class="fas fa-folder folder-icon"></i>
-                    <div class="item-name">${item.name}</div>
-                `;
+                div.innerHTML = `<i class="fas fa-folder folder-icon"></i><div class="item-name">${item.name}</div>`;
             } else {
                 const fileName = item.name.split('/').pop();
-                const ext = fileName.split('.').pop().toLowerCase();
-                let iconClass = 'fas fa-file-video';
-                div.innerHTML = `
-                    <i class="${iconClass} file-icon"></i>
-                    <div class="item-name">${fileName}</div>
-                `;
+                div.innerHTML = `<i class="fas fa-file-video file-icon"></i><div class="item-name">${fileName}</div>`;
             }
-            // === SINGLE CLICK для визуального выбора ===
+
+            div.addEventListener('dragstart', (e) => {
+                draggedItem = item.path;
+                e.dataTransfer.setData('text/plain', item.path);
+                setTimeout(() => div.style.opacity = '0.4', 0);
+            });
+            div.addEventListener('dragend', () => {
+                div.style.opacity = '1';
+                draggedItem = null;
+            });
+
             div.addEventListener('click', (e) => {
                 if (e.target.closest('.item-actions')) return;
-                const isCtrlClick = e.ctrlKey || e.metaKey;
-                const isShiftClick = e.shiftKey;
-                const itemPath = item.path;
-                if (isCtrlClick) {
-                    if (selectedItems.has(itemPath)) {
-                        selectedItems.delete(itemPath);
-                    } else {
-                        selectedItems.add(itemPath);
-                    }
-                } else if (isShiftClick) {
-                    if (selectedItems.has(itemPath)) {
-                        selectedItems.delete(itemPath);
-                    } else {
-                        selectedItems.add(itemPath);
-                    }
+
+                // Сброс буфера перемещения при новом выделении
+                if (moveBuffer) {
+                    moveBuffer = null;
+                    const btn = document.getElementById('moveItemsBtn');
+                    btn.innerHTML = '<i class="fas fa-arrow-right"></i>';
+                    btn.title = 'Move Selected';
+                }
+
+                const isCtrl = e.ctrlKey || e.metaKey;
+                const path = item.path;
+                if (isCtrl) {
+                    selectedItems.has(path) ? selectedItems.delete(path) : selectedItems.add(path);
                 } else {
                     selectedItems.clear();
-                    selectedItems.add(itemPath);
+                    selectedItems.add(path);
                 }
                 updateExplorerSelection();
                 updateExplorerActions();
-                // === СИНХРОНИЗАЦИЯ ВЫБОРА ВИДЕО (только визуально) ===
                 if (item.type !== 'folder') {
-                    highlightSelectedVideo(item.path);
+                    highlightSelectedVideo(path);
                 }
-                // === /СИНХРОНИЗАЦИЯ ВЫБОРА ВИДЕО ===
             });
-            // === DOUBLE CLICK для открытия/воспроизведения ===
+
             div.addEventListener('dblclick', (e) => {
-                 if (e.target.closest('.item-actions')) return;
-                 if (item.type === 'folder') {
-                     navigateExplorerToFolder(item.path);
-                 } else {
-                     const fileName = item.name.split('/').pop();
-                     const ext = fileName.split('.').pop().toLowerCase();
-                     const supportedFormats = ['mp4', 'webm', 'ogg'];
-                     const isSupported = supportedFormats.includes(ext);
-                     if (!isSupported) {
-                       if (!confirm(`Формат видео "${fileName}" может не воспроизводиться в браузере. Продолжить?`)) {
-                         return;
-                       }
-                     }
-                     // === СИНХРОНИЗАЦИЯ ВЫБОРА ВИДЕО (перед воспроизведением) ===
-                     highlightSelectedVideo(item.path);
-                     video.src = `/videos/${item.name}`;
-                     statusEl.innerHTML = `Video loaded: ${fileName}`;
-                     currentVideoFile = item.name;
-                     isVideoReady = false;
-                     // ИСПРАВЛЕНО: Отправляем объект с roomId и filename
-                     socket.emit('select-video', { roomId: joinedRoom, filename: item.name });
-                     // === /СИНХРОНИЗАЦИЯ ВЫБОРА ВИДЕО ===
-                 }
+                if (e.target.closest('.item-actions')) return;
+                if (item.type === 'folder') {
+                    navigateExplorerToFolder(item.path);
+                } else {
+                    const fileName = item.name.split('/').pop();
+                    const ext = fileName.split('.').pop().toLowerCase();
+                    const supportedFormats = ['mp4', 'webm', 'ogg'];
+                    const isSupported = supportedFormats.includes(ext);
+                    if (!isSupported) {
+                      if (!confirm(`Формат видео "${fileName}" может не воспроизводиться в браузере. Продолжить?`)) {
+                        return;
+                      }
+                    }
+                    highlightSelectedVideo(item.path);
+                    video.src = `/videos/${item.name}`;
+                    statusEl.innerHTML = `Video loaded: ${fileName}`;
+                    currentVideoFile = item.name;
+                    isVideoReady = false;
+                    socket.emit('select-video', { roomId: joinedRoom, filename: item.name });
+                }
             });
+
+            if (item.type === 'folder') {
+                div.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                });
+                div.addEventListener('dragenter', (e) => {
+                    e.preventDefault();
+                    if (draggedItem && draggedItem !== item.path) {
+                        div.classList.add('drag-over');
+                    }
+                });
+                div.addEventListener('dragleave', () => {
+                    div.classList.remove('drag-over');
+                });
+                div.addEventListener('drop', async (e) => {
+                    e.preventDefault();
+                    div.classList.remove('drag-over');
+                    if (!draggedItem || draggedItem === item.path) return;
+                    await moveItems([draggedItem], item.path);
+                });
+            }
             explorerList.appendChild(div);
         });
         updateExplorerSelection();
     }
-    // --- НОВАЯ ФУНКЦИЯ: Перемещение элементов ---
+
+    // ✅ ИСПРАВЛЕННАЯ ФУНКЦИЯ С ЛОГИРОВАНИЕМ
     async function moveItems(itemsToMove, targetPath) {
         if (!itemsToMove || itemsToMove.length === 0) {
-            console.warn('[EXPLORER] No items selected to move.');
+            console.warn('[MOVE] No items to move');
             return false;
         }
-        if (targetPath === undefined || targetPath === null || typeof targetPath !== 'string') {
-            console.warn('[EXPLORER] Invalid or no target path specified for move operation:', targetPath);
-            showNotification('Invalid target path for move operation.', 'error');
+        if (typeof targetPath !== 'string') {
+            console.error('[MOVE] Invalid targetPath:', targetPath);
+            showNotification('Invalid target path', 'error');
             return false;
         }
-        console.log(`[EXPLORER] Attempting to move items to: "${targetPath}"`);
-        console.log(`[EXPLORER] Items to move:`, itemsToMove);
+        const token = localStorage.getItem('authToken');
+        if (!token) {
+            console.error('[MOVE] No auth token found');
+            showNotification('Authentication required. Please log in.', 'error');
+            return false;
+        }
         try {
-            const token = localStorage.getItem('authToken');
-            if (!token) {
-                throw new Error('Authentication token not found. Please log in again.');
-            }
-            console.log(`[EXPLORER] Sending request to /api/files/move with body:`, {
-                items: itemsToMove,
-                destination: targetPath
-            });
+            console.log('[MOVE] Sending request:', { items: itemsToMove, destination: targetPath });
             const response = await fetch('/api/files/move', {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify({
-                    items: itemsToMove,
-                    destination: targetPath
-                })
+                body: JSON.stringify({ items: itemsToMove, destination: targetPath })
             });
-            console.log(`[EXPLORER] Server response status:`, response.status);
             const data = await response.json();
-            console.log(`[EXPLORER] Server response body:`, data);
+            console.log('[MOVE] Response:', response.status, data);
             if (response.ok && data.success) {
-                showNotification(`Successfully moved ${itemsToMove.length} item(s).`, 'success');
+                showNotification(`Moved ${itemsToMove.length} item(s)`, 'success');
                 loadAndRenderExplorerForPath(currentExplorerPath);
                 selectedItems.clear();
                 updateExplorerSelection();
                 updateExplorerActions();
                 return true;
             } else {
-                const errorMessage = data.error || data.message || 'Failed to move items';
-                console.error('[EXPLORER] Move operation failed:', errorMessage);
-                showNotification(`Error moving items: ${errorMessage}`, 'error');
+                const msg = data.error || data.message || 'Unknown error';
+                console.error('[MOVE] Failed:', msg);
+                showNotification('Move failed: ' + msg, 'error');
                 return false;
             }
         } catch (error) {
-            console.error('[EXPLORER] Network error during move:', error);
-            showNotification(`Error moving items: ${error.message}`, 'error');
+            console.error('[MOVE] Network error:', error);
+            showNotification('Move error: ' + error.message, 'error');
             return false;
         }
     }
-    // === ИНИЦИАЛИЗАЦИЯ ПРОВОДНИКА ПОСЛЕ ЗАГРУЗКИ DOM ===
+
     window.addEventListener('DOMContentLoaded', () => {
-        const createFolderModal = document.getElementById('createFolderModal');
-        const createFolderBtnExplorer = document.getElementById('createFolderBtnExplorer');
-        const closeModalBtn = document.querySelector('.close-modal');
-        const cancelCreateFolderBtn = document.getElementById('cancelCreateFolder');
-        const confirmCreateFolderBtn = document.getElementById('confirmCreateFolder');
-        const newFolderNameInput = document.getElementById('newFolderName');
-        const currentModalPathInput = document.getElementById('currentModalPath');
-        const uploadBtnExplorer = document.getElementById('uploadBtnExplorer');
-        const uploadInputExplorer = document.getElementById('uploadInputExplorer');
-        createFolderBtnExplorer.addEventListener('click', () => {
-            currentModalPathInput.value = currentExplorerPath;
-            newFolderNameInput.value = '';
-            createFolderModal.style.display = 'flex';
-            newFolderNameInput.focus();
-        });
-        closeModalBtn.addEventListener('click', () => {
+      const createFolderModal = document.getElementById('createFolderModal');
+      const createFolderBtnExplorer = document.getElementById('createFolderBtnExplorer');
+      const closeModalBtn = document.querySelector('.close-modal');
+      const cancelCreateFolderBtn = document.getElementById('cancelCreateFolder');
+      const confirmCreateFolderBtn = document.getElementById('confirmCreateFolder');
+      const newFolderNameInput = document.getElementById('newFolderName');
+      const currentModalPathInput = document.getElementById('currentModalPath');
+      const uploadBtnExplorer = document.getElementById('uploadBtnExplorer');
+      const uploadInputExplorer = document.getElementById('uploadInputExplorer');
+
+      createFolderBtnExplorer.addEventListener('click', () => {
+        currentModalPathInput.value = currentExplorerPath;
+        newFolderNameInput.value = '';
+        createFolderModal.style.display = 'flex';
+        newFolderNameInput.focus();
+      });
+
+      closeModalBtn.addEventListener('click', () => {
+        createFolderModal.style.display = 'none';
+      });
+
+      cancelCreateFolderBtn.addEventListener('click', () => {
+        createFolderModal.style.display = 'none';
+      });
+
+      window.addEventListener('click', (event) => {
+        if (event.target === createFolderModal) {
+          createFolderModal.style.display = 'none';
+        }
+      });
+
+      confirmCreateFolderBtn.addEventListener('click', async () => {
+        const folderName = newFolderNameInput.value.trim();
+        const basePath = currentModalPathInput.value;
+        if (!folderName) {
+          showNotification('Please enter a folder name', 'error');
+          return;
+        }
+        if (/[<>:"/\\|?*\x00-\x1F]/.test(folderName)) {
+          showNotification('Folder name contains invalid characters', 'error');
+          return;
+        }
+        confirmCreateFolderBtn.disabled = true;
+        confirmCreateFolderBtn.textContent = 'Creating...';
+        try {
+          const fullFolderPath = basePath ? `${basePath}/${folderName}` : folderName;
+          const token = localStorage.getItem('authToken');
+          if (!token) {
+            throw new Error('Authentication required. Please log in.');
+          }
+          const response = await fetch('/api/files/create-folder', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ path: fullFolderPath })
+          });
+          const data = await response.json();
+          if (response.ok && data.success) {
+            showNotification(`Folder '${folderName}' created successfully`, 'success');
             createFolderModal.style.display = 'none';
-        });
-        cancelCreateFolderBtn.addEventListener('click', () => {
-            createFolderModal.style.display = 'none';
-        });
-        window.addEventListener('click', (event) => {
-            if (event.target === createFolderModal) {
-                createFolderModal.style.display = 'none';
-            }
-        });
-        confirmCreateFolderBtn.addEventListener('click', async () => {
-            const folderName = newFolderNameInput.value.trim();
-            const basePath = currentModalPathInput.value;
-            if (!folderName) {
-                showNotification('Please enter a folder name', 'error');
-                return;
-            }
-            if (/[<>:"/\\|?*\x00-\x1F]/.test(folderName)) {
-                showNotification('Folder name contains invalid characters', 'error');
-                return;
-            }
-            confirmCreateFolderBtn.disabled = true;
-            confirmCreateFolderBtn.textContent = 'Creating...';
-            try {
-                const fullFolderPath = basePath ? `${basePath}/${folderName}` : folderName;
-                const token = localStorage.getItem('authToken');
-                if (!token) {
-                    throw new Error('Authentication required. Please log in.');
-                }
-                const response = await fetch('/api/files/create-folder', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify({ path: fullFolderPath })
-                });
-                const data = await response.json();
-                if (response.ok && data.success) {
-                    showNotification(`Folder '${folderName}' created successfully`, 'success');
-                    createFolderModal.style.display = 'none';
-                    loadAndRenderExplorerForPath(currentExplorerPath);
-                } else {
-                    const errorMessage = data.error || data.message || 'Failed to create folder';
-                    console.error('[CREATE FOLDER] Server error:', errorMessage);
-                    showNotification(`Error: ${errorMessage}`, 'error');
-                }
-            } catch (error) {
-                console.error('[CREATE FOLDER] Network or other error:', error);
-                showNotification(`Error creating folder: ${error.message}`, 'error');
-            } finally {
-                confirmCreateFolderBtn.disabled = false;
-                confirmCreateFolderBtn.textContent = 'Create';
-            }
-        });
-        uploadBtnExplorer.addEventListener('click', () => {
-            uploadInputExplorer.click();
-        });
-        uploadInputExplorer.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                const formData = new FormData();
-                formData.append('video', file);
-                const progressBar = document.querySelector('.progress-bar');
-                progressBar.style.display = 'block';
-                const progressBarFill = document.querySelector('.progress-bar-fill');
-                const xhr = new XMLHttpRequest();
-                xhr.upload.addEventListener('progress', (e) => {
-                  if (e.lengthComputable) {
-                    const percentComplete = (e.loaded / e.total) * 100;
-                    progressBarFill.style.width = `${percentComplete}%`;
-                  }
-                });
-                xhr.addEventListener('load', () => {
-                  if (xhr.status === 200) {
-                    const data = JSON.parse(xhr.responseText);
-                    if (data.success) {
-                      showNotification(`Video uploaded: ${data.file}`, 'success');
-                      progressBar.style.display = 'none';
-                      progressBarFill.style.width = '0';
-                      loadAndRenderExplorerForPath(currentExplorerPath);
-                    } else {
-                      showNotification('Upload failed', 'error');
-                      progressBar.style.display = 'none';
-                    }
-                  } else {
-                    showNotification('Upload failed', 'error');
-                    progressBar.style.display = 'none';
-                  }
-                });
-                xhr.open('POST', '/upload');
-                xhr.send(formData);
-            }
-        });
-        document.getElementById('refreshExplorerBtn').addEventListener('click', () => {
             loadAndRenderExplorerForPath(currentExplorerPath);
-        });
-        document.getElementById('moveItemsBtn').addEventListener('click', async () => {
-            if (selectedItems.size === 0) {
-                console.warn('[EXPLORER] No items selected to move via button.');
-                return;
+          } else {
+            const errorMessage = data.error || data.message || 'Failed to create folder';
+            console.error('[CREATE FOLDER] Server error:', errorMessage);
+            showNotification(`Error: ${errorMessage}`, 'error');
+          }
+        } catch (error) {
+          console.error('[CREATE FOLDER] Network or other error:', error);
+          showNotification(`Error creating folder: ${error.message}`, 'error');
+        } finally {
+          confirmCreateFolderBtn.disabled = false;
+          confirmCreateFolderBtn.textContent = 'Create';
+        }
+      });
+
+      uploadBtnExplorer.addEventListener('click', () => {
+        uploadInputExplorer.click();
+      });
+
+      uploadInputExplorer.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          const formData = new FormData();
+          formData.append('video', file);
+          const progressBar = document.querySelector('.progress-bar');
+          progressBar.style.display = 'block';
+          const progressBarFill = document.querySelector('.progress-bar-fill');
+          const xhr = new XMLHttpRequest();
+          xhr.upload.addEventListener('progress', (e) => {
+            if (e.lengthComputable) {
+              progressBarFill.style.width = `${(e.loaded / e.total) * 100}%`;
             }
-            const itemsToMove = Array.from(selectedItems);
-            const targetPath = currentExplorerPath;
-            console.log(`[EXPLORER] Button move clicked. Items:`, itemsToMove, "Target:", targetPath);
-            let allInSameFolder = true;
-            for (const itemPath of itemsToMove) {
-                const parentPath = itemPath.split('/').slice(0, -1).join('/');
-                if (parentPath !== targetPath) {
-                    allInSameFolder = false;
-                    break;
-                }
-            }
-            if (allInSameFolder) {
-                console.log('[EXPLORER] Items are already in the target folder.');
-                showNotification('Items are already in this folder.', 'info');
-                selectedItems.clear();
-                updateExplorerSelection();
-                updateExplorerActions();
-                return;
-            }
-            await moveItems(itemsToMove, targetPath);
-        });
-        document.getElementById('deleteItemsBtn').addEventListener('click', async () => {
-            if (selectedItems.size === 0) return;
-            const itemsToDelete = Array.from(selectedItems);
-            const itemCount = itemsToDelete.length;
-            const itemNames = itemsToDelete.map(p => p.split('/').pop()).join(', ');
-            if (!confirm(`Are you sure you want to delete ${itemCount} item(s)?
-${itemNames}`)) {
-                return;
-            }
-            let successCount = 0;
-            let failCount = 0;
-            for (const itemPath of itemsToDelete) {
-                try {
-                    const token = localStorage.getItem('authToken');
-                    if (!token) throw new Error('Not authenticated');
-                    const response = await fetch('/api/files/delete', {
-                        method: 'DELETE',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${token}`
-                        },
-                        body: JSON.stringify({ path: itemPath })
-                    });
-                    const data = await response.json();
-                    if (response.ok && data.success) {
-                        successCount++;
-                    } else {
-                        failCount++;
-                        console.error(`[DELETE] Failed to delete ${itemPath}:`, data.error || data.message);
-                    }
-                } catch (err) {
-                    failCount++;
-                    console.error(`[DELETE] Network error deleting ${itemPath}:`, err);
-                }
-            }
-            if (failCount === 0) {
-                showNotification(`Successfully deleted ${successCount} item(s)`, 'success');
+          });
+          xhr.addEventListener('load', () => {
+            progressBar.style.display = 'none';
+            progressBarFill.style.width = '0';
+            if (xhr.status === 200) {
+              const data = JSON.parse(xhr.responseText);
+              if (data.success) {
+                showNotification(`Video uploaded: ${data.file}`, 'success');
+                loadAndRenderExplorerForPath(currentExplorerPath);
+              } else {
+                showNotification('Upload failed', 'error');
+              }
             } else {
-                showNotification(`Deleted ${successCount} item(s). Failed to delete ${failCount} item(s).`, 'warning');
+              showNotification('Upload failed', 'error');
             }
-            selectedItems.clear();
-            updateExplorerSelection();
-            updateExplorerActions();
-            loadAndRenderExplorerForPath(currentExplorerPath);
-        });
+          });
+          xhr.open('POST', '/upload');
+          xhr.send(formData);
+        }
+      });
+
+      document.getElementById('refreshExplorerBtn').addEventListener('click', () => {
+        loadAndRenderExplorerForPath(currentExplorerPath);
+      });
+
+      // === ОБНОВЛЁННЫЙ ОБРАБОТЧИК КНОПКИ MOVE ===
+      document.getElementById('moveItemsBtn').addEventListener('click', async () => {
+        const moveItemsBtn = document.getElementById('moveItemsBtn');
+
+        if (moveBuffer) {
+          // Второе нажатие: переместить буфер в текущую папку
+          await moveItems(moveBuffer, currentExplorerPath);
+          moveBuffer = null;
+          moveItemsBtn.innerHTML = '<i class="fas fa-arrow-right"></i>';
+          moveItemsBtn.title = 'Move Selected';
+          selectedItems.clear();
+          updateExplorerSelection();
+          updateExplorerActions();
+        } else {
+          // Первое нажатие: запомнить выделенные файлы
+          if (selectedItems.size === 0) {
+            showNotification('No items selected', 'info');
+            return;
+          }
+          moveBuffer = Array.from(selectedItems);
+          moveItemsBtn.innerHTML = '<i class="fas fa-arrow-down"></i> Move Here';
+          moveItemsBtn.title = 'Click to move selected items here';
+          selectedItems.clear();
+          updateExplorerSelection();
+          updateExplorerActions();
+          showNotification('Selected items will be moved. Navigate to target folder and click "Move Here".', 'info');
+        }
+      });
+
+      document.getElementById('deleteItemsBtn').addEventListener('click', async () => {
+        if (selectedItems.size === 0) return;
+        const itemsToDelete = Array.from(selectedItems);
+        const itemCount = itemsToDelete.length;
+        const itemNames = itemsToDelete.map(p => p.split('/').pop()).join(', ');
+        if (!confirm(`Are you sure you want to delete ${itemCount} item(s)?
+${itemNames}`)) {
+          return;
+        }
+        let successCount = 0;
+        let failCount = 0;
+        for (const itemPath of itemsToDelete) {
+          try {
+            const token = localStorage.getItem('authToken');
+            if (!token) throw new Error('Not authenticated');
+            const response = await fetch('/api/files/delete', {
+              method: 'DELETE',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              },
+              body: JSON.stringify({ path: itemPath })
+            });
+            const data = await response.json();
+            if (response.ok && data.success) {
+              successCount++;
+            } else {
+              failCount++;
+            }
+          } catch (err) {
+            failCount++;
+          }
+        }
+        if (failCount === 0) {
+          showNotification(`Successfully deleted ${successCount} item(s)`, 'success');
+        } else {
+          showNotification(`Deleted ${successCount} item(s). Failed to delete ${failCount} item(s).`, 'warning');
+        }
+        selectedItems.clear();
+        updateExplorerSelection();
+        updateExplorerActions();
+        loadAndRenderExplorerForPath(currentExplorerPath);
+      });
     });
-    // ===========================================================================
-    // === КОНЕЦ ЛОГИКИ ПРОВОДНИКА ===============================================
-    // ===========================================================================
   </script>
 </body>
 </html>

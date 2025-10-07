@@ -1,4 +1,3 @@
-// server.js
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
@@ -379,7 +378,6 @@ class SyncWatchServer {
         }
       });
 
-      // 🔑 ОБНОВЛЕНО: отправка room-state при входе
       socket.on('join-room', (data, callback) => {
         console.log(`[SOCKET] ${socket.id} attempting to join room ${data.roomId} as ${data.name || 'Anonymous'}`);
         const room = this.roomService.joinRoom(data.roomId, socket.id, data.name);
@@ -388,7 +386,6 @@ class SyncWatchServer {
           socket.join(data.roomId);
           socket.emit('room-joined', room);
 
-          // 🔑 ОТПРАВКА СОСТОЯНИЯ КОМНАТЫ НОВОМУ ПОЛЬЗОВАТЕЛЮ
           socket.emit('room-state', {
             currentVideo: room.currentVideo || null,
             currentTime: typeof room.currentTime === 'number' ? room.currentTime : 0,
@@ -428,7 +425,78 @@ class SyncWatchServer {
         }
       });
 
-      // Синхронизация видео — ОБЯЗАТЕЛЬНО передаём time!
+      // === НОВОЕ: KICK USER (любой может кикать) ===
+      socket.on('kick-user', (data, callback) => {
+        const { roomId, targetUserId } = data;
+        console.log(`[SOCKET] ${socket.id} requested to kick user ${targetUserId} from room ${roomId}`);
+
+        const room = this.roomService.getRoom(roomId);
+        if (!room) {
+          if (callback) callback({ success: false, error: 'Room not found' });
+          return;
+        }
+
+        if (!room.users || !room.users[targetUserId]) {
+          if (callback) callback({ success: false, error: 'User not in room' });
+          return;
+        }
+
+        // Отправляем сигнал выгнанному пользователю
+        const targetSocket = this.io.sockets.sockets.get(targetUserId);
+        if (targetSocket) {
+          targetSocket.emit('kicked-from-room', { message: 'You have been kicked from the room' });
+          targetSocket.leave(roomId);
+        }
+
+        // Удаляем из комнаты
+        this.roomService.leaveRoom(roomId, targetUserId);
+
+        // Уведомляем остальных в комнате
+        socket.to(roomId).emit('user-left', { socketId: targetUserId });
+
+        // Обновляем глобальный список
+        this.io.emit('room-list', this.roomService.getAllRooms());
+
+        console.log(`[SOCKET] User ${targetUserId} kicked from room ${roomId} by ${socket.id}`);
+        if (callback) callback({ success: true, message: 'User kicked successfully' });
+      });
+
+      // === НОВОЕ: KICK ALL (кроме самого инициатора) ===
+      socket.on('kick-all', (data, callback) => {
+        const { roomId } = data;
+        console.log(`[SOCKET] ${socket.id} requested to kick ALL users from room ${roomId}`);
+
+        const room = this.roomService.getRoom(roomId);
+        if (!room) {
+          if (callback) callback({ success: false, error: 'Room not found' });
+          return;
+        }
+
+        const usersToKick = Object.keys(room.users || {}).filter(uid => uid !== socket.id);
+
+        if (usersToKick.length === 0) {
+          if (callback) callback({ success: true, message: 'No other users to kick' });
+          return;
+        }
+
+        usersToKick.forEach(uid => {
+          const targetSocket = this.io.sockets.sockets.get(uid);
+          if (targetSocket) {
+            targetSocket.emit('kicked-from-room', { message: 'You have been kicked from the room' });
+            targetSocket.leave(roomId);
+          }
+          this.roomService.leaveRoom(roomId, uid);
+        });
+
+        // Уведомляем (остаётся только инициатор)
+        socket.to(roomId).emit('user-left', { socketId: usersToKick });
+
+        this.io.emit('room-list', this.roomService.getAllRooms());
+
+        console.log(`[SOCKET] Kicked ${usersToKick.length} users from room ${roomId} by ${socket.id}`);
+        if (callback) callback({ success: true, message: `Kicked ${usersToKick.length} users` });
+      });
+
       socket.on('play-video', (data) => {
         console.log(`[VIDEO] 🟢 play-video from ${socket.id}:`, JSON.stringify(data, null, 2));
         if (data.time === undefined) {
@@ -492,7 +560,6 @@ class SyncWatchServer {
       });
     });
 
-    // === ТАЙМЕР ОБНОВЛЕНИЯ /json/rooms.json ===
     this.roomUpdateInterval = setInterval(() => {
       try {
         const allRooms = this.roomService.getAllRooms();
@@ -509,7 +576,6 @@ class SyncWatchServer {
         const roomsJsonPath = path.join(__dirname, 'json', 'rooms.json');
         fs.writeFileSync(roomsJsonPath, JSON.stringify(roomsData, null, 2), 'utf8');
 
-        // Рассылка для live-обновления
         roomsData.forEach(room => {
           if (room.id) {
             this.io.emit('room-update', {

@@ -2,23 +2,23 @@ const express = require('express');
 const path = require('path');
 const cors = require('cors');
 const config = require('./config');
-const { logRequests } = require('./middleware/logging'); // Подключаем логирование
+const { logRequests } = require('./middleware/logging');
 const { authenticateToken, isAdmin } = require('./middleware/auth');
 
 const app = express();
 
 // Настройки
-app.set('trust proxy', true); // Если за reverse proxy
+app.set('trust proxy', true);
 
 // Middleware
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
-app.use(logRequests); // Подключаем логирование запросов
+app.use(logRequests);
 
 // Маршруты API
-const adminRoutes = require('./routes/admin');
-app.use('/api', adminRoutes);
+// ✅ Ключевое изменение: подключаем админские роуты по префиксу /api/admin
+app.use('/api/admin', require('./routes/admin'));
 
 // Обслуживание HTML-файлов
 app.get('/', (req, res) => {
