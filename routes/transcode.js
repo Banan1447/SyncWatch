@@ -1,121 +1,137 @@
 // routes/transcode.js
 const express = require('express');
 const router = express.Router();
-const fs = require('fs');
 const path = require('path');
-// const { isLocalhostOnly } = require('../middleware/auth'); // или где там находится
-const config = require('../config'); // или '../config' если используете config/index.js
-const TranscodeService = require('../services/transcodeService'); // Импортируем сервис
+const TranscodeService = require('../services/transcodeService');
 
-// Создаём экземпляр сервиса
 const transcodeService = new TranscodeService();
 
-// --- ОЧЕРЕДЬ ---
+// Вспомогательная функция для генерации имени выходного файла
+function getOutputPath(inputFile, suffix = '_converted') {
+  const ext = path.extname(inputFile);
+  const name = path.basename(inputFile, ext);
+  return `${name}${suffix}.mp4`;
+}
 
-// Получить очередь (использует новый метод)
+// --- МАРШРУТЫ ---
+
+// Получить очередь
 router.get('/queue', (req, res) => {
   try {
     const queue = transcodeService.getQueueWithNames();
     res.json({ success: true, queue });
   } catch (error) {
-    console.error('[TRANSCODE ROUTES] Ошибка получения очереди:', error.message);
+    console.error('[TRANSCODE] Error getting queue:', error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// --- ШАБЛОНЫ ---
-
-// Получить шаблоны (использует новый метод)
+// Получить шаблоны
 router.get('/templates', (req, res) => {
   try {
     const templates = transcodeService.getTemplatesAsArray();
     res.json({ success: true, templates });
   } catch (error) {
-    console.error('[TRANSCODE ROUTES] Ошибка получения шаблонов:', error.message);
+    console.error('[TRANSCODE] Error getting templates:', error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// --- БЫСТРОЕ ТРАНСКОДИРОВАНИЕ ---
+// Добавить в очередь (фронтенд: { fileId, templateId })
+router.post('/add-to-queue', (req, res) => {
+  const { fileId, templateId } = req.body;
 
-// Выполнить быстрое транскодирование
-router.post('/quick-transcode', async (req, res) => {
-  const { inputFile, outputFile, templateId } = req.body; // Пример входных данных
-  if (!inputFile || !outputFile || !templateId) {
-    return res.status(400).json({ success: false, error: 'Missing required fields: inputFile, outputFile, templateId' });
+  if (!fileId || !templateId) {
+    return res.status(400).json({ success: false, error: 'Missing fileId or templateId' });
   }
 
   try {
-    // Вызываем метод quickTranscode из сервиса
-    const result = await transcodeService.quickTranscode(inputFile, outputFile, templateId);
-    res.json(result); // Возвращаем результат из сервиса
-  } catch (error) {
-    console.error('[TRANSCODE ROUTES] Ошибка быстрого транскодирования:', error.message);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// --- ОСТАЛЬНЫЕ МАРШРУТЫ (примеры, могут отличаться) ---
-// Добавить задание в очередь
-router.post('/queue', (req, res) => {
-  const { inputFile, outputFile, templateId, userId } = req.body; // Пример входных данных
-  if (!inputFile || !outputFile || !templateId || !userId) {
-    return res.status(400).json({ success: false, error: 'Missing required fields' });
-  }
-
-  try {
-    const success = transcodeService.addToQueue(inputFile, outputFile, templateId, userId);
+    const outputFile = getOutputPath(fileId);
+    const success = transcodeService.addToQueue(fileId, outputFile, templateId, 'default_user');
     if (success) {
       res.json({ success: true, message: 'Job added to queue' });
     } else {
-      res.status(400).json({ success: false, error: 'Failed to add job to queue' });
+      res.status(400).json({ success: false, error: 'Failed to add job' });
     }
   } catch (error) {
-    console.error('[TRANSCODE ROUTES] Ошибка добавления задания в очередь:', error.message);
+    console.error('[TRANSCODE] Error adding to queue:', error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// Отменить задание
-router.delete('/queue/:jobId', (req, res) => {
-  const { jobId } = req.params;
+// Быстрое транскодирование (фронтенд: { filename, command })
+router.post('/quick-transcode', async (req, res) => {
+  const { filename, command } = req.body;
+
+  if (!filename || !command) {
+    return res.status(400).json({ success: false, error: 'Missing filename or command' });
+  }
+
+  try {
+    const outputFile = getOutputPath(filename, '_quick');
+    await transcodeService.quickTranscodeWithCommand(filename, outputFile, command);
+    res.json({ success: true, output: outputFile });
+  } catch (error) {
+    console.error('[TRANSCODE] Quick transcode error:', error.message);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Отмена задания (фронтенд: { jobId })
+router.post('/cancel-job', (req, res) => {
+  const { jobId } = req.body;
+
+  if (!jobId) {
+    return res.status(400).json({ success: false, error: 'Missing jobId' });
+  }
+
   try {
     const success = transcodeService.cancelJob(jobId);
     if (success) {
       res.json({ success: true, message: 'Job cancelled' });
     } else {
-      res.status(400).json({ success: false, error: 'Failed to cancel job' });
+      res.status(404).json({ success: false, error: 'Job not found or cannot be cancelled' });
     }
   } catch (error) {
-    console.error('[TRANSCODE ROUTES] Ошибка отмены задания:', error.message);
+    console.error('[TRANSCODE] Cancel job error:', error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// Сохранить/обновить шаблон
-router.post('/templates', (req, res) => {
-  const { id, templateData } = req.body; // Пример входных данных
-  if (!id || !templateData) {
-    return res.status(400).json({ success: false, error: 'Missing required fields' });
+// Удалить шаблон (фронтенд: { id })
+router.post('/delete-template', (req, res) => {
+  const { id } = req.body;
+
+  if (!id) {
+    return res.status(400).json({ success: false, error: 'Missing template id' });
   }
 
   try {
-    transcodeService.saveTemplate(id, templateData);
-    res.json({ success: true, message: 'Template saved' });
+    const success = transcodeService.deleteTemplate(id);
+    if (success) {
+      res.json({ success: true, message: 'Template deleted' });
+    } else {
+      res.status(404).json({ success: false, error: 'Template not found' });
+    }
   } catch (error) {
-    console.error('[TRANSCODE ROUTES] Ошибка сохранения шаблона:', error.message);
+    console.error('[TRANSCODE] Delete template error:', error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// Удалить шаблон
-router.delete('/templates/:id', (req, res) => {
-  const { id } = req.params;
+// Сохранить шаблон (фронтенд: { name, description, command })
+router.post('/save-template', (req, res) => {
+  const { name, description, command } = req.body;
+
+  if (!name || !command) {
+    return res.status(400).json({ success: false, error: 'Name and command are required' });
+  }
+
   try {
-    transcodeService.deleteTemplate(id);
-    res.json({ success: true, message: 'Template deleted' });
+    const id = transcodeService.saveTemplate(null, { name, description, command });
+    res.json({ success: true, id, message: 'Template saved' });
   } catch (error) {
-    console.error('[TRANSCODE ROUTES] Ошибка удаления шаблона:', error.message);
+    console.error('[TRANSCODE] Save template error:', error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 });

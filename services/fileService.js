@@ -1,11 +1,20 @@
+// services/fileService.js
 const fs = require('fs').promises;
 const path = require('path');
 const config = require('../config');
 
 class FileService {
   constructor(videoDirectory) {
-    // Нормализуем и разрешаем абсолютный путь к базовой директории
-    this.videoDirectory = path.resolve(videoDirectory || config.videoDirectory);
+    // ✅ Используем videoDir из config (имя изменено!)
+    // Если передан videoDirectory — используем его, иначе — из config
+    const dir = videoDirectory || config.videoDir; // ← БЫЛО: config.videoDirectory
+
+    if (!dir) {
+      throw new Error('[FileService] videoDirectory is undefined. Check config.videoDir.');
+    }
+
+    // Нормализуем и разрешаем абсолютный путь
+    this.videoDirectory = path.resolve(dir);
   }
 
   // Вспомогательный метод: безопасное разрешение пути внутри videoDirectory
@@ -150,13 +159,12 @@ class FileService {
     }
   }
 
-  // ✅ ИСПРАВЛЕННЫЙ МЕТОД ПЕРЕМЕЩЕНИЯ
+  // Перемещение
   async moveItem(sourcePath, destinationPath) {
     const fullSourcePath = this._resolveSafePath(sourcePath);
     let fullDestinationPath = this._resolveSafePath(destinationPath);
 
     try {
-      // Проверяем, существует ли destination и является ли он директорией
       let isDestinationDir = false;
       try {
         const destStat = await fs.stat(fullDestinationPath);
@@ -165,16 +173,13 @@ class FileService {
         }
       } catch (err) {
         if (err.code !== 'ENOENT') throw err;
-        // Если destination не существует — это нормально (будет новое имя файла)
       }
 
-      // Если destination — директория, перемещаем ВНУТРЬ неё
       if (isDestinationDir) {
         const fileName = path.basename(fullSourcePath);
         fullDestinationPath = path.join(fullDestinationPath, fileName);
       }
 
-      // Проверка: не существует ли уже целевой файл (защита от перезаписи)
       try {
         await fs.stat(fullDestinationPath);
         throw new Error(`Destination already exists: ${fullDestinationPath}`);
@@ -182,7 +187,6 @@ class FileService {
         if (err.code !== 'ENOENT') throw err;
       }
 
-      // Выполняем перемещение
       await fs.rename(fullSourcePath, fullDestinationPath);
       console.log(`[FILE SERVICE] Перемещен элемент: ${fullSourcePath} -> ${fullDestinationPath}`);
       return { success: true, message: `Item moved from ${sourcePath} to ${destinationPath} successfully` };

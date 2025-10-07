@@ -6,7 +6,8 @@ const { isLocalhostOnly } = require('../middleware/auth');
 const { logClientRequest } = require('../middleware/logging');
 const config = require('../config');
 
-const videoService = new VideoService(config.videoDirectory);
+// ✅ ИСПРАВЛЕНО: используем config.videoDir вместо config.videoDirectory
+const videoService = new VideoService(config.videoDir);
 
 // GET /api/videos
 router.get('/', async (req, res) => {
@@ -15,10 +16,19 @@ router.get('/', async (req, res) => {
   
   try {
     const videos = await videoService.getAllVideos();
-    res.json(videos);
+    // Убедимся, что ответ — массив объектов с полем "name"
+    const formattedVideos = videos.map(video => {
+      if (typeof video === 'string') {
+        // Если сервис возвращает строки (имена файлов), оборачиваем в объект
+        return { name: video };
+      }
+      // Если уже объект — оставляем как есть, но гарантируем наличие "name"
+      return { name: video.name || video.filename || video, ...video };
+    });
+    res.json(formattedVideos);
   } catch (error) {
     console.error('[VIDEOS API] Ошибка при получении списка видео:', error);
-    res.status(500).json([]);
+    res.status(500).json([]); // Возвращаем пустой массив, а не ошибку
   }
 });
 
@@ -33,6 +43,7 @@ router.get('/check-quality/:file/:quality', (req, res) => {
     const result = videoService.checkQuality(file, quality);
     res.json(result);
   } catch (error) {
+    console.error('[VIDEOS API] Ошибка checkQuality:', error);
     res.status(400).json({ success: false, error: error.message });
   }
 });
@@ -48,6 +59,7 @@ router.post('/delete', isLocalhostOnly, (req, res) => {
     videoService.deleteVideo(filename);
     res.json({ success: true });
   } catch (error) {
+    console.error('[VIDEOS API] Ошибка удаления видео:', error);
     res.status(400).json({ success: false, error: error.message });
   }
 });
@@ -63,6 +75,7 @@ router.post('/rename', isLocalhostOnly, (req, res) => {
     videoService.renameVideo(oldName, newName);
     res.json({ success: true });
   } catch (error) {
+    console.error('[VIDEOS API] Ошибка переименования видео:', error);
     res.status(400).json({ success: false, error: error.message });
   }
 });

@@ -1,3 +1,4 @@
+// config.js
 const path = require('path');
 const fs = require('fs').promises;
 
@@ -10,7 +11,7 @@ if (isNaN(port) || port < 1 || port > 65535) {
 
 // --- Валидация VIDEO_DIRECTORY ---
 const videoDirEnv = process.env.VIDEO_DIRECTORY;
-const allowedBaseDir = process.cwd(); // или другая базовая директория
+const allowedBaseDir = process.cwd();
 const requestedDir = path.resolve(path.normalize(videoDirEnv || path.join(allowedBaseDir, 'videos')));
 
 if (!requestedDir.startsWith(allowedBaseDir)) {
@@ -31,25 +32,30 @@ if (!jwtSecret) {
   console.warn('[CONFIG] Установите JWT_SECRET в переменных окружения!');
 }
 
+// ✅ КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: определяем publicDirectory
+const publicDirectory = path.join(__dirname, 'public');
+
+// Экспортируем config с publicDirectory
 const config = {
   port,
-  videoDirectory: requestedDir,
+  videoDir: requestedDir,        // ✅ videoDir (не videoDirectory!)
+  publicDirectory,               // ✅ обязательно!
   jwtSecret: jwtSecret || 'your-super-secret-jwt-key-change-in-production',
   jwtExpiresIn
 };
 
-// --- Создание директории и проверка прав ---
+// Создание videoDir при старте
 (async () => {
   try {
-    await fs.access(config.videoDirectory, fs.constants.W_OK);
+    await fs.access(config.videoDir, fs.constants.W_OK);
   } catch {
     try {
-      await fs.mkdir(config.videoDirectory, { recursive: true });
-      console.log(`[CONFIG] Создана папка для видео: ${config.videoDirectory}`);
+      await fs.mkdir(config.videoDir, { recursive: true });
+      console.log(`[CONFIG] Создана папка для видео: ${config.videoDir}`);
     } catch (error) {
-      throw new Error(`Не удалось создать или получить доступ к ${config.videoDirectory}: ${error.message}`);
+      console.error(`[CONFIG] Не удалось создать папку видео: ${error.message}`);
     }
   }
 })();
 
-module.exports = config;
+module.exports = config; // ✅ обязательно!

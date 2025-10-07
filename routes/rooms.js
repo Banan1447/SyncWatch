@@ -1,11 +1,11 @@
-// routes/admin/rooms.js
+// routes/rooms.js
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const router = express.Router();
 
 // Путь к файлу комнат: корень проекта → папка js → rooms.json
-const ROOMS_FILE = path.join(__dirname, '../../js/rooms.json');
+const ROOMS_FILE = path.join(__dirname, '/json/rooms.json');
 
 /**
  * Чтение комнат из файла

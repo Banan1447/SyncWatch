@@ -20,6 +20,7 @@ const { authenticateToken, isAdmin } = require('./middleware/auth');
 const { logRequests, logClientRequest } = require('./middleware/logging');
 
 // Импорт маршрутов
+// Импорт
 const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
 const metricsRoutes = require('./routes/metrics');
@@ -27,6 +28,11 @@ const healthRoutes = require('./routes/health');
 const filesRoutes = require('./routes/files');
 const videosRoutes = require('./routes/videos');
 const transcodeRoutes = require('./routes/transcode');
+// ✅ НОВЫЕ:
+const roomsRoutes = require('./routes/rooms');
+const sessionsRoutes = require('./routes/sessions');
+const statsRoutes = require('./routes/stats');
+
 
 class SyncWatchServer {
   constructor() {
@@ -39,12 +45,13 @@ class SyncWatchServer {
       }
     });
 
+    // ✅ ИСПРАВЛЕНО: используем config.videoDir вместо config.videoDirectory
     this.roomService = new RoomService();
     this.authService = new AuthService();
     this.transcodeService = new TranscodeService();
     this.adminService = new AdminService();
-    this.videoService = new VideoService(config.videoDirectory);
-    this.fileService = new FileService(config.videoDirectory);
+    this.videoService = new VideoService(config.videoDir); // ← ИСПРАВЛЕНО
+    this.fileService = new FileService(config.videoDir);   // ← ИСПРАВЛЕНО
 
     this.roomUpdateInterval = null;
 
@@ -59,12 +66,14 @@ class SyncWatchServer {
     this.app.use(express.urlencoded({ extended: true }));
     this.app.use(logRequests);
 
-    // Статические файлы
-    this.app.use(express.static(path.join(__dirname, 'public')));
-    this.app.use('/styles', express.static(path.join(__dirname, 'styles')));
-    this.app.use('/js', express.static(path.join(__dirname, 'js')));
-    this.app.use('/videos', express.static(config.videoDirectory));
-    this.app.use('/json', express.static(path.join(__dirname, 'json')));
+    // ✅ УДАЛЕНО дублирующее static('public') — оставляем только одно
+    // Статические файлы из папки public (корень веб-сайта)
+    console.log('[DEBUG] publicDirectory =', config.publicDirectory);
+    console.log('[DEBUG] typeof publicDirectory =', typeof config.publicDirectory);
+    this.app.use(express.static(config.publicDirectory)); // ← ИСПОЛЬЗУЕМ ИЗ CONFIG
+
+    // Дополнительные статические пути (если нужны)
+    this.app.use('/videos', express.static(config.videoDir)); // ← ИСПРАВЛЕНО
 
     // CORS
     this.app.use((req, res, next) => {
@@ -83,6 +92,10 @@ class SyncWatchServer {
     this.app.use('/api/files', filesRoutes);
     this.app.use('/api/videos', videosRoutes);
     this.app.use('/api/transcode', transcodeRoutes);
+    // ✅ НОВЫЕ:
+    this.app.use('/api/rooms', roomsRoutes);
+    this.app.use('/api/sessions', sessionsRoutes);
+    this.app.use('/api/stats', statsRoutes);
 
     this.app.post('/api/auth/login', async (req, res) => {
       try {
@@ -255,7 +268,7 @@ class SyncWatchServer {
     });
 
     const upload = multer({ 
-      dest: config.videoDirectory,
+      dest: config.videoDir, // ← ИСПРАВЛЕНО
       limits: {
         fileSize: 100 * 1024 * 1024 * 1024
       },
@@ -274,7 +287,7 @@ class SyncWatchServer {
         return res.status(400).json({ success: false, error: 'No file uploaded or invalid field name. Expected field "video".' });
       }
 
-      const finalPath = path.join(config.videoDirectory, req.file.originalname);
+      const finalPath = path.join(config.videoDir, req.file.originalname); // ← ИСПРАВЛЕНО
       
       fs.rename(req.file.path, finalPath, (err) => {
         if (err) {
@@ -292,15 +305,15 @@ class SyncWatchServer {
     });
 
     this.app.get('/admin', (req, res) => {
-      res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+      res.sendFile(path.join(config.publicDirectory, 'admin.html')); // ← ИСПОЛЬЗУЕМ ИЗ CONFIG
     });
 
     this.app.get('/admin.html', (req, res) => {
-      res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+      res.sendFile(path.join(config.publicDirectory, 'admin.html'));
     });
 
     this.app.get('/', (req, res) => {
-      res.sendFile(path.join(__dirname, 'public', 'index.html'));
+      res.sendFile(path.join(config.publicDirectory, 'index.html'));
     });
 
     this.app.use('*', (req, res) => {
@@ -573,8 +586,8 @@ class SyncWatchServer {
           isPlaying: !!room.isPlaying
         }));
 
-        const roomsJsonPath = path.join(__dirname, 'json', 'rooms.json');
-        fs.writeFileSync(roomsJsonPath, JSON.stringify(roomsData, null, 2), 'utf8');
+        const jsonDir = path.join(__dirname, 'json');
+        const roomsJsonPath = path.join(jsonDir, 'rooms.json');
 
         roomsData.forEach(room => {
           if (room.id) {
@@ -595,8 +608,8 @@ class SyncWatchServer {
   }
 
   setupFileUpload() {
-    if (!fs.existsSync(config.videoDirectory)) {
-      fs.mkdirSync(config.videoDirectory, { recursive: true });
+    if (!fs.existsSync(config.videoDir)) { // ← ИСПРАВЛЕНО
+      fs.mkdirSync(config.videoDir, { recursive: true });
     }
   }
 

@@ -1,293 +1,266 @@
 // services/transcodeService.js
-const fs = require('fs');
+const fsPromises = require('fs').promises;
+const fs = require('fs'); // Для синхронных методов: existsSync, readFileSync
 const path = require('path');
 const { spawn } = require('child_process');
-const EventEmitter = require('events');
+const config = require('../config');
 
-class TranscodeService extends EventEmitter {
+class TranscodeService {
   constructor() {
-    super();
-    // Путь к файлу очереди
-    this.queueFilePath = path.join(__dirname, '..', 'json', 'transcode-queue.json');
-    // Путь к файлу шаблонов
-    this.templatesFilePath = path.join(__dirname, '..', 'json', 'transcode-templates.json');
-    // Загружаем очередь и шаблоны при инициализации
-    this.queue = this.loadQueue();
-    this.templates = this.loadTemplates();
-    // Добавляем переменную для отслеживания состояния очереди
-    this.wasQueueEmpty = this.queue.length === 0;
-    // Запускаем обработчик очереди
-    this.startProcessing();
-  }
+    this.videoDir = config.videoDir;
+    this.queue = [];
+    this.jobs = new Map();
+    this.nextJobId = 1;
+    this.running = false;
 
-  // --- СУЩЕСТВУЮЩИЕ МЕТОДЫ (без изменений) ---
-  loadQueue() {
-    try {
-      if (fs.existsSync(this.queueFilePath)) {
-        const data = fs.readFileSync(this.queueFilePath, 'utf8');
-        const parsed = JSON.parse(data);
-        return Array.isArray(parsed) ? parsed : [];
+    // Системные шаблоны (только для чтения)
+    this.systemTemplates = {
+      'copy-stream': {
+        id: 'copy-stream',
+        name: 'Copy Stream (No Re-encode)',
+        description: 'Fastest: Copies streams without re-encoding. Output: MP4',
+        command: '-c copy -map 0'
       }
-    } catch (error) {
-      console.error('[TRANSCODE SERVICE] Ошибка загрузки очереди:', error.message);
-    }
-    return [];
-  }
-
-  saveQueue() {
-    try {
-      const dir = path.dirname(this.queueFilePath);
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-      }
-      fs.writeFileSync(this.queueFilePath, JSON.stringify(this.queue, null, 2));
-    } catch (error) {
-      console.error('[TRANSCODE SERVICE] Ошибка сохранения очереди:', error.message);
-    }
-  }
-
-  loadTemplates() {
-    try {
-      if (fs.existsSync(this.templatesFilePath)) {
-        const data = fs.readFileSync(this.templatesFilePath, 'utf8');
-        const parsed = JSON.parse(data);
-        return typeof parsed === 'object' && parsed !== null ? parsed : {};
-      }
-    } catch (error) {
-      console.error('[TRANSCODE SERVICE] Ошибка загрузки шаблонов:', error.message);
-    }
-    return {};
-  }
-
-  saveTemplates() {
-    try {
-      const dir = path.dirname(this.templatesFilePath);
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-      }
-      fs.writeFileSync(this.templatesFilePath, JSON.stringify(this.templates, null, 2));
-    } catch (error) {
-      console.error('[TRANSCODE SERVICE] Ошибка сохранения шаблонов:', error.message);
-    }
-  }
-
-  getQueueWithNames() {
-    return this.queue.map(job => ({
-      id: job.id,
-      inputFile: job.inputFile,
-      outputFile: job.outputFile,
-      templateId: job.templateId,
-      userId: job.userId,
-      status: job.status,
-      progress: job.progress,
-      startTime: job.startTime,
-      endTime: job.endTime,
-      log: job.log
-    }));
-  }
-
-  getTemplatesAsArray() {
-    return Object.entries(this.templates).map(([id, templateData]) => ({
-      id: id,
-      ...templateData
-    }));
-  }
-
-  addToQueue(inputFile, outputFile, templateId, userId) {
-    const template = this.templates[templateId];
-    if (!template) {
-      console.error(`[TRANSCODE SERVICE] Шаблон ${templateId} не найден`);
-      return false;
-    }
-
-    const job = {
-      id: Date.now() + Math.random(),
-      inputFile,
-      outputFile,
-      templateId,
-      userId,
-      status: 'pending',
-      progress: 0,
-      startTime: null,
-      endTime: null,
-      log: []
     };
 
-    this.queue.push(job);
-    this.saveQueue();
-    console.log(`[TRANSCODE SERVICE] Задание ${job.id} добавлено в очередь.`);
-    this.emit('queue-updated', this.getQueue());
-    return true;
+    // Пользовательские шаблоны
+    this.userTemplates = {};
+    this.loadUserTemplates();
   }
 
-  getQueue() {
-    return [...this.queue];
+  // Загрузка пользовательских шаблонов из файла
+  loadUserTemplates() {
+    const templatesPath = path.join(this.videoDir, 'templates.json');
+    try {
+      if (fs.existsSync(templatesPath)) {
+        const data = fs.readFileSync(templatesPath, 'utf8');
+        this.userTemplates = JSON.parse(data);
+        // Убедимся, что все шаблоны имеют id
+        for (const [id, template] of Object.entries(this.userTemplates)) {
+          template.id = id;
+        }
+      }
+    } catch (err) {
+      console.warn('[TRANSCODE] Could not load user templates:', err.message);
+      this.userTemplates = {};
+    }
   }
 
-  getTemplates() {
-    return { ...this.templates };
+  // Сохранение пользовательских шаблонов
+  saveUserTemplates() {
+    const templatesPath = path.join(this.videoDir, 'templates.json');
+    return fsPromises.writeFile(
+      templatesPath,
+      JSON.stringify(this.userTemplates, null, 2),
+      'utf8'
+    ).catch(err => {
+      console.error('[TRANSCODE] Failed to save templates:', err);
+    });
   }
 
+  // Получить все шаблоны как массив
+  getTemplatesAsArray() {
+    return [
+      this.systemTemplates['copy-stream'],
+      ...Object.values(this.userTemplates)
+    ];
+  }
+
+  // Получить шаблон по ID
+  getTemplateById(id) {
+    if (this.systemTemplates[id]) {
+      return this.systemTemplates[id];
+    }
+    return this.userTemplates[id] || null;
+  }
+
+  // Сохранить или создать шаблон
   saveTemplate(id, templateData) {
-    this.templates[id] = templateData;
-    this.saveTemplates();
-    console.log(`[TRANSCODE SERVICE] Шаблон ${id} сохранён.`);
+    if (!templateData.name || !templateData.command) {
+      throw new Error('Template must have name and command');
+    }
+
+    const newId = id || 'template_' + Date.now();
+    this.userTemplates[newId] = {
+      id: newId,
+      name: templateData.name,
+      description: templateData.description || '',
+      command: templateData.command
+    };
+    this.saveUserTemplates();
+    return newId;
   }
 
+  // Удалить шаблон
   deleteTemplate(id) {
-    delete this.templates[id];
-    this.saveTemplates();
-    console.log(`[TRANSCODE SERVICE] Шаблон ${id} удалён.`);
-  }
-
-  cancelJob(jobId) {
-    const job = this.queue.find(j => j.id === jobId);
-    if (job && (job.status === 'pending' || job.status === 'processing')) {
-      job.status = 'cancelled';
-      this.saveQueue();
-      console.log(`[TRANSCODE SERVICE] Задание ${jobId} отменено.`);
-      this.emit('queue-updated', this.getQueue());
+    if (this.systemTemplates[id]) {
+      throw new Error('Cannot delete system template');
+    }
+    if (this.userTemplates[id]) {
+      delete this.userTemplates[id];
+      this.saveUserTemplates();
       return true;
     }
     return false;
   }
 
-  startProcessing() {
-    setInterval(() => {
-      this.processQueue();
-    }, 5000);
-  }
-
-  processQueue() {
-    const nextJob = this.queue.find(job => job.status === 'pending');
-
-    if (nextJob) {
-      if (this.wasQueueEmpty) {
-        this.wasQueueEmpty = false;
-        console.log('[TRANSCODE SERVICE] Найдено новое задание для обработки.');
-      }
-      this.runTranscodeJob(nextJob);
-    } else {
-      if (!this.wasQueueEmpty) {
-        console.log('[TRANSCODE SERVICE] Очередь пуста или все задания отменены/обработаны');
-        this.wasQueueEmpty = true;
-      }
-    }
-  }
-
-  runTranscodeJob(job) {
-    if (job.status !== 'pending') {
-      return;
-    }
-
-    console.log(`[TRANSCODE SERVICE] Начинаем транскодирование задания ${job.id}`);
-    job.status = 'processing';
-    job.startTime = new Date().toISOString();
-    this.saveQueue();
-    this.emit('queue-updated', this.getQueue());
-
-    const template = this.templates[job.templateId];
+  // Добавить задание в очередь
+  addToQueue(inputFile, outputFile, templateId, userId = 'default') {
+    const template = this.getTemplateById(templateId);
     if (!template) {
-      console.error(`[TRANSCODE SERVICE] Шаблон ${job.templateId} для задания ${job.id} не найден!`);
-      job.status = 'error';
-      job.log.push(`Ошибка: Шаблон ${job.templateId} не найден`);
-      job.endTime = new Date().toISOString();
-      this.saveQueue();
-      this.emit('queue-updated', this.getQueue());
-      return;
+      throw new Error(`Template ${templateId} not found`);
     }
 
-    const args = ['-i', job.inputFile, ...template.args, job.outputFile];
+    const jobId = this.nextJobId++;
+    const job = {
+      id: jobId,
+      inputFile,
+      outputFile,
+      templateId,
+      templateName: template.name,
+      userId,
+      status: 'pending',
+      progress: 0,
+      isCancelled: false,
+      error: null,
+      eta: null
+    };
 
-    const process = spawn('ffmpeg', args);
+    this.queue.push(job);
+    this.jobs.set(jobId, job);
+    this.processQueue();
+    return true;
+  }
 
-    let stderrData = '';
+  // Обработка очереди (по одному заданию)
+  async processQueue() {
+    if (this.running) return;
 
-    process.stdout.on('data', (data) => {
-      // FFmpeg обычно выводит прогресс в stderr
-    });
+    const pendingJob = this.queue.find(job => job.status === 'pending');
+    if (!pendingJob) return;
 
-    process.stderr.on('data', (data) => {
-      stderrData += data.toString();
-      const match = stderrData.match(/frame=(.*)/);
-      if (match) {
-        job.log.push(data.toString());
-      }
-    });
+    this.running = true;
+    const job = pendingJob;
+    job.status = 'processing';
 
-    process.on('close', (code) => {
-      if (code === 0) {
-        console.log(`[TRANSCODE SERVICE] Задание ${job.id} завершено успешно.`);
-        job.status = 'completed';
-      } else {
-        console.error(`[TRANSCODE SERVICE] Задание ${job.id} завершено с ошибкой, код: ${code}`);
-        job.status = 'error';
-        job.log.push(`FFmpeg завершился с кодом: ${code}`);
-      }
-      job.endTime = new Date().toISOString();
-      this.saveQueue();
-      this.emit('queue-updated', this.getQueue());
-    });
-
-    process.on('error', (err) => {
-      console.error(`[TRANSCODE SERVICE] Ошибка при запуске FFmpeg для задания ${job.id}:`, err.message);
+    try {
+      await this.runTranscodeJob(job);
+    } catch (err) {
       job.status = 'error';
-      job.log.push(`Ошибка запуска процесса: ${err.message}`);
-      job.endTime = new Date().toISOString();
-      this.saveQueue();
-      this.emit('queue-updated', this.getQueue());
-    });
+      job.error = err.message || 'Unknown error';
+      console.error(`[TRANSCODE] Job ${job.id} failed:`, err.message);
+    } finally {
+      this.running = false;
+      // Запустить следующее задание
+      setImmediate(() => this.processQueue());
+    }
   }
-  // --- КОНЕЦ СУЩЕСТВУЮЩИХ МЕТОДОВ ---
 
-  // --- НОВЫЙ МЕТОД: быстрое транскодирование ---
-  quickTranscode(inputFile, outputFile, templateId) {
+  // Выполнить транскодирование
+  async runTranscodeJob(job) {
+    const inputPath = path.join(this.videoDir, job.inputFile);
+    const outputPath = path.join(this.videoDir, job.outputFile);
+    const template = this.getTemplateById(job.templateId);
+
+    // Проверка существования входного файла
+    if (!fs.existsSync(inputPath)) {
+      throw new Error(`Input file not found: ${job.inputFile}`);
+    }
+
+    // Формируем аргументы для ffmpeg
+    const args = ['-i', inputPath, ...template.command.trim().split(/\s+/), outputPath];
+
     return new Promise((resolve, reject) => {
-      const template = this.templates[templateId];
-      if (!template) {
-        console.error(`[TRANSCODE SERVICE] Шаблон ${templateId} не найден для быстрого транскодирования`);
-        return reject(new Error(`Шаблон ${templateId} не найден`));
-      }
+      const ffmpeg = spawn('ffmpeg', args);
 
-      const args = ['-i', inputFile, ...template.args, outputFile];
-
-      const process = spawn('ffmpeg', args);
-
-      let stderrOutput = '';
-      let stdoutOutput = '';
-
-      process.stdout.on('data', (data) => {
-        stdoutOutput += data.toString();
-      });
-
-      process.stderr.on('data', (data) => {
-        stderrOutput += data.toString();
-        // Пытаемся извлечь прогресс из лога FFmpeg (опционально, для демонстрации)
-        const match = stderrOutput.match(/frame=(.*)/);
-        if (match) {
-          // console.log(`Прогресс: ${match[1]}`); // Можно использовать для обновления прогресса
-        }
-      });
-
-      process.on('close', (code) => {
-        if (code === 0) {
-          console.log(`[TRANSCODE SERVICE] Быстрое транскодирование успешно завершено: ${outputFile}`);
-          resolve({ success: true, message: 'Транскодирование успешно завершено', outputFile });
+      ffmpeg.on('close', (code) => {
+        if (job.isCancelled) {
+          job.status = 'cancelled';
+          // Удаляем незавершённый файл
+          fsPromises.unlink(outputPath).catch(() => {});
+          resolve();
+        } else if (code === 0) {
+          job.status = 'completed';
+          job.progress = 100;
+          resolve();
         } else {
-          console.error(`[TRANSCODE SERVICE] Быстрое транскодирование завершено с ошибкой, код: ${code}`);
-          console.error(`STDERR: ${stderrOutput}`);
-          console.error(`STDOUT: ${stdoutOutput}`);
-          reject(new Error(`FFmpeg завершился с кодом: ${code}`));
+          job.status = 'error';
+          job.error = `FFmpeg exited with code ${code}`;
+          // Удаляем битый файл
+          fsPromises.unlink(outputPath).catch(() => {});
+          reject(new Error(job.error));
         }
       });
 
-      process.on('error', (err) => {
-        console.error(`[TRANSCODE SERVICE] Ошибка при запуске FFmpeg для быстрого транскодирования:`, err.message);
-        reject(new Error(`Ошибка запуска процесса: ${err.message}`));
+      ffmpeg.on('error', (err) => {
+        job.status = 'error';
+        job.error = err.message;
+        fsPromises.unlink(outputPath).catch(() => {});
+        reject(err);
+      });
+
+      // Опционально: парсинг прогресса через stderr (упрощённо)
+      // ffmpeg.stderr.on('data', (data) => { ... });
+    });
+  }
+
+  // Отмена задания
+  cancelJob(jobId) {
+    const job = this.jobs.get(Number(jobId));
+    if (!job) return false;
+    if (job.status !== 'pending' && job.status !== 'processing') return false;
+
+    job.isCancelled = true;
+    // Если задание в процессе — оно будет помечено как cancelled при завершении
+    return true;
+  }
+
+  // Получить очередь с именами шаблонов
+  getQueueWithNames() {
+    return this.queue.map(job => ({
+      id: job.id,
+      fileId: job.inputFile,
+      outputFile: job.outputFile,
+      templateId: job.templateId,
+      templateName: job.templateName,
+      status: job.status,
+      progress: job.progress,
+      isCancelled: job.isCancelled,
+      error: job.error,
+      eta: job.eta
+    }));
+  }
+
+  // Быстрое транскодирование с кастомной командой
+  async quickTranscodeWithCommand(inputFile, outputFile, command) {
+    const inputPath = path.join(this.videoDir, inputFile);
+    const outputPath = path.join(this.videoDir, outputFile);
+
+    if (!fs.existsSync(inputPath)) {
+      throw new Error(`Input file not found: ${inputFile}`);
+    }
+
+    const args = ['-i', inputPath, ...command.trim().split(/\s+/), outputPath];
+
+    return new Promise((resolve, reject) => {
+      const ffmpeg = spawn('ffmpeg', args);
+
+      ffmpeg.on('close', (code) => {
+        if (code === 0) {
+          resolve({ success: true, output: outputFile });
+        } else {
+          // Удаляем неудачный файл
+          fsPromises.unlink(outputPath).catch(() => {});
+          reject(new Error(`FFmpeg exited with code ${code}`));
+        }
+      });
+
+      ffmpeg.on('error', (err) => {
+        fsPromises.unlink(outputPath).catch(() => {});
+        reject(err);
       });
     });
   }
-  // --- КОНЕЦ НОВОГО МЕТОДА ---
 }
 
 module.exports = TranscodeService;

@@ -266,7 +266,7 @@
     .room-item {
       display: flex;
       justify-content: space-between;
-      align-items: flex-start; /* чтобы кнопка не тянула по центру */
+      align-items: flex-start;
       padding: 1rem;
       background: var(--bg-dark);
       border-radius: 4px;
@@ -475,17 +475,24 @@
     let roomsData = null;
     const roomStates = {}; // { roomId: { videoId, currentTime } }
 
-    // Загрузка rooms.json
+    // Загрузка данных через API (исправлено!)
     async function loadRoomsJson() {
       if (roomsData) return;
       try {
-        const response = await fetch('/json/rooms.json');
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        roomsData = await response.json();
-        console.log('rooms.json успешно загружен:', roomsData);
+        const response = await fetch('/api/rooms');
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        const result = await response.json();
+        if (result.success && Array.isArray(result.rooms)) {
+          roomsData = result.rooms;
+          console.log('Данные rooms.json успешно загружены:', roomsData);
+        } else {
+          throw new Error('Некорректный формат ответа от API');
+        }
       } catch (err) {
         console.error('Не удалось загрузить rooms.json:', err);
-        showNotification('Не удалось загрузить данные видео. Некоторые функции могут быть недоступны.', 'error');
+        showNotification('Не удалось загрузить данные видео.', 'error');
       }
     }
 
@@ -542,7 +549,6 @@
         updateRoomListDisplay(rooms);
       });
 
-      // НОВОЕ: обработка обновлений комнат
       socket.on('room-update', (update) => {
         if (update.roomId && (update.videoId !== undefined || update.currentTime !== undefined)) {
           roomStates[update.roomId] = {
@@ -767,7 +773,6 @@
         `;
         roomList.appendChild(div);
 
-        // Клик по комнате → редирект
         div.addEventListener('click', (e) => {
           if (e.target.closest('.delete-btn')) return;
           let url = `/player.html?room=${room.id}`;
@@ -780,7 +785,6 @@
           window.location.href = url;
         });
 
-        // Удаление
         div.querySelector('.delete-btn').addEventListener('click', (e) => {
           e.stopPropagation();
           if (confirm(`Удалить комнату "${room.name}"?`)) {
@@ -793,7 +797,6 @@
           }
         });
 
-        // Обновить отображение, если данные уже есть
         if (roomStates[room.id]) {
           updateRoomDisplay(room.id);
         }
