@@ -1,7 +1,7 @@
 // routes/admin/index.js
 const express = require('express');
 const router = express.Router();
-const { authenticateToken, isAdmin } = require('../../middleware/auth');
+const { authenticateToken, isAdmin } = require('../middleware/auth');
 
 // Защищаем все роуты
 router.use(authenticateToken);

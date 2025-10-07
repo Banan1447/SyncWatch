@@ -10,7 +10,7 @@ function showNotification(message, type = 'info') {
   if (!notifications) return;
 
   const notification = document.createElement('div');
-  notification.className = `notification ${type}`;
+  notification.className = `notification status-${type}`;
   notification.textContent = message;
   notifications.appendChild(notification);
 
@@ -58,23 +58,12 @@ async function loadTemplates() {
   const container = document.getElementById('templatesList');
   if (!container) return;
 
-  const SYSTEM_TEMPLATES = [
-    {
-      id: 'copy-stream',
-      name: 'Copy Stream (No Re-encode)',
-      description: 'Fastest: Copies streams without re-encoding. Output: MP4',
-      command: '-c copy -map 0 output.mp4',
-      system: true
-    }
-  ];
-
-  const userTemplates = res.success && Array.isArray(res.templates) ? res.templates : [];
-  const allTemplates = [...SYSTEM_TEMPLATES, ...userTemplates];
+  const templates = res.success && Array.isArray(res.templates) ? res.templates : [];
 
   container.innerHTML = '';
-  if (allTemplates.length > 0) {
-    allTemplates.forEach(template => {
-      const isSystem = template.system || template.id === 'copy-stream';
+  if (templates.length > 0) {
+    templates.forEach(template => {
+      const isSystem = template.id === 'copy-stream';
       const div = document.createElement('div');
       div.className = `template-item ${isSystem ? 'template-system' : ''}`;
       div.innerHTML = `
@@ -100,24 +89,12 @@ async function loadTemplates() {
       `;
       container.appendChild(div);
     });
-
-    // Навешиваем обработчики
-    container.querySelectorAll('.apply-template-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        const templateId = e.target.closest('.apply-template-btn').dataset.templateId;
-        applyTemplateToSelected(templateId);
-      });
-    });
-
-    container.querySelectorAll('.delete-template-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        const templateId = e.target.closest('.delete-template-btn').dataset.templateId;
-        deleteTemplate(templateId);
-      });
-    });
   } else {
     container.innerHTML = '<div class="template-item">No templates found</div>';
   }
+
+  // Обновляем состояние кнопок Apply после загрузки шаблонов
+  updateApplyButtons();
 }
 
 // Загрузка файлов
@@ -128,70 +105,81 @@ async function loadFiles() {
 
   try {
     const res = await fetch('/api/videos');
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
     const files = await res.json();
+
+    if (!Array.isArray(files)) {
+      throw new Error('Invalid response: expected array of files');
+    }
+
     container.innerHTML = '';
 
-    if (files.length > 0) {
-      files.forEach(file => {
-        const ext = file.name.split('.').pop().toLowerCase();
-        const supportedFormats = ['mp4', 'webm', 'ogg', 'mov', 'm4v', 'mkv', 'avi'];
-        const isSupported = supportedFormats.includes(ext);
-        const copyFriendly = ['mp4', 'm4v', 'mov'].includes(ext);
-        let copyWarning = '';
-        if (isSupported && !copyFriendly) {
-          copyWarning = `
-            <div class="unsupported-warning">
-              <i class="fas fa-info-circle"></i>
-              Copy stream may fail. Re-encode recommended.
-            </div>
-          `;
-        }
+    if (files.length === 0) {
+      container.innerHTML = '<div class="file-item">No videos found</div>';
+      return;
+    }
 
-        const div = document.createElement('div');
-        div.className = 'file-item';
-        div.innerHTML = `
-          <div class="file-info" style="display: flex; align-items: center; gap: 0.75rem; width: 100%;">
-            <input type="checkbox" class="file-checkbox" data-file="${file.name}" 
-              ${window.selectedFiles.has(file.name) ? 'checked' : ''}>
-            <div style="flex: 1; min-width: 0;">
-              <div class="file-name">${file.name}</div>
-              <div class="file-meta">${file.resolution || 'N/A'} | ${file.bitrate || 'N/A'}</div>
-              ${!isSupported ? `
-                <div class="unsupported-warning">
-                  <i class="fas fa-exclamation-triangle"></i>
-                  Requires conversion
-                </div>
-              ` : copyWarning}
-            </div>
-            <button class="quick-transcode-btn" data-file="${file.name}" title="Quick transcode (Copy Stream)">
-              <i class="fas fa-copy"></i>
-            </button>
+    files.forEach(file => {
+      if (!file || typeof file.name !== 'string') {
+        console.warn('Skipping invalid file entry:', file);
+        return;
+      }
+
+      const ext = file.name.split('.').pop().toLowerCase();
+      const supportedFormats = ['mp4', 'webm', 'ogg', 'mov', 'm4v', 'mkv', 'avi'];
+      const isSupported = supportedFormats.includes(ext);
+      const copyFriendly = ['mp4', 'm4v', 'mov'].includes(ext);
+      let copyWarning = '';
+      if (isSupported && !copyFriendly) {
+        copyWarning = `
+          <div class="unsupported-warning">
+            <i class="fas fa-info-circle"></i>
+            Copy stream may fail. Re-encode recommended.
           </div>
         `;
-        container.appendChild(div);
+      }
 
-        // Чекбокс
-        const checkbox = div.querySelector('.file-checkbox');
-        checkbox.addEventListener('change', (e) => {
-          const filename = e.target.dataset.file;
-          if (e.target.checked) {
-            window.selectedFiles.add(filename);
-          } else {
-            window.selectedFiles.delete(filename);
-          }
-          updateApplyButtons();
-        });
+      const div = document.createElement('div');
+      div.className = 'file-item';
+      div.innerHTML = `
+        <div class="file-info" style="display: flex; align-items: center; gap: 0.75rem; width: 100%;">
+          <input type="checkbox" class="file-checkbox" data-file="${file.name}">
+          <div style="flex: 1; min-width: 0;">
+            <div class="file-name">${file.name}</div>
+            <div class="file-meta">${file.resolution || 'N/A'} | ${file.bitrate || 'N/A'}</div>
+            ${!isSupported ? `
+              <div class="unsupported-warning">
+                <i class="fas fa-exclamation-triangle"></i>
+                Requires conversion
+              </div>
+            ` : copyWarning}
+          </div>
+          <button class="quick-transcode-btn" data-file="${file.name}" title="Quick transcode (Copy Stream)">
+            <i class="fas fa-copy"></i>
+          </button>
+        </div>
+      `;
+      container.appendChild(div);
 
-        // Кнопка быстрого транскодирования
-        const quickBtn = div.querySelector('.quick-transcode-btn');
-        quickBtn.addEventListener('click', () => {
-          quickTranscode(file.name);
-        });
+      // Восстанавливаем состояние чекбокса
+      const checkbox = div.querySelector('.file-checkbox');
+      checkbox.checked = window.selectedFiles.has(file.name);
+      checkbox.addEventListener('change', (e) => {
+        const filename = e.target.dataset.file;
+        if (e.target.checked) {
+          window.selectedFiles.add(filename);
+        } else {
+          window.selectedFiles.delete(filename);
+        }
+        updateApplyButtons();
       });
-    } else {
-      container.innerHTML = '<div class="file-item">No videos found</div>';
-    }
+
+      // Кнопка быстрого транскодирования
+      const quickBtn = div.querySelector('.quick-transcode-btn');
+      quickBtn.addEventListener('click', () => {
+        quickTranscode(file.name);
+      });
+    });
   } catch (err) {
     console.error('[TRANSCODE] Error loading files:', err);
     container.innerHTML = `<div class="file-item">Error: ${err.message}</div>`;
@@ -312,25 +300,25 @@ async function loadQueue() {
         ${errorHtml}
       `;
       container.appendChild(div);
+    });
 
-      const cancelBtn = div.querySelector('.cancel-job-btn');
-      if (cancelBtn) {
-        cancelBtn.addEventListener('click', async () => {
-          if (!confirm(`Cancel job ${item.id}?`)) return;
-          const cancelRes = await fetch('/api/transcode/cancel-job', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ jobId: item.id })
-          });
-          const cancelData = await cancelRes.json();
-          if (cancelData.success) {
-            showNotification(`Job ${item.id} cancelled`, 'success');
-            loadQueue();
-          } else {
-            showNotification('Cancel failed: ' + (cancelData.error || 'Unknown'), 'error');
-          }
+    // Навешиваем обработчики отмены (можно также через делегирование)
+    container.querySelectorAll('.cancel-job-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm(`Cancel job ${btn.dataset.jobId}?`)) return;
+        const cancelRes = await fetch('/api/transcode/cancel-job', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jobId: btn.dataset.jobId })
         });
-      }
+        const cancelData = await cancelRes.json();
+        if (cancelData.success) {
+          showNotification(`Job ${btn.dataset.jobId} cancelled`, 'success');
+          loadQueue();
+        } else {
+          showNotification('Cancel failed: ' + (cancelData.error || 'Unknown'), 'error');
+        }
+      });
     });
   } else {
     container.innerHTML = '<div class="queue-item">Queue is empty</div>';
@@ -348,8 +336,24 @@ async function deleteTemplate(templateId) {
   }
 }
 
-// Инициализация
+// === ИНИЦИАЛИЗАЦИЯ ===
 document.addEventListener('DOMContentLoaded', () => {
+  const templatesContainer = document.getElementById('templatesList');
+  const filesContainer = document.getElementById('filesList');
+
+  // Делегирование для шаблонов (Apply и Delete)
+  if (templatesContainer) {
+    templatesContainer.addEventListener('click', (e) => {
+      if (e.target.closest('.apply-template-btn')) {
+        const btn = e.target.closest('.apply-template-btn');
+        applyTemplateToSelected(btn.dataset.templateId);
+      } else if (e.target.closest('.delete-template-btn')) {
+        const btn = e.target.closest('.delete-template-btn');
+        deleteTemplate(btn.dataset.templateId);
+      }
+    });
+  }
+
   // Кнопка добавления шаблона (временно)
   document.getElementById('addTemplateBtn')?.addEventListener('click', () => {
     alert('Template creation UI is not implemented in this demo.\nUse system "Copy Stream" or contact admin.');

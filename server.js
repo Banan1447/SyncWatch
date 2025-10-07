@@ -20,7 +20,6 @@ const { authenticateToken, isAdmin } = require('./middleware/auth');
 const { logRequests, logClientRequest } = require('./middleware/logging');
 
 // Импорт маршрутов
-// Импорт
 const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
 const metricsRoutes = require('./routes/metrics');
@@ -28,11 +27,9 @@ const healthRoutes = require('./routes/health');
 const filesRoutes = require('./routes/files');
 const videosRoutes = require('./routes/videos');
 const transcodeRoutes = require('./routes/transcode');
-// ✅ НОВЫЕ:
 const roomsRoutes = require('./routes/rooms');
 const sessionsRoutes = require('./routes/sessions');
 const statsRoutes = require('./routes/stats');
-
 
 class SyncWatchServer {
   constructor() {
@@ -45,37 +42,98 @@ class SyncWatchServer {
       }
     });
 
-    // ✅ ИСПРАВЛЕНО: используем config.videoDir вместо config.videoDirectory
     this.roomService = new RoomService();
     this.authService = new AuthService();
     this.transcodeService = new TranscodeService();
     this.adminService = new AdminService();
-    this.videoService = new VideoService(config.videoDir); // ← ИСПРАВЛЕНО
-    this.fileService = new FileService(config.videoDir);   // ← ИСПРАВЛЕНО
+    this.videoService = new VideoService(config.videoDir);
+    this.fileService = new FileService(config.videoDir);
 
     this.roomUpdateInterval = null;
+    this.roomStatesAutosaveInterval = null; // ← ДОБАВЛЕНО: интервал автосохранения
+
+    // ← ДОБАВЛЕНО: путь к файлу состояний
+    this.ROOM_STATES_FILE = path.join(__dirname, 'json', 'room-states.json');
 
     this.setupMiddleware();
     this.setupRoutes();
+    this.loadRoomStates(); // ← ДОБАВЛЕНО: загрузка состояний при старте
     this.setupSocketIO();
+    this.startRoomStatesAutosave(); // ← ДОБАВЛЕНО: запуск автосохранения
     this.setupFileUpload();
   }
+
+  // === НОВЫЕ МЕТОДЫ ДЛЯ СОХРАНЕНИЯ СОСТОЯНИЙ ===
+
+  loadRoomStates() {
+    try {
+      if (fs.existsSync(this.ROOM_STATES_FILE)) {
+        const data = fs.readFileSync(this.ROOM_STATES_FILE, 'utf8');
+        const savedStates = JSON.parse(data);
+        // Применяем сохранённые состояния к существующим комнатам
+        for (const [roomId, state] of Object.entries(savedStates)) {
+          this.roomService.updateRoomState(roomId, {
+            currentVideo: state.currentVideo,
+            currentTime: state.currentTime,
+            isPlaying: state.isPlaying
+          });
+        }
+        console.log('✅ Состояния комнат загружены из room-states.json');
+      } else {
+        console.log('ℹ️ Файл room-states.json не найден — будет создан при первом сохранении');
+      }
+    } catch (err) {
+      console.error('❌ Ошибка загрузки состояний комнат:', err);
+    }
+  }
+
+  saveRoomStates() {
+    try {
+      const allRooms = this.roomService.getAllRooms();
+      const statesToSave = {};
+
+      for (const room of allRooms) {
+        if (room.id) {
+          statesToSave[room.id] = {
+            currentVideo: room.currentVideo || null,
+            currentTime: typeof room.currentTime === 'number' ? room.currentTime : 0,
+            isPlaying: !!room.isPlaying
+          };
+        }
+      }
+
+      // Создаём папку json, если её нет
+      const dir = path.dirname(this.ROOM_STATES_FILE);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+
+      fs.writeFileSync(this.ROOM_STATES_FILE, JSON.stringify(statesToSave, null, 2));
+      console.log(`💾 Состояния комнат сохранены (${new Date().toISOString()})`);
+    } catch (err) {
+      console.error('❌ Ошибка сохранения состояний комнат:', err);
+    }
+  }
+
+  startRoomStatesAutosave() {
+    // Сохраняем каждые 5 секунд
+    this.roomStatesAutosaveInterval = setInterval(() => {
+      this.saveRoomStates();
+    }, 5000);
+    console.log('🔁 Автосохранение состояний комнат запущено (каждые 5 сек)');
+  }
+
+  // === КОНЕЦ НОВЫХ МЕТОДОВ ===
 
   setupMiddleware() {
     this.app.use(express.json({ limit: '50mb' }));
     this.app.use(express.urlencoded({ extended: true }));
     this.app.use(logRequests);
 
-    // ✅ УДАЛЕНО дублирующее static('public') — оставляем только одно
-    // Статические файлы из папки public (корень веб-сайта)
     console.log('[DEBUG] publicDirectory =', config.publicDirectory);
-    console.log('[DEBUG] typeof publicDirectory =', typeof config.publicDirectory);
-    this.app.use(express.static(config.publicDirectory)); // ← ИСПОЛЬЗУЕМ ИЗ CONFIG
+    this.app.use(express.static(config.publicDirectory));
+    this.app.use('/videos', express.static(config.videoDir));
 
-    // Дополнительные статические пути (если нужны)
-    this.app.use('/videos', express.static(config.videoDir)); // ← ИСПРАВЛЕНО
-
-    // CORS
     this.app.use((req, res, next) => {
       res.header('Access-Control-Allow-Origin', '*');
       res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
@@ -92,7 +150,6 @@ class SyncWatchServer {
     this.app.use('/api/files', filesRoutes);
     this.app.use('/api/videos', videosRoutes);
     this.app.use('/api/transcode', transcodeRoutes);
-    // ✅ НОВЫЕ:
     this.app.use('/api/rooms', roomsRoutes);
     this.app.use('/api/sessions', sessionsRoutes);
     this.app.use('/api/stats', statsRoutes);
@@ -268,7 +325,7 @@ class SyncWatchServer {
     });
 
     const upload = multer({ 
-      dest: config.videoDir, // ← ИСПРАВЛЕНО
+      dest: config.videoDir,
       limits: {
         fileSize: 100 * 1024 * 1024 * 1024
       },
@@ -287,7 +344,7 @@ class SyncWatchServer {
         return res.status(400).json({ success: false, error: 'No file uploaded or invalid field name. Expected field "video".' });
       }
 
-      const finalPath = path.join(config.videoDir, req.file.originalname); // ← ИСПРАВЛЕНО
+      const finalPath = path.join(config.videoDir, req.file.originalname);
       
       fs.rename(req.file.path, finalPath, (err) => {
         if (err) {
@@ -305,7 +362,7 @@ class SyncWatchServer {
     });
 
     this.app.get('/admin', (req, res) => {
-      res.sendFile(path.join(config.publicDirectory, 'admin.html')); // ← ИСПОЛЬЗУЕМ ИЗ CONFIG
+      res.sendFile(path.join(config.publicDirectory, 'admin.html'));
     });
 
     this.app.get('/admin.html', (req, res) => {
@@ -438,7 +495,6 @@ class SyncWatchServer {
         }
       });
 
-      // === НОВОЕ: KICK USER (любой может кикать) ===
       socket.on('kick-user', (data, callback) => {
         const { roomId, targetUserId } = data;
         console.log(`[SOCKET] ${socket.id} requested to kick user ${targetUserId} from room ${roomId}`);
@@ -454,27 +510,20 @@ class SyncWatchServer {
           return;
         }
 
-        // Отправляем сигнал выгнанному пользователю
         const targetSocket = this.io.sockets.sockets.get(targetUserId);
         if (targetSocket) {
           targetSocket.emit('kicked-from-room', { message: 'You have been kicked from the room' });
           targetSocket.leave(roomId);
         }
 
-        // Удаляем из комнаты
         this.roomService.leaveRoom(roomId, targetUserId);
-
-        // Уведомляем остальных в комнате
         socket.to(roomId).emit('user-left', { socketId: targetUserId });
-
-        // Обновляем глобальный список
         this.io.emit('room-list', this.roomService.getAllRooms());
 
         console.log(`[SOCKET] User ${targetUserId} kicked from room ${roomId} by ${socket.id}`);
         if (callback) callback({ success: true, message: 'User kicked successfully' });
       });
 
-      // === НОВОЕ: KICK ALL (кроме самого инициатора) ===
       socket.on('kick-all', (data, callback) => {
         const { roomId } = data;
         console.log(`[SOCKET] ${socket.id} requested to kick ALL users from room ${roomId}`);
@@ -501,9 +550,7 @@ class SyncWatchServer {
           this.roomService.leaveRoom(roomId, uid);
         });
 
-        // Уведомляем (остаётся только инициатор)
         socket.to(roomId).emit('user-left', { socketId: usersToKick });
-
         this.io.emit('room-list', this.roomService.getAllRooms());
 
         console.log(`[SOCKET] Kicked ${usersToKick.length} users from room ${roomId} by ${socket.id}`);
@@ -608,7 +655,7 @@ class SyncWatchServer {
   }
 
   setupFileUpload() {
-    if (!fs.existsSync(config.videoDir)) { // ← ИСПРАВЛЕНО
+    if (!fs.existsSync(config.videoDir)) {
       fs.mkdirSync(config.videoDir, { recursive: true });
     }
   }
@@ -618,6 +665,7 @@ class SyncWatchServer {
       console.log(`🚀 SyncWatch server running on port ${port}`);
       console.log(`📊 Admin panel: http://localhost:${port}/admin`);
       console.log(`📁 rooms.json: http://localhost:${port}/json/rooms.json`);
+      console.log(`💾 room-states.json: http://localhost:${port}/json/room-states.json`); // ← ДОБАВЛЕНО
       console.log(`🔑 Default admin: admin / admin`);
     });
 
@@ -625,6 +673,10 @@ class SyncWatchServer {
       console.log('Shutting down server...');
       if (this.roomUpdateInterval) {
         clearInterval(this.roomUpdateInterval);
+      }
+      if (this.roomStatesAutosaveInterval) { // ← ДОБАВЛЕНО
+        clearInterval(this.roomStatesAutosaveInterval);
+        this.saveRoomStates(); // Сохраняем в последний раз
       }
       this.roomService.shutdown();
       this.server.close(() => {
