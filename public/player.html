@@ -666,7 +666,7 @@
   <div class="main-container">
     <div class="left-panel">
       <div class="video-status" id="status">Status: Not connected</div>
-      <div class="video-container">
+      <div class="video-container" id="videoDropZone">
         <video id="videoPlayer" width="100%" controls></video>
       </div>
       <div class="upload-section">
@@ -725,8 +725,8 @@
     if (!roomId) {
         window.location.href = '/select-room.html';
     }
-    // === НОВАЯ ГЛОБАЛЬНАЯ ПЕРЕМЕННАЯ ===
     let moveBuffer = null;
+
     function joinRoom() {
       const name = localStorage.getItem('userName') || '';
       socket.emit('join-room', { roomId, name }, res => {
@@ -743,29 +743,23 @@
       });
     }
 
-    // ✅ ИСПРАВЛЕННАЯ ФУНКЦИЯ — БЕЗ ОШИБОК
     async function loadAndApplyRoomStateFromJson(roomId) {
       try {
         const response = await fetch('/api/rooms');
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        
         const result = await response.json();
         if (!result.success || !Array.isArray(result.rooms)) {
           throw new Error('Invalid API response format');
         }
-
-        const roomsData = result.rooms; // ← корректный массив
+        const roomsData = result.rooms;
         const roomInfo = roomsData.find(r => r.id === roomId);
-
         if (roomInfo && roomInfo.currentVideo) {
           const video = document.getElementById('videoPlayer');
           const statusEl = document.getElementById('status');
-          
           video.src = `/videos/${roomInfo.currentVideo}`;
           statusEl.innerHTML = `Video loaded from state: ${roomInfo.currentVideo.split('/').pop()}`;
           currentVideoFile = roomInfo.currentVideo;
           isVideoReady = false;
-
           video.addEventListener('loadedmetadata', function onLoadedMetadata() {
             video.removeEventListener('loadedmetadata', onLoadedMetadata);
             isVideoReady = true;
@@ -790,31 +784,36 @@
       localStorage.setItem('lastRoomId', roomId);
       joinRoom();
     });
+
     const video = document.getElementById('videoPlayer');
     const statusEl = document.getElementById('status');
     const leaveRoomBtn = document.getElementById('leaveRoomBtn');
     const usersToggle = document.getElementById('usersToggle');
     const usersDropdown = document.getElementById('usersDropdown');
+    const videoDropZone = document.getElementById('videoDropZone');
+
     leaveRoomBtn.addEventListener('click', () => {
       socket.emit('leave-room', { roomId }, () => {
         window.location.href = '/select-room.html';
       });
     });
+
     usersToggle.addEventListener('click', (e) => {
       e.stopPropagation();
       usersDropdown.classList.toggle('show');
     });
+
     document.addEventListener('click', (e) => {
       if (!usersToggle.contains(e.target) && !usersDropdown.contains(e.target)) {
         usersDropdown.classList.remove('show');
       }
     });
+
     const uploadBtn = document.getElementById('uploadBtn');
     const uploadInput = document.getElementById('uploadInput');
     uploadBtn.addEventListener('click', () => uploadInput.click());
-    uploadInput.addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
+
+    function handleFileUpload(file) {
       const formData = new FormData();
       formData.append('video', file);
       const progressBar = document.querySelector('.progress-bar');
@@ -834,6 +833,16 @@
           if (data.success) {
             showNotification(`Video uploaded: ${data.file}`, 'success');
             loadAndRenderExplorerForPath(currentExplorerPath);
+            // Set as current video
+            video.src = `/videos/${data.file}`;
+            statusEl.innerHTML = `Video loaded: ${data.file.split('/').pop()}`;
+            currentVideoFile = data.file;
+            isVideoReady = false;
+            socket.emit('select-video', { roomId: joinedRoom, filename: data.file });
+            video.addEventListener('loadedmetadata', () => {
+              isVideoReady = true;
+              video.play().catch(() => {});
+            }, { once: true });
           } else {
             showNotification('Upload failed', 'error');
           }
@@ -843,20 +852,75 @@
       });
       xhr.open('POST', '/upload');
       xhr.send(formData);
+    }
+
+    uploadInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) handleFileUpload(file);
     });
+
+    // === DRAG & DROP НА ПЛЕЕР ===
+    videoDropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+      videoDropZone.style.backgroundColor = 'rgba(74, 144, 226, 0.1)';
+    });
+
+    videoDropZone.addEventListener('dragenter', (e) => {
+      e.preventDefault();
+    });
+
+    videoDropZone.addEventListener('dragleave', () => {
+      videoDropZone.style.backgroundColor = '';
+    });
+
+    videoDropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      videoDropZone.style.backgroundColor = '';
+
+      // Случай 1: файл из ОС
+      const files = e.dataTransfer.files;
+      if (files.length > 0 && files[0].type.startsWith('video/')) {
+        handleFileUpload(files[0]);
+        return;
+      }
+
+      // Случай 2: элемент из File Explorer (внутренний путь)
+      const path = e.dataTransfer.getData('text/plain');
+      if (path && !path.endsWith('/')) {
+        const fileName = path.split('/').pop();
+        const ext = fileName.split('.').pop()?.toLowerCase();
+        const supportedFormats = ['mp4', 'webm', 'ogg', 'mov', 'avi', 'mkv'];
+        if (ext && supportedFormats.includes(ext)) {
+          highlightSelectedVideo(path);
+          video.src = `/videos/${path}`;
+          statusEl.innerHTML = `Video loaded: ${fileName}`;
+          currentVideoFile = path;
+          isVideoReady = false;
+          socket.emit('select-video', { roomId: joinedRoom, filename: path });
+          return;
+        }
+      }
+
+      showNotification('Only video files are supported', 'error');
+    });
+
     video.addEventListener('loadedmetadata', () => isVideoReady = true);
+
     video.addEventListener('play', () => {
       if (isVideoReady) {
         socket.emit('video-command', { type: 'play', roomId: joinedRoom });
         socket.emit('play-video', { roomId: joinedRoom, time: video.currentTime });
       }
     });
+
     video.addEventListener('pause', () => {
       if (isVideoReady) {
         socket.emit('video-command', { type: 'pause', roomId: joinedRoom });
         socket.emit('pause-video', { roomId: joinedRoom, time: video.currentTime });
       }
     });
+
     video.addEventListener('seeked', () => {
       if (isVideoReady) {
         const now = Date.now();
@@ -867,6 +931,7 @@
         }
       }
     });
+
     socket.on('video-command', (data) => {
       if (!isVideoReady || video.readyState < 1) return;
       if (data.type === 'play' && video.paused) {
@@ -879,6 +944,7 @@
         }
       }
     });
+
     function showNotification(message, type) {
       const notification = document.createElement('div');
       notification.className = `notification ${type}`;
@@ -886,10 +952,12 @@
       document.getElementById('notifications').appendChild(notification);
       setTimeout(() => notification.remove(), 3000);
     }
+
     socket.on('kicked-from-room', () => {
       alert('You have been kicked from the room');
       window.location.href = '/select-room.html';
     });
+
     socket.on('video-updated', (filename) => {
       video.src = `/videos/${filename}`;
       statusEl.innerHTML = `Video loaded: ${filename.split('/').pop()}`;
@@ -898,6 +966,7 @@
       highlightSelectedVideo(filename);
       loadAndRenderExplorerForPath(currentExplorerPath);
     });
+
     let roomState = null;
     socket.on('room-state', (state) => {
       roomState = state;
@@ -924,6 +993,7 @@
       renderUsersDropdown();
       loadAndRenderExplorerForPath(currentExplorerPath);
     });
+
     function applyRoomStateToVideo(state) {
       if (Math.abs(video.currentTime - state.currentTime) > 0.5) {
         video.currentTime = state.currentTime;
@@ -934,6 +1004,7 @@
         video.pause();
       }
     }
+
     function renderUsersDropdown() {
       if (!roomState || !roomState.users) {
         usersDropdown.innerHTML = '<div style="padding: 0.75rem; color: var(--text-secondary);">No users</div>';
@@ -979,14 +1050,17 @@
         }
       });
     }
+
     let currentExplorerPath = '';
     let selectedItems = new Set();
     let draggedItem = null;
+
     async function navigateExplorerToFolder(folderPath) {
         currentExplorerPath = folderPath;
         updateExplorerBreadcrumb();
         await loadAndRenderExplorerForPath(folderPath);
     }
+
     function updateExplorerBreadcrumb() {
         const breadcrumb = document.getElementById('explorerBreadcrumb');
         breadcrumb.innerHTML = '';
@@ -1013,6 +1087,7 @@
             }
         });
     }
+
     async function loadAndRenderExplorerForPath(path) {
         const explorerList = document.getElementById('explorerList');
         explorerList.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 2rem; opacity: 0.7;">Loading...</div>';
@@ -1043,17 +1118,20 @@
             explorerList.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 2rem; opacity: 0.7;">Error loading folder</div>';
         }
     }
+
     function highlightSelectedVideo(videoPath) {
         document.querySelectorAll('#explorerList .explorer-item').forEach(item => item.classList.remove('selected'));
         if (!videoPath) return;
         const el = document.querySelector(`#explorerList .explorer-item[data-path="${videoPath}"]`);
         if (el) el.classList.add('selected');
     }
+
     function updateExplorerSelection() {
         document.querySelectorAll('.explorer-item').forEach(el => {
             el.classList.toggle('selected', selectedItems.has(el.dataset.path));
         });
     }
+
     function updateExplorerActions() {
         const moveBtn = document.getElementById('moveItemsBtn');
         const deleteBtn = document.getElementById('deleteItemsBtn');
@@ -1061,6 +1139,7 @@
         moveBtn.disabled = !hasSelection;
         deleteBtn.disabled = !hasSelection;
     }
+
     function renderExplorerItems(contents) {
         const explorerList = document.getElementById('explorerList');
         explorerList.innerHTML = '';
@@ -1071,10 +1150,8 @@
             parentItem.dataset.type = 'folder';
             parentItem.draggable = false;
             parentItem.innerHTML = `<i class="fas fa-level-up-alt folder-icon"></i><div class="item-name">..</div>`;
-            // === CLICK: сброс moveBuffer и выделение ".." ===
             parentItem.addEventListener('click', (e) => {
                 if (e.target.closest('.item-actions')) return;
-                // Сброс буфера перемещения
                 if (moveBuffer) {
                     moveBuffer = null;
                     const btn = document.getElementById('moveItemsBtn');
@@ -1086,13 +1163,11 @@
                 updateExplorerSelection();
                 updateExplorerActions();
             });
-            // === DOUBLE CLICK: переход в родительскую папку ===
             parentItem.addEventListener('dblclick', (e) => {
                 if (e.target.closest('.item-actions')) return;
                 const parentPath = currentExplorerPath.split('/').slice(0, -1).join('/');
                 navigateExplorerToFolder(parentPath);
             });
-            // === DRAG-AND-DROP НА ".." ===
             parentItem.addEventListener('dragover', (e) => {
                 e.preventDefault();
                 e.dataTransfer.dropEffect = 'move';
@@ -1142,7 +1217,6 @@
             });
             div.addEventListener('click', (e) => {
                 if (e.target.closest('.item-actions')) return;
-                // Сброс буфера перемещения при новом выделении
                 if (moveBuffer) {
                     moveBuffer = null;
                     const btn = document.getElementById('moveItemsBtn');
@@ -1210,7 +1284,7 @@
         });
         updateExplorerSelection();
     }
-    // ✅ ИСПРАВЛЕННАЯ ФУНКЦИЯ С ЛОГИРОВАНИЕМ
+
     async function moveItems(itemsToMove, targetPath) {
         if (!itemsToMove || itemsToMove.length === 0) {
             console.warn('[MOVE] No items to move');
@@ -1258,6 +1332,7 @@
             return false;
         }
     }
+
     window.addEventListener('DOMContentLoaded', () => {
       const createFolderModal = document.getElementById('createFolderModal');
       const createFolderBtnExplorer = document.getElementById('createFolderBtnExplorer');
@@ -1268,23 +1343,28 @@
       const currentModalPathInput = document.getElementById('currentModalPath');
       const uploadBtnExplorer = document.getElementById('uploadBtnExplorer');
       const uploadInputExplorer = document.getElementById('uploadInputExplorer');
+
       createFolderBtnExplorer.addEventListener('click', () => {
         currentModalPathInput.value = currentExplorerPath;
         newFolderNameInput.value = '';
         createFolderModal.style.display = 'flex';
         newFolderNameInput.focus();
       });
+
       closeModalBtn.addEventListener('click', () => {
         createFolderModal.style.display = 'none';
       });
+
       cancelCreateFolderBtn.addEventListener('click', () => {
         createFolderModal.style.display = 'none';
       });
+
       window.addEventListener('click', (event) => {
         if (event.target === createFolderModal) {
           createFolderModal.style.display = 'none';
         }
       });
+
       confirmCreateFolderBtn.addEventListener('click', async () => {
         const folderName = newFolderNameInput.value.trim();
         const basePath = currentModalPathInput.value;
@@ -1330,50 +1410,23 @@
           confirmCreateFolderBtn.textContent = 'Create';
         }
       });
+
       uploadBtnExplorer.addEventListener('click', () => {
         uploadInputExplorer.click();
       });
+
       uploadInputExplorer.addEventListener('change', (e) => {
         const file = e.target.files[0];
-        if (file) {
-          const formData = new FormData();
-          formData.append('video', file);
-          const progressBar = document.querySelector('.progress-bar');
-          progressBar.style.display = 'block';
-          const progressBarFill = document.querySelector('.progress-bar-fill');
-          const xhr = new XMLHttpRequest();
-          xhr.upload.addEventListener('progress', (e) => {
-            if (e.lengthComputable) {
-              progressBarFill.style.width = `${(e.loaded / e.total) * 100}%`;
-            }
-          });
-          xhr.addEventListener('load', () => {
-            progressBar.style.display = 'none';
-            progressBarFill.style.width = '0';
-            if (xhr.status === 200) {
-              const data = JSON.parse(xhr.responseText);
-              if (data.success) {
-                showNotification(`Video uploaded: ${data.file}`, 'success');
-                loadAndRenderExplorerForPath(currentExplorerPath);
-              } else {
-                showNotification('Upload failed', 'error');
-              }
-            } else {
-              showNotification('Upload failed', 'error');
-            }
-          });
-          xhr.open('POST', '/upload');
-          xhr.send(formData);
-        }
+        if (file) handleFileUpload(file);
       });
+
       document.getElementById('refreshExplorerBtn').addEventListener('click', () => {
         loadAndRenderExplorerForPath(currentExplorerPath);
       });
-      // === ОБНОВЛЁННЫЙ ОБРАБОТЧИК КНОПКИ MOVE ===
+
       document.getElementById('moveItemsBtn').addEventListener('click', async () => {
         const moveItemsBtn = document.getElementById('moveItemsBtn');
         if (moveBuffer) {
-          // Второе нажатие: переместить буфер в текущую папку
           await moveItems(moveBuffer, currentExplorerPath);
           moveBuffer = null;
           moveItemsBtn.innerHTML = '<i class="fas fa-arrow-right"></i>';
@@ -1382,7 +1435,6 @@
           updateExplorerSelection();
           updateExplorerActions();
         } else {
-          // Первое нажатие: запомнить выделенные файлы
           if (selectedItems.size === 0) {
             showNotification('No items selected', 'info');
             return;
@@ -1396,6 +1448,7 @@
           showNotification('Selected items will be moved. Navigate to target folder and click "Move Here".', 'info');
         }
       });
+
       document.getElementById('deleteItemsBtn').addEventListener('click', async () => {
         if (selectedItems.size === 0) return;
         const itemsToDelete = Array.from(selectedItems);

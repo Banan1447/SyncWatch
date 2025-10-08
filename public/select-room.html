@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Select Room</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css  ">
   <style>
     :root {
       --primary: #4a90e2;
@@ -161,6 +161,7 @@
       border-radius: 8px;
       box-shadow: 0 4px 12px var(--shadow);
       padding: 2rem;
+      position: relative;
     }
 
     .room-section h2 {
@@ -378,6 +379,48 @@
         opacity: 1;
       }
     }
+
+    .drop-zone {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      border: 2px dashed var(--accent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 9999;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+
+    .drop-zone.active {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    .drop-zone-content {
+      text-align: center;
+      color: var(--text);
+    }
+
+    .drop-zone-content i {
+      font-size: 4rem;
+      color: var(--accent);
+      margin-bottom: 1rem;
+    }
+
+    .drop-zone-content h3 {
+      font-size: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .drop-zone-content p {
+      color: var(--text-secondary);
+    }
   </style>
 </head>
 <body>
@@ -464,6 +507,14 @@
         <h2>Доступные комнаты</h2>
         <div id="roomList">Загрузка комнат...</div>
       </div>
+      
+      <div class="drop-zone" id="dropZone">
+        <div class="drop-zone-content">
+          <i class="fas fa-file-video"></i>
+          <h3>Перетащите файл сюда</h3>
+          <p>Поддерживаемые форматы: MP4, WebM, OGG и другие</p>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -530,6 +581,8 @@
     function initializePage() {
       socket = io();
 
+      setupDragAndDrop();
+
       socket.on('connect', () => {
         console.log('Сокет подключен');
         updateAuthUI();
@@ -571,6 +624,56 @@
       });
     }
 
+    function setupDragAndDrop() {
+      const dropZone = document.getElementById('dropZone');
+      const roomSection = document.querySelector('.room-section');
+
+      roomSection.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('active');
+      });
+
+      roomSection.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        if (e.relatedTarget && !roomSection.contains(e.relatedTarget)) {
+          dropZone.classList.remove('active');
+        }
+      });
+
+      roomSection.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('active');
+
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+          handleFileDrop(files[0]);
+        }
+      });
+    }
+
+    function handleFileDrop(file) {
+      if (!file.type.startsWith('video/')) {
+        showNotification('Пожалуйста, перетащите видеофайл', 'error');
+        return;
+      }
+
+      // Создаем временное имя комнаты на основе имени файла
+      const fileName = file.name.replace(/\.[^/.]+$/, ""); // Убираем расширение
+      const roomName = fileName.length > 50 ? fileName.substring(0, 50) : fileName;
+
+      // Создаем комнату с указанным именем
+      socket.emit('create-room', { name: roomName }, (res) => {
+        if (res && res.success && res.id) {
+          // Создаем URL для файла и передаем его в плеер
+          const fileUrl = URL.createObjectURL(file);
+          const url = `/player.html?room=${res.id}&file=${encodeURIComponent(fileUrl)}`;
+          window.location.href = url;
+        } else {
+          showNotification('Не удалось создать комнату: ' + (res?.error || 'Неизвестная ошибка'), 'error');
+        }
+      });
+    }
+
     function redirectToPlayerWithTime(roomId) {
       let url = `/player.html?room=${roomId}`;
       if (roomsData) {
@@ -589,6 +692,10 @@
       return fetch(`/api${endpoint}`, { method, headers, body: data ? JSON.stringify(data) : null })
         .then(response => {
           if (!response.ok) {
+            if (response.status === 415) {
+              showNotification('Неподдерживаемый тип файла', 'error');
+              return { success: false, error: 'Неподдерживаемый тип файла' };
+            }
             if (response.status === 401 || response.status === 403) {
               handleLogout();
               throw new Error('Сессия истекла. Пожалуйста, войдите снова.');
