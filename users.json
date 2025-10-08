@@ -22,5 +22,13 @@
     "password": "$2b$10$Z1saReYTn7Tq5l3Nh5BCEeKxpSbzMhZOm4j652K.lYi6kWofKpKqe",
     "role": "user",
     "createdAt": "2025-10-05T01:36:10.354Z"
+  },
+  {
+    "id": "user_1759960887717",
+    "username": "KlukwaQwQ",
+    "email": "quasar.stellar001@gmail.com",
+    "password": "$2b$10$Q1NyqupoXK9I0oMQElVh.e5G2sy7.QwagMglF7udFVdHH7TsUsPSO",
+    "role": "user",
+    "createdAt": "2025-10-08T22:01:27.717Z"
   }
 ]
