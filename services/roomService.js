@@ -7,7 +7,6 @@ class RoomService {
     this.rooms = new Map();
     this.roomsFilePath = path.join(__dirname, '..', 'json', 'rooms.json');
     this.loadRoomsFromFile();
-    // ❌ УДАЛЁН: this.saveRoomsToFile() — он не нужен при старте
   }
 
   loadRoomsFromFile() {
@@ -18,7 +17,6 @@ class RoomService {
 
         if (Array.isArray(roomsData)) {
           roomsData.forEach(roomData => {
-            // Восстанавливаем пользователей как Map
             const usersMap = new Map();
             if (roomData.users && typeof roomData.users === 'object' && !Array.isArray(roomData.users)) {
               Object.entries(roomData.users).forEach(([socketId, userData]) => {
@@ -26,7 +24,11 @@ class RoomService {
               });
             }
 
-            // ВАЖНО: копируем ВСЕ поля из файла, включая currentVideo, currentTime, isPlaying
+            // Загружаем очередь YouTube, если есть
+            const youtubeQueue = Array.isArray(roomData.youtubeQueue)
+              ? roomData.youtubeQueue
+              : [];
+
             this.rooms.set(roomData.id, {
               id: roomData.id,
               name: roomData.name,
@@ -34,7 +36,8 @@ class RoomService {
               users: usersMap,
               currentVideo: roomData.currentVideo || null,
               currentTime: typeof roomData.currentTime === 'number' ? roomData.currentTime : 0,
-              isPlaying: !!roomData.isPlaying
+              isPlaying: !!roomData.isPlaying,
+              youtubeQueue // ← НОВОЕ: очередь YouTube
             });
           });
 
@@ -47,7 +50,7 @@ class RoomService {
       }
     } catch (error) {
       console.error(`[RoomService] Ошибка при загрузке комнат из файла:`, error.message);
-      this.rooms = new Map(); // сбрасываем в пустое состояние при ошибке
+      this.rooms = new Map();
     }
   }
 
@@ -71,7 +74,8 @@ class RoomService {
           users: usersObject,
           currentVideo: room.currentVideo,
           currentTime: room.currentTime,
-          isPlaying: room.isPlaying
+          isPlaying: room.isPlaying,
+          youtubeQueue: room.youtubeQueue || [] // ← Сохраняем очередь
         };
       });
 
@@ -98,7 +102,8 @@ class RoomService {
       users: usersObject,
       currentVideo: room.currentVideo,
       currentTime: room.currentTime,
-      isPlaying: room.isPlaying
+      isPlaying: room.isPlaying,
+      youtubeQueue: room.youtubeQueue || []
     };
   }
 
@@ -117,7 +122,8 @@ class RoomService {
         users: usersObject,
         currentVideo: room.currentVideo,
         currentTime: room.currentTime,
-        isPlaying: room.isPlaying
+        isPlaying: room.isPlaying,
+        youtubeQueue: room.youtubeQueue || []
       });
     }
     return allRooms;
@@ -145,16 +151,14 @@ class RoomService {
     }
   }
 
-  // ✅ КЛЮЧЕВОЙ МЕТОД: сохраняет изменения на диск
   updateRoomState(roomId, updates) {
     const room = this.rooms.get(roomId);
     if (room) {
-      // Обновляем только разрешённые поля
       if (updates.hasOwnProperty('currentVideo')) room.currentVideo = updates.currentVideo;
       if (updates.hasOwnProperty('currentTime')) room.currentTime = updates.currentTime;
       if (updates.hasOwnProperty('isPlaying')) room.isPlaying = updates.isPlaying;
-
-      this.saveRoomsToFile(); // 🔥 Сохраняем сразу!
+      // Очередь обновляется отдельными методами
+      this.saveRoomsToFile();
     }
   }
 
@@ -163,7 +167,6 @@ class RoomService {
     if (room && room.users.has(socketId)) {
       const user = room.users.get(socketId);
       Object.assign(user, updates);
-      // Состояние пользователя — временное, не сохраняем в файл
     }
   }
 
@@ -188,13 +191,58 @@ class RoomService {
       users: new Map(),
       currentVideo: null,
       currentTime: 0,
-      isPlaying: false
+      isPlaying: false,
+      youtubeQueue: [] // ← НОВОЕ: пустая очередь при создании
     };
     this.rooms.set(id, newRoom);
     this.saveRoomsToFile();
     console.log(`[RoomService] Создана комната ${id} пользователем ${ownerSocketId}`);
     return newRoom;
   }
+
+  // === МЕТОДЫ ДЛЯ УПРАВЛЕНИЯ ОЧЕРЕДЬЮ YOUTUBE ===
+
+  addVideoToQueue(roomId, video) {
+    const room = this.rooms.get(roomId);
+    if (room) {
+      room.youtubeQueue.push(video);
+      this.saveRoomsToFile();
+      return true;
+    }
+    return false;
+  }
+
+  removeVideoFromQueue(roomId, index) {
+    const room = this.rooms.get(roomId);
+    if (room && index >= 0 && index < room.youtubeQueue.length) {
+      room.youtubeQueue.splice(index, 1);
+      this.saveRoomsToFile();
+      return true;
+    }
+    return false;
+  }
+
+  clearQueue(roomId) {
+    const room = this.rooms.get(roomId);
+    if (room) {
+      room.youtubeQueue = [];
+      this.saveRoomsToFile();
+      return true;
+    }
+    return false;
+  }
+
+  getNextVideo(roomId) {
+    const room = this.rooms.get(roomId);
+    if (room && room.youtubeQueue.length > 0) {
+      const next = room.youtubeQueue.shift();
+      this.saveRoomsToFile();
+      return next;
+    }
+    return null;
+  }
+
+  // === КОНЕЦ МЕТОДОВ ОЧЕРЕДИ ===
 
   generateRoomId() {
     return Math.random().toString(36).substring(2, 11);

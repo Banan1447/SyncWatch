@@ -6,6 +6,7 @@ const fs = require('fs');
 const { ensureDir } = require('fs-extra');
 const multer = require('multer');
 const config = require('./config');
+const ytdl = require('ytdl-core'); // ← ДОБАВЛЕНО
 
 // Импорт сервисов
 const RoomService = require('./services/roomService');
@@ -50,27 +51,24 @@ class SyncWatchServer {
     this.fileService = new FileService(config.videoDir);
 
     this.roomUpdateInterval = null;
-    this.roomStatesAutosaveInterval = null; // ← ДОБАВЛЕНО: интервал автосохранения
-
-    // ← ДОБАВЛЕНО: путь к файлу состояний
+    this.roomStatesAutosaveInterval = null;
     this.ROOM_STATES_FILE = path.join(__dirname, 'json', 'room-states.json');
 
     this.setupMiddleware();
     this.setupRoutes();
-    this.loadRoomStates(); // ← ДОБАВЛЕНО: загрузка состояний при старте
+    this.loadRoomStates();
     this.setupSocketIO();
-    this.startRoomStatesAutosave(); // ← ДОБАВЛЕНО: запуск автосохранения
+    this.startRoomStatesAutosave();
     this.setupFileUpload();
   }
 
-  // === НОВЫЕ МЕТОДЫ ДЛЯ СОХРАНЕНИЯ СОСТОЯНИЙ ===
+  // === МЕТОДЫ ДЛЯ СОХРАНЕНИЯ СОСТОЯНИЙ ===
 
   loadRoomStates() {
     try {
       if (fs.existsSync(this.ROOM_STATES_FILE)) {
         const data = fs.readFileSync(this.ROOM_STATES_FILE, 'utf8');
         const savedStates = JSON.parse(data);
-        // Применяем сохранённые состояния к существующим комнатам
         for (const [roomId, state] of Object.entries(savedStates)) {
           this.roomService.updateRoomState(roomId, {
             currentVideo: state.currentVideo,
@@ -102,7 +100,6 @@ class SyncWatchServer {
         }
       }
 
-      // Создаём папку json, если её нет
       const dir = path.dirname(this.ROOM_STATES_FILE);
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
@@ -116,14 +113,29 @@ class SyncWatchServer {
   }
 
   startRoomStatesAutosave() {
-    // Сохраняем каждые 5 секунд
     this.roomStatesAutosaveInterval = setInterval(() => {
       this.saveRoomStates();
     }, 5000);
     console.log('🔁 Автосохранение состояний комнат запущено (каждые 5 сек)');
   }
 
-  // === КОНЕЦ НОВЫХ МЕТОДОВ ===
+  // === ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ДЛЯ YOUTUBE ===
+
+  extractYouTubeId(url) {
+    const regExp = /^.*(youtu\.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]{11}).*/;
+    const match = url.match(regExp);
+    return match ? match[2] : null;
+  }
+
+  formatDuration(seconds) {
+    if (!seconds || seconds <= 0) return '0s';
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    return (h ? `${h}h ` : '') + (m ? `${m}m ` : '') + `${s}s`;
+  }
+
+  // === КОНЕЦ ВСПОМОГАТЕЛЬНЫХ МЕТОДОВ ===
 
   setupMiddleware() {
     this.app.use(express.json({ limit: '50mb' }));
@@ -417,6 +429,86 @@ class SyncWatchServer {
         }
       });
 
+      // === YOUTUBE QUEUE EVENTS ===
+
+      socket.on('queue-add-youtube', async (data, callback) => {
+        const { roomId, url } = data;
+        try {
+          const videoId = this.extractYouTubeId(url);
+          if (!videoId) {
+            const error = 'Неверная ссылка на YouTube';
+            if (callback) callback({ success: false, error });
+            socket.emit('notification', { type: 'error', message: error });
+            return;
+          }
+
+          const info = await ytdl.getBasicInfo(videoId);
+          const video = {
+            id: videoId,
+            title: info.videoDetails.title || 'Без названия',
+            duration: this.formatDuration(info.videoDetails.lengthSeconds),
+            thumbnail: `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`,
+            type: 'youtube'
+          };
+
+          this.roomService.addVideoToQueue(roomId, video);
+          const room = this.roomService.getRoom(roomId);
+          this.io.to(roomId).emit('queue-updated', room.youtubeQueue);
+
+          if (callback) callback({ success: true, video });
+          socket.emit('notification', { type: 'success', message: 'Видео добавлено в очередь' });
+        } catch (err) {
+          console.error('[YouTube] Ошибка добавления видео:', err.message);
+          const error = 'Не удалось загрузить видео с YouTube';
+          if (callback) callback({ success: false, error });
+          socket.emit('notification', { type: 'error', message: error });
+        }
+      });
+
+      socket.on('skip-video', (data) => {
+        const { roomId } = data;
+        const next = this.roomService.getNextVideo(roomId);
+        if (next && next.type === 'youtube') {
+          this.roomService.updateRoomState(roomId, { currentVideo: next.id });
+          this.io.to(roomId).emit('video-changed', { videoUrl: next.id, type: 'youtube' });
+        } else {
+          this.roomService.updateRoomState(roomId, { currentVideo: null });
+          this.io.to(roomId).emit('video-changed', { videoUrl: null });
+        }
+        const room = this.roomService.getRoom(roomId);
+        this.io.to(roomId).emit('queue-updated', room.youtubeQueue);
+      });
+
+      socket.on('queue-remove', (data) => {
+        const { roomId, index } = data;
+        this.roomService.removeVideoFromQueue(roomId, index);
+        const room = this.roomService.getRoom(roomId);
+        this.io.to(roomId).emit('queue-updated', room.youtubeQueue);
+      });
+
+      socket.on('queue-clear', (data) => {
+        const { roomId } = data;
+        this.roomService.clearQueue(roomId);
+        this.io.to(roomId).emit('queue-updated', []);
+      });
+
+      socket.on('video-ended', (data) => {
+        const { roomId } = data || {};
+        if (!roomId) return;
+        const next = this.roomService.getNextVideo(roomId);
+        if (next && next.type === 'youtube') {
+          this.roomService.updateRoomState(roomId, { currentVideo: next.id });
+          this.io.to(roomId).emit('video-changed', { videoUrl: next.id, type: 'youtube' });
+        } else {
+          this.roomService.updateRoomState(roomId, { currentVideo: null });
+          this.io.to(roomId).emit('video-changed', { videoUrl: null });
+        }
+        const room = this.roomService.getRoom(roomId);
+        this.io.to(roomId).emit('queue-updated', room.youtubeQueue);
+      });
+
+      // === ОСТАЛЬНЫЕ СОКЕТ-СОБЫТИЯ ===
+
       socket.on('video-command', (data) => {
         console.log(`[SOCKET] Received video-command from ${socket.id}:`, data);
         if (data.roomId) {
@@ -665,7 +757,7 @@ class SyncWatchServer {
       console.log(`🚀 SyncWatch server running on port ${port}`);
       console.log(`📊 Admin panel: http://localhost:${port}/admin`);
       console.log(`📁 rooms.json: http://localhost:${port}/json/rooms.json`);
-      console.log(`💾 room-states.json: http://localhost:${port}/json/room-states.json`); // ← ДОБАВЛЕНО
+      console.log(`💾 room-states.json: http://localhost:${port}/json/room-states.json`);
       console.log(`🔑 Default admin: admin / admin`);
     });
 
@@ -674,9 +766,9 @@ class SyncWatchServer {
       if (this.roomUpdateInterval) {
         clearInterval(this.roomUpdateInterval);
       }
-      if (this.roomStatesAutosaveInterval) { // ← ДОБАВЛЕНО
+      if (this.roomStatesAutosaveInterval) {
         clearInterval(this.roomStatesAutosaveInterval);
-        this.saveRoomStates(); // Сохраняем в последний раз
+        this.saveRoomStates();
       }
       this.roomService.shutdown();
       this.server.close(() => {
