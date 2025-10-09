@@ -9,26 +9,62 @@ if (leaveRoomBtn) {
 }
 
 // --- ROOM JOIN LOGIC ---
-function tryAutoJoinRoomFromUrl() {
+function tryAutoJoinRoomFromUrl(password = null) {
   const params = new URLSearchParams(window.location.search);
   const room = params.get('room');
   if (!room) {
     window.location.href = '/select-room.html';
     return;
   }
-  // join room
-  const name = localStorage.getItem('userName') || '';
-  socket.emit('join-room', { roomId: room, name }, res => {
+
+  const name = localStorage.getItem('userName') || prompt('Введите ваше имя:') || `User${Math.floor(Math.random() * 10000)}`;
+  const finalPassword = password !== null ? password : (document.getElementById('roomPassword')?.value.trim() || '');
+
+  socket.emit('join-room', { roomId: room, name, password: finalPassword }, res => {
     if (!(res && res.success)) {
-      alert(res && res.error ? res.error : 'Ошибка входа в комнату');
-      window.location.href = '/select-room.html';
+      if (res?.error === 'Invalid password') {
+        const newPass = prompt('Неверный пароль. Введите правильный пароль:');
+        if (newPass !== null) {
+          tryAutoJoinRoomFromUrl(newPass); // рекурсивно пробуем снова
+        } else {
+          window.location.href = '/select-room.html';
+        }
+      } else {
+        alert(res?.error || 'Ошибка входа в комнату');
+        window.location.href = '/select-room.html';
+      }
     }
   });
 }
 
-window.addEventListener('DOMContentLoaded', tryAutoJoinRoomFromUrl);
+// Инициализация сокета
 const socket = io();
 
+// Ожидание DOM
+window.addEventListener('DOMContentLoaded', () => {
+  // Добавляем поле ввода пароля, если его нет
+  const uploadSection = document.querySelector('.upload-section');
+  if (uploadSection && !document.getElementById('roomPassword')) {
+    const passwordInput = document.createElement('input');
+    passwordInput.type = 'password';
+    passwordInput.id = 'roomPassword';
+    passwordInput.placeholder = 'Пароль комнаты (если есть)';
+    passwordInput.style.cssText = `
+      width: 100%;
+      padding: 0.5rem;
+      margin: 0.5rem 0;
+      border: 1px solid var(--border);
+      background: var(--secondary);
+      color: white;
+      border-radius: 4px;
+    `;
+    uploadSection.insertBefore(passwordInput, uploadSection.firstChild);
+  }
+
+  tryAutoJoinRoomFromUrl();
+});
+
+// --- ОСТАЛЬНОЙ КОД БЕЗ ИЗМЕНЕНИЙ ---
 const video = document.getElementById('videoPlayer');
 const statusEl = document.getElementById('status');
 const videoList = document.getElementById('videoList');
@@ -104,12 +140,11 @@ let roomState = null;
 
 function renderRoomVideoList() {
   videoList.innerHTML = '';
-  // Используем fetch('/api/videos'), как было раньше
   fetch('/api/videos')
     .then(res => res.json())
     .then(videos => {
-      console.log('API returned videos:', videos); // ✅ Отладка
-      console.log('Total videos from API:', videos.length); // ✅ Отладка
+      console.log('API returned videos:', videos);
+      console.log('Total videos from API:', videos.length);
       videos.forEach(video => {
         const ext = video.name.split('.').pop().toLowerCase();
         const isSupported = ['mp4', 'webm', 'ogg'].includes(ext);
@@ -153,7 +188,6 @@ uploadInput.addEventListener('change', (e) => {
     const formData = new FormData();
     formData.append('video', file);
 
-    // Показать прогресс-бар
     const progressBar = document.querySelector('.progress-bar');
     progressBar.style.display = 'block';
     const progressBarFill = document.querySelector('.progress-bar-fill');
@@ -174,7 +208,6 @@ uploadInput.addEventListener('change', (e) => {
           showNotification(`Video uploaded: ${data.file}`, 'success');
           progressBar.style.display = 'none';
           progressBarFill.style.width = '0';
-          // После загрузки обновляем список видео
           renderRoomVideoList();
         } else {
           showNotification('Upload failed', 'error');
@@ -194,17 +227,14 @@ uploadInput.addEventListener('change', (e) => {
 // --- ROOM STATE ---
 socket.on('room-state', (state) => {
   roomState = state;
-  console.log('Room state received:', state); // ✅ Отладка
-  // Видео
+  console.log('Room state received:', state);
   if (state.currentVideo) {
     video.src = `/videos/${state.currentVideo}`;
     statusEl.innerHTML = `Video loaded: ${state.currentVideo}`;
     currentVideoFile = state.currentVideo;
     isVideoReady = false;
   }
-  // Пользователи
   document.getElementById('onlineCount').textContent = Object.keys(state.users).length;
-  // Чат
   const commentsList = document.getElementById('commentsList');
   commentsList.innerHTML = '';
   (state.chat || []).forEach(comment => {
@@ -213,26 +243,21 @@ socket.on('room-state', (state) => {
     div.innerHTML = `<strong>${comment.user}:</strong> ${comment.text}`;
     commentsList.appendChild(div);
   });
-  // ✅ Обновляем список видео
   renderRoomVideoList();
 });
 
-// ✅ НОВОЕ: Обработка события video-added
 socket.on('video-added', (newVideo) => {
-  console.log('Video added:', newVideo); // ✅ Отладка
-  renderRoomVideoList(); // Обновляем список
+  console.log('Video added:', newVideo);
+  renderRoomVideoList();
 });
 
-// ✅ НОВОЕ: Обработка события video-removed
 socket.on('video-removed', (removedVideoName) => {
-  console.log('Video removed:', removedVideoName); // ✅ Отладка
-  renderRoomVideoList(); // Обновляем список
+  console.log('Video removed:', removedVideoName);
+  renderRoomVideoList();
 });
 
-// Управление видео — только после загрузки
 video.addEventListener('loadedmetadata', () => {
   isVideoReady = true;
-  // ✅ Не вызываем video.play() автоматически
 });
 
 video.addEventListener('play', () => {
@@ -247,7 +272,6 @@ video.addEventListener('pause', () => {
   }
 });
 
-// === ПРОСТОЙ ФУНКЦИОНАЛ ПЕРЕМАТЫВАНИЯ ===
 let lastSeekSent = 0;
 video.addEventListener('seeked', () => {
   if (isVideoReady) {
@@ -259,14 +283,13 @@ video.addEventListener('seeked', () => {
   }
 });
 
-// Приём команды от других пользователей
 socket.on('video-command', (data) => {
   if (isVideoReady && video.readyState >= 1) {
     if (data.type === 'play') {
       if (video.paused) {
         const playPromise = video.play();
         if (playPromise !== undefined) {
-          playPromise.then(() => {}).catch(error => {
+          playPromise.catch(error => {
             console.warn('Play command blocked by browser:', error);
           });
         }
@@ -284,7 +307,6 @@ socket.on('video-command', (data) => {
   }
 });
 
-// Прогресс буфера
 video.addEventListener('progress', () => {
   const buffered = video.buffered;
   if (buffered.length > 0) {
@@ -304,7 +326,6 @@ video.addEventListener('progress', () => {
   }
 });
 
-// Комментарии
 document.getElementById('sendCommentBtn').addEventListener('click', () => {
   const text = document.getElementById('commentInput').value.trim();
   if (text) {
@@ -313,12 +334,10 @@ document.getElementById('sendCommentBtn').addEventListener('click', () => {
   }
 });
 
-// new-comment: просто обновим room-state, чтобы не было гонок
 socket.on('new-comment', () => {
   // room-state придёт отдельно
 });
 
-// Функция уведомлений
 function showNotification(message, type) {
   const notification = document.createElement('div');
   notification.className = `notification ${type}`;
@@ -330,11 +349,12 @@ function showNotification(message, type) {
   }, 3000);
 }
 
-// ✅ НОВОЕ: КНОПКА ОБНОВЛЕНИЯ СПИСКА
 document.addEventListener('DOMContentLoaded', () => {
   const rightPanel = document.querySelector('.right-panel');
   const videosHeader = rightPanel.querySelector('h3');
   
+  if (!videosHeader) return;
+
   const refreshBtn = document.createElement('button');
   refreshBtn.innerHTML = '<i class="fas fa-sync-alt"></i> Refresh';
   refreshBtn.style = `
@@ -349,10 +369,8 @@ document.addEventListener('DOMContentLoaded', () => {
     transition: background 0.2s ease;
   `;
   refreshBtn.onclick = renderRoomVideoList;
-  
   videosHeader.appendChild(refreshBtn);
 
-  // ✅ КНОПКА ДЛЯ ОТЛАДКИ API
   const debugApiBtn = document.createElement('button');
   debugApiBtn.innerHTML = '<i class="fas fa-bug"></i> Debug API';
   debugApiBtn.style = `
@@ -378,6 +396,5 @@ document.addEventListener('DOMContentLoaded', () => {
         alert('Error fetching API videos');
       });
   };
-  
   videosHeader.appendChild(debugApiBtn);
 });

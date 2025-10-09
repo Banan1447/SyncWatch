@@ -1,44 +1,13 @@
 [
   {
-    "id": "692cxwu02",
+    "id": "kQFZ2sc9Y",
     "name": "1",
-    "ownerId": "MiQXjB57FHJMDA7gAAAF",
-    "users": {
-      "toBmDr4ASKG3dhAzAAAD": {
-        "name": "Artur",
-        "socketId": "toBmDr4ASKG3dhAzAAAD"
-      },
-      "wybMGExQ1_lINy5oAAAD": {
-        "name": "Artur",
-        "socketId": "wybMGExQ1_lINy5oAAAD"
-      },
-      "Lqv3B4DazK78AV8EAAAN": {
-        "name": "Artur",
-        "socketId": "Lqv3B4DazK78AV8EAAAN"
-      },
-      "g21xhTVWhkGLtyGwAAAR": {
-        "name": "",
-        "socketId": "g21xhTVWhkGLtyGwAAAR"
-      }
-    },
-    "currentVideo": "Solo_Leveling_Ep01.mp4",
-    "currentTime": 8.360789,
+    "ownerId": "NaFDArbzMUo4mHlsAAAB",
+    "password": null,
+    "users": {},
+    "currentVideo": "Alien.Earth.S01E06.WEB-DLRip.RGzsRutracker.mp4",
+    "currentTime": 1159.626677,
     "isPlaying": false,
-    "youtubeQueue": [
-      {
-        "id": "g8yaBq6FU1c",
-        "title": "ПОЛЕТИТ ЛИ МАШИНА С КРЫЛЬЯМИ В GTA 5 и BeamNG Drive?",
-        "duration": "10m 51s",
-        "thumbnail": "https://i.ytimg.com/vi/g8yaBq6FU1c/mqdefault.jpg",
-        "type": "youtube"
-      },
-      {
-        "id": "g8yaBq6FU1c",
-        "title": "ПОЛЕТИТ ЛИ МАШИНА С КРЫЛЬЯМИ В GTA 5 и BeamNG Drive?",
-        "duration": "10m 51s",
-        "thumbnail": "https://i.ytimg.com/vi/g8yaBq6FU1c/mqdefault.jpg",
-        "type": "youtube"
-      }
-    ]
+    "youtubeQueue": []
   }
 ]

@@ -6,7 +6,7 @@ const fs = require('fs');
 const { ensureDir } = require('fs-extra');
 const multer = require('multer');
 const config = require('./config');
-const ytdl = require('ytdl-core'); // ← ДОБАВЛЕНО
+const ytdl = require('ytdl-core');
 
 // Импорт сервисов
 const RoomService = require('./services/roomService');
@@ -28,9 +28,7 @@ const healthRoutes = require('./routes/health');
 const filesRoutes = require('./routes/files');
 const videosRoutes = require('./routes/videos');
 const transcodeRoutes = require('./routes/transcode');
-const roomsRoutes = require('./routes/rooms');
-const sessionsRoutes = require('./routes/sessions');
-const statsRoutes = require('./routes/stats');
+const roomsRoutes = require('./routes/rooms'); // Используем только этот маршрут
 
 class SyncWatchServer {
   constructor() {
@@ -43,6 +41,7 @@ class SyncWatchServer {
       }
     });
 
+    // Единый экземпляр RoomService для всего приложения
     this.roomService = new RoomService();
     this.authService = new AuthService();
     this.transcodeService = new TranscodeService();
@@ -66,22 +65,38 @@ class SyncWatchServer {
 
   loadRoomStates() {
     try {
-      if (fs.existsSync(this.ROOM_STATES_FILE)) {
-        const data = fs.readFileSync(this.ROOM_STATES_FILE, 'utf8');
-        const savedStates = JSON.parse(data);
-        for (const [roomId, state] of Object.entries(savedStates)) {
-          this.roomService.updateRoomState(roomId, {
-            currentVideo: state.currentVideo,
-            currentTime: state.currentTime,
-            isPlaying: state.isPlaying
-          });
-        }
-        console.log('✅ Состояния комнат загружены из room-states.json');
-      } else {
+      if (!fs.existsSync(this.ROOM_STATES_FILE)) {
         console.log('ℹ️ Файл room-states.json не найден — будет создан при первом сохранении');
+        return;
       }
+
+      const data = fs.readFileSync(this.ROOM_STATES_FILE, 'utf8').trim();
+      
+      if (!data) {
+        console.log('⚠️ Файл room-states.json пуст — игнорируем');
+        return;
+      }
+
+      const savedStates = JSON.parse(data);
+      for (const [roomId, state] of Object.entries(savedStates)) {
+        this.roomService.updateRoomState(roomId, {
+          currentVideo: state.currentVideo,
+          currentTime: state.currentTime,
+          isPlaying: state.isPlaying
+        });
+      }
+      console.log('✅ Состояния комнат загружены из room-states.json');
     } catch (err) {
-      console.error('❌ Ошибка загрузки состояний комнат:', err);
+      console.error('❌ Ошибка загрузки состояний комнат:', err.message);
+      console.warn('⚠️ Файл room-states.json повреждён или содержит недопустимый JSON. Он будет перезаписан при следующем сохранении.');
+      
+      // Удаляем повреждённый файл, чтобы избежать повторных ошибок
+      try {
+        fs.unlinkSync(this.ROOM_STATES_FILE);
+        console.log('🗑️ Повреждённый room-states.json удалён');
+      } catch (delErr) {
+        console.error('❌ Не удалось удалить повреждённый файл:', delErr.message);
+      }
     }
   }
 
@@ -162,9 +177,9 @@ class SyncWatchServer {
     this.app.use('/api/files', filesRoutes);
     this.app.use('/api/videos', videosRoutes);
     this.app.use('/api/transcode', transcodeRoutes);
-    this.app.use('/api/rooms', roomsRoutes);
-    this.app.use('/api/sessions', sessionsRoutes);
-    this.app.use('/api/stats', statsRoutes);
+    this.app.use('/api/rooms', roomsRoutes); // ЕДИНСТВЕННЫЙ маршрут для комнат
+
+    // УДАЛЕНЫ: /api/sessions — дублирует /api/rooms
 
     this.app.post('/api/auth/login', async (req, res) => {
       try {
@@ -212,6 +227,7 @@ class SyncWatchServer {
       }
     });
 
+    // === ADMIN API (оставлено без изменений) ===
     this.app.get('/api/admin/stats', authenticateToken, isAdmin, (req, res) => {
       try {
         const stats = this.adminService.getStats();
@@ -399,10 +415,38 @@ class SyncWatchServer {
     this.io.on('connection', (socket) => {
       console.log(`[SOCKET] User connected: ${socket.id}`);
 
+      // ✅ ИСПРАВЛЕННЫЙ ОБРАБОТЧИК get-rooms — возвращает данные о видео в нужном формате
       socket.on('get-rooms', (callback) => {
         console.log(`[SOCKET] ${socket.id} requested room list`);
+        
+        const rawRooms = this.roomService.getAllRooms();
+        const roomsForClient = rawRooms.map(room => {
+          let videoTitle = null;
+          if (room.currentVideo) {
+            // Простая эвристика: если строка длиной 11 — YouTube ID
+            if (typeof room.currentVideo === 'string' && room.currentVideo.length === 11) {
+              videoTitle = `YouTube: ${room.currentVideo}`;
+            } else {
+              // Иначе — имя файла
+              videoTitle = room.currentVideo;
+            }
+          }
+
+          return {
+            id: room.id,
+            name: room.name,
+            hasPassword: !!room.password,
+            users: room.users || {},
+            video: room.currentVideo ? {
+              title: videoTitle || 'Без названия',
+              currentTime: typeof room.currentTime === 'number' ? room.currentTime : 0,
+              isPlaying: !!room.isPlaying
+            } : null
+          };
+        });
+
         if (callback) {
-          callback(this.roomService.getAllRooms());
+          callback(roomsForClient);
         }
       });
 
@@ -531,7 +575,7 @@ class SyncWatchServer {
       });
 
       socket.on('create-room', (data, callback) => {
-        const room = this.roomService.createRoom(data.name, socket.id);
+        const room = this.roomService.createRoom(data.name, socket.id, data.password);
         socket.join(room.id);
         socket.emit('room-created', room);
         this.io.emit('room-list', this.roomService.getAllRooms());
@@ -540,40 +584,57 @@ class SyncWatchServer {
         }
       });
 
+      // ✅ ИСПРАВЛЕННЫЙ ОБРАБОТЧИК join-room
       socket.on('join-room', (data, callback) => {
         console.log(`[SOCKET] ${socket.id} attempting to join room ${data.roomId} as ${data.name || 'Anonymous'}`);
-        const room = this.roomService.joinRoom(data.roomId, socket.id, data.name);
-        if (room) {
-          console.log(`[SOCKET] ${socket.id} successfully joined room ${data.roomId}`);
-          socket.join(data.roomId);
-          socket.emit('room-joined', room);
+        
+        if (!data.roomId || !data.name) {
+          console.log(`[SOCKET] Missing roomId or name for join-room from ${socket.id}`);
+          if (callback) callback({ success: false, error: 'Missing roomId or name' });
+          return;
+        }
 
-          socket.emit('room-state', {
-            currentVideo: room.currentVideo || null,
-            currentTime: typeof room.currentTime === 'number' ? room.currentTime : 0,
-            isPlaying: !!room.isPlaying,
-            users: Object.fromEntries(room.users)
-          });
+        const result = this.roomService.joinRoom(data.roomId, socket.id, data.name, data.password);
+        
+        if (!result || !result.success) {
+          console.log(`[SOCKET] ${socket.id} failed to join room ${data.roomId}: ${result?.error || 'Unknown error'}`);
+          if (callback) callback({ success: false, error: result?.error || 'Failed to join room' });
+          return;
+        }
 
-          socket.to(data.roomId).emit('user-joined', { 
-            user: { socketId: socket.id, name: data.name },
-            room: room
+        const room = result.room;
+        if (!room) {
+          console.error(`[SOCKET] joinRoom returned success but no room data for ${data.roomId}`);
+          if (callback) callback({ success: false, error: 'Room data unavailable' });
+          return;
+        }
+
+        console.log(`[SOCKET] ${socket.id} successfully joined room ${data.roomId}`);
+        socket.join(data.roomId);
+        socket.emit('room-joined', room);
+
+        // ✅ room.users — уже обычный объект {}, НЕ Map!
+        socket.emit('room-state', {
+          currentVideo: room.currentVideo || null,
+          currentTime: typeof room.currentTime === 'number' ? room.currentTime : 0,
+          isPlaying: !!room.isPlaying,
+          users: room.users
+        });
+
+        socket.to(data.roomId).emit('user-joined', { 
+          user: { socketId: socket.id, name: data.name },
+          room: room
+        });
+        this.io.emit('room-list', this.roomService.getAllRooms());
+        
+        if (callback) {
+          callback({ 
+            success: true, 
+            room: {
+              id: room.id,
+              name: room.name,
+            } 
           });
-          this.io.emit('room-list', this.roomService.getAllRooms());
-          if (callback) {
-            callback({ 
-              success: true, 
-              room: {
-                id: room.id,
-                name: room.name,
-              } 
-            });
-          }
-        } else {
-          console.log(`[SOCKET] ${socket.id} failed to join room ${data.roomId} - room not found`);
-          if (callback) {
-            callback({ success: false, error: 'Room not found' });
-          }
         }
       });
 

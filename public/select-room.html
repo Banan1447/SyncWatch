@@ -2,14 +2,15 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Select Room</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css  ">
+  <title>SyncWatch — Select Room</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <script src="/socket.io/socket.io.js"></script>
   <style>
     :root {
       --primary: #4a90e2;
       --secondary: #343a40;
-      --accent: #007bff;
+      --accent-start: #4a90e2;
+      --accent-end: #8e44ad;
       --bg-dark: #121212;
       --bg-darker: #0d0d0d;
       --text: #ffffff;
@@ -17,931 +18,381 @@
       --border: #333333;
       --shadow: rgba(0, 0, 0, 0.5);
       --hover-bg: #1e1e1e;
-      --progress-bg: #2c2c2c;
-      --progress-fill: #007bff;
-      --error: #dc3545;
-      --success: #28a745;
     }
-
     * {
       margin: 0;
       padding: 0;
       box-sizing: border-box;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     }
-
     body {
       background: var(--bg-dark);
       color: var(--text);
-      line-height: 1.6;
-      transition: background 0.3s ease;
+      padding: 2rem;
     }
-
     .header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 1rem 2rem;
-      background: var(--bg-darker);
-      border-bottom: 1px solid var(--border);
-      box-shadow: 0 2px 10px var(--shadow);
+      margin-bottom: 2rem;
     }
-
-    .logo-container {
+    .logo {
       display: flex;
       align-items: center;
       gap: 0.75rem;
-      cursor: pointer;
-      transition: opacity 0.2s ease;
     }
-
-    .logo-container:hover {
-      opacity: 0.8;
-    }
-
     .logo-icon {
-      width: 40px;
-      height: 40px;
+      width: 48px;
+      height: 48px;
       border-radius: 50%;
-      background: linear-gradient(135deg, #4a90e2, #8e44ad);
+      background: linear-gradient(135deg, var(--accent-start), var(--accent-end));
       display: flex;
       align-items: center;
       justify-content: center;
       color: white;
       font-weight: bold;
-      position: relative;
     }
-
-    .logo-svg {
-      width: 80%;
-      height: 80%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .logo-svg svg {
-      width: 100%;
-      height: 100%;
-    }
-
     .header h1 {
-      font-size: 1.8rem;
-      font-weight: 600;
+      font-size: 2rem;
       color: var(--primary);
     }
-
-    .auth-section {
+    .controls {
       display: flex;
-      align-items: center;
       gap: 1rem;
+      align-items: center;
     }
-
-    .user-info {
+    .btn {
+      padding: 0.6rem 1.2rem;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: opacity 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent-start), var(--accent-end));
+      color: white;
+    }
+    .btn-primary:hover {
+      opacity: 0.9;
+    }
+    .btn-secondary {
+      background: var(--secondary);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-secondary:hover {
+      background: var(--hover-bg);
+    }
+    .btn-logout {
+      background: #e74c3c;
+      color: white;
+      border: none;
+    }
+    .btn-logout:hover {
+      opacity: 0.9;
+    }
+    .room-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 1.5rem;
+      margin-top: 1rem;
+    }
+    .room-card {
+      background: var(--secondary);
+      border-radius: 8px;
+      padding: 1.2rem;
+      box-shadow: 0 4px 12px var(--shadow);
+      transition: transform 0.2s ease;
+      position: relative;
+    }
+    .room-card:hover {
+      transform: translateY(-4px);
+    }
+    .room-card h3 {
+      font-size: 1.25rem;
+      margin-bottom: 0.5rem;
       display: flex;
       align-items: center;
       gap: 0.5rem;
     }
-
-    .user-name {
-      color: var(--accent);
-    }
-
-    .profile-link {
-      color: var(--text-secondary);
-      text-decoration: none;
-      margin-right: 1rem;
-      transition: color 0.2s ease;
-    }
-
-    .profile-link:hover {
-      color: var(--accent);
-    }
-
-    .login-btn, .register-btn, .logout-btn {
-      color: var(--accent);
-      text-decoration: none;
-      font-weight: 500;
-      padding: 0.5rem 1rem;
-      border-radius: 4px;
-      transition: all 0.2s ease;
-      cursor: pointer;
-      border: 1px solid var(--accent);
-      background: transparent;
-    }
-
-    .login-btn:hover, .register-btn:hover {
-      background: rgba(0, 123, 255, 0.1);
-      color: #fff;
-    }
-
-    .logout-btn {
-      color: var(--error);
-      border-color: var(--error);
-    }
-
-    .logout-btn:hover {
-      background: rgba(220, 53, 69, 0.1);
-      color: #fff;
-    }
-
-    .main-container {
-      padding: 2rem;
-      min-height: calc(100vh - 100px);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .room-section {
-      width: 100%;
-      max-width: 600px;
-      background: var(--bg-darker);
-      border-radius: 8px;
-      box-shadow: 0 4px 12px var(--shadow);
-      padding: 2rem;
-      position: relative;
-    }
-
-    .room-section h2 {
-      margin-bottom: 1.5rem;
-      font-size: 1.5rem;
+    .room-card h3 i {
       color: var(--primary);
     }
-
-    .auth-forms {
-      display: none;
-    }
-
-    .form-group {
-      margin-bottom: 1rem;
-    }
-
-    .form-group label {
-      display: block;
-      margin-bottom: 0.5rem;
-      color: var(--text-secondary);
-    }
-
-    .form-group input {
-      width: 100%;
-      padding: 0.75rem;
-      border: 1px solid var(--border);
-      background: var(--secondary);
-      color: var(--text);
-      border-radius: 4px;
-      font-size: 1rem;
-    }
-
-    .form-group button {
-      width: 100%;
-      padding: 0.75rem;
-      background: var(--accent);
-      color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      font-weight: 500;
-      transition: background 0.2s ease;
-      margin-top: 0.5rem;
-    }
-
-    .form-group button:hover {
-      background: #0056b3;
-    }
-
-    .toggle-auth {
-      text-align: center;
-      margin-top: 0.5rem;
-      color: var(--text-secondary);
-    }
-
-    .toggle-auth a {
-      color: var(--accent);
-      cursor: pointer;
-      text-decoration: none;
-    }
-
-    .input-group {
-      margin-bottom: 1rem;
-    }
-
-    .input-group label {
-      display: block;
-      margin-bottom: 0.5rem;
-      color: var(--text-secondary);
-    }
-
-    .input-group input {
-      width: 100%;
-      padding: 0.75rem;
-      border: 1px solid var(--border);
-      background: var(--secondary);
-      color: var(--text);
-      border-radius: 4px;
-      font-size: 1rem;
-    }
-
-    .input-group button {
-      width: 100%;
-      padding: 0.75rem;
-      background: var(--accent);
-      color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      font-weight: 500;
-      transition: background 0.2s ease;
-      margin-top: 1rem;
-    }
-
-    .input-group button:hover {
-      background: #0056b3;
-    }
-
-    .room-list {
-      margin-top: 2rem;
-    }
-
-    .room-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      padding: 1rem;
-      background: var(--bg-dark);
-      border-radius: 4px;
-      border: 1px solid var(--border);
-      margin-bottom: 0.5rem;
-      transition: background 0.2s ease;
-      cursor: pointer;
-    }
-
-    .room-item:hover {
-      background: var(--hover-bg);
-    }
-
     .room-info {
-      flex: 1;
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+      margin: 0.5rem 0;
     }
-
-    .room-name {
-      font-size: 1.1rem;
-      color: var(--text);
-    }
-
-    .room-users, .room-video, .room-time {
+    .video-info {
       font-size: 0.85rem;
       color: var(--text-secondary);
-      margin-top: 0.25rem;
+      margin: 0.5rem 0;
+      padding-top: 0.5rem;
+      border-top: 1px solid var(--border);
     }
-
     .room-actions {
       display: flex;
       gap: 0.5rem;
-      margin-top: auto;
-      margin-bottom: auto;
+      margin-top: 1rem;
     }
-
-    .action-btn {
-      background: var(--accent);
+    .join-btn {
+      flex: 1;
+      padding: 0.5rem;
+      background: var(--primary);
       color: white;
       border: none;
-      width: 32px;
-      height: 32px;
       border-radius: 4px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
       cursor: pointer;
-      transition: background 0.2s ease;
+      font-weight: 500;
     }
-
-    .action-btn:hover {
-      background: #0056b3;
+    .join-btn:hover {
+      opacity: 0.9;
     }
-
-    .delete-btn {
-      background: var(--error);
+    .password-input {
+      width: 100%;
+      padding: 0.5rem;
+      margin: 0.5rem 0;
+      border: 1px solid var(--border);
+      background: var(--bg-darker);
+      color: var(--text);
+      border-radius: 4px;
+      display: none;
     }
-
-    .delete-btn:hover {
-      background: #c82333;
-    }
-
-    #notifications {
+    .notification {
       position: fixed;
       top: 20px;
       right: 20px;
-      z-index: 1000;
-      max-width: 300px;
-    }
-
-    .notification {
       padding: 1rem;
-      margin-bottom: 0.5rem;
+      background: var(--secondary);
+      border-left: 4px solid var(--primary);
       border-radius: 4px;
       box-shadow: 0 4px 12px var(--shadow);
-      animation: slideIn 0.3s ease-out;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
+      z-index: 1000;
     }
-
-    .notification.success {
-      background: rgba(40, 167, 69, 0.2);
-      border-left: 4px solid var(--success);
-      color: var(--success);
-    }
-
-    .notification.error {
-      background: rgba(220, 53, 69, 0.2);
-      border-left: 4px solid var(--error);
-      color: var(--error);
-    }
-
-    .notification-close {
-      background: none;
-      border: none;
-      color: inherit;
-      font-size: 1.2rem;
-      cursor: pointer;
-      padding: 0 0.5rem;
-    }
-
-    @keyframes slideIn {
-      from {
-        transform: translateX(100%);
-        opacity: 0;
-      }
-      to {
-        transform: translateX(0);
-        opacity: 1;
-      }
-    }
-
-    .drop-zone {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      border: 2px dashed var(--accent);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: rgba(0, 0, 0, 0.7);
-      z-index: 9999;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.3s ease;
-    }
-
-    .drop-zone.active {
-      opacity: 1;
-      pointer-events: all;
-    }
-
-    .drop-zone-content {
+    .empty-state {
+      grid-column: 1 / -1;
       text-align: center;
-      color: var(--text);
-    }
-
-    .drop-zone-content i {
-      font-size: 4rem;
-      color: var(--accent);
-      margin-bottom: 1rem;
-    }
-
-    .drop-zone-content h3 {
-      font-size: 1.5rem;
-      margin-bottom: 0.5rem;
-    }
-
-    .drop-zone-content p {
+      padding: 2rem;
       color: var(--text-secondary);
+    }
+    .empty-state i {
+      font-size: 3rem;
+      margin-bottom: 1rem;
+      color: var(--primary);
     }
   </style>
 </head>
 <body>
   <div class="header">
-    <div class="logo-container" onclick="window.location.href='/select-room.html'">
-      <div class="logo-icon">
-        <div class="logo-svg">
-          <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stop-color="#4a90e2" />
-                <stop offset="100%" stop-color="#8e44ad" />
-              </linearGradient>
-            </defs>
-            <circle cx="50" cy="50" r="48" fill="url(#logoGradient)" />
-            <text 
-              x="50" 
-              y="50" 
-              font-family="Arial, sans-serif" 
-              font-size="40" 
-              fill="white" 
-              text-anchor="middle" 
-              dominant-baseline="middle"
-            >
-              S
-            </text>
-          </svg>
-        </div>
-      </div>
+    <div class="logo">
+      <div class="logo-icon">S</div>
       <h1>SyncWatch</h1>
     </div>
-    <div class="auth-section">
-      <div id="authControls"></div>
+    <div class="controls" id="authControls">
+      <!-- Кнопки будут добавлены скриптом -->
     </div>
   </div>
 
-  <div class="main-container">
-    <div class="room-section">
-      <h2>Создать комнату</h2>
-      <div id="authForms" class="auth-forms">
-        <div id="loginForm" style="display: none;">
-          <form class="form-group">
-            <div class="form-group">
-              <label for="loginUsername">Имя пользователя:</label>
-              <input type="text" id="loginUsername" placeholder="Введите имя" autocomplete="username">
-            </div>
-            <div class="form-group">
-              <label for="loginPassword">Пароль:</label>
-              <input type="password" id="loginPassword" placeholder="Введите пароль" autocomplete="current-password">
-            </div>
-            <button type="button" onclick="handleLogin()">Войти</button>
-          </form>
-          <div class="toggle-auth">
-            Нет аккаунта? <a onclick="showAuthForm('register')">Зарегистрироваться</a>
-          </div>
-        </div>
+  <button id="createRoomBtn" class="btn btn-primary">Создать новую комнату</button>
 
-        <div id="registerForm" style="display: none;">
-          <form class="form-group">
-            <div class="form-group">
-              <label for="registerUsername">Имя пользователя:</label>
-              <input type="text" id="registerUsername" placeholder="Введите имя" autocomplete="username">
-            </div>
-            <div class="form-group">
-              <label for="registerPassword">Пароль:</label>
-              <input type="password" id="registerPassword" placeholder="Введите пароль (мин. 6)" autocomplete="new-password">
-            </div>
-            <button type="button" onclick="handleRegister()">Зарегистрироваться</button>
-          </form>
-          <div class="toggle-auth">
-            Уже есть аккаунт? <a onclick="showAuthForm('login')">Войти</a>
-          </div>
-        </div>
-      </div>
-
-      <div class="input-group">
-        <label for="roomName">Название комнаты:</label>
-        <input type="text" id="roomName" placeholder="Введите название">
-        <button id="createRoomBtn">Создать и присоединиться</button>
-        <button id="createRoomNoJoinBtn">Создать (не присоединяться)</button>
-      </div>
-
-      <div class="room-list">
-        <h2>Доступные комнаты</h2>
-        <div id="roomList">Загрузка комнат...</div>
-      </div>
-      
-      <div class="drop-zone" id="dropZone">
-        <div class="drop-zone-content">
-          <i class="fas fa-file-video"></i>
-          <h3>Перетащите файл сюда</h3>
-          <p>Поддерживаемые форматы: MP4, WebM, OGG и другие</p>
-        </div>
-      </div>
-    </div>
+  <div class="room-list" id="roomList">
+    <!-- Комнаты будут загружены сюда -->
   </div>
 
   <div id="notifications"></div>
 
-  <script src="/socket.io/socket.io.js"></script>
   <script>
-    // Глобальная переменная для хранения данных из rooms.json
-    let roomsData = null;
-    const roomStates = {}; // { roomId: { videoId, currentTime } }
-
-    // Загрузка данных через API (исправлено!)
-    async function loadRoomsJson() {
-      if (roomsData) return;
-      try {
-        const response = await fetch('/api/rooms');
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
-        const result = await response.json();
-        if (result.success && Array.isArray(result.rooms)) {
-          roomsData = result.rooms;
-          console.log('Данные rooms.json успешно загружены:', roomsData);
-        } else {
-          throw new Error('Некорректный формат ответа от API');
-        }
-      } catch (err) {
-        console.error('Не удалось загрузить rooms.json:', err);
-        showNotification('Не удалось загрузить данные видео.', 'error');
-      }
-    }
-
-    window.addEventListener('load', () => {
+    // === ПРОВЕРКА АВТОРИЗАЦИИ ПРИ ЗАГРУЗКЕ ===
+    (function() {
       const token = localStorage.getItem('authToken');
       if (!token) {
-        console.log('Нет токена, перенаправляем на страницу входа');
+        // Перенаправляем на страницу входа
+        alert('Требуется авторизация');
         window.location.href = '/login.html';
         return;
       }
+    })();
 
-      fetch('/api/auth/profile', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      .then(response => {
-        if (!response.ok) {
+    const socket = io();
+    let rooms = [];
+
+    // Проверка авторизации
+    function isAuthenticated() {
+      return !!localStorage.getItem('authToken');
+    }
+
+    // Извлечение данных из JWT (если используется)
+    function getUserInfo() {
+      const token = localStorage.getItem('authToken');
+      if (!token) return null;
+      try {
+        const payload = token.split('.')[1];
+        if (!payload) return null;
+        const decoded = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
+        return decoded;
+      } catch (e) {
+        console.warn('Не удалось распарсить токен:', e);
+        return null;
+      }
+    }
+
+    // Обновление кнопок в шапке
+    function updateAuthControls() {
+      const controls = document.getElementById('authControls');
+      if (isAuthenticated()) {
+        const user = getUserInfo();
+        const username = user?.username || 'Профиль';
+        controls.innerHTML = `
+          <a href="/user-player.html" class="btn btn-secondary">
+            <i class="fas fa-user"></i> ${username}
+          </a>
+          <button id="logoutBtn" class="btn btn-logout">
+            <i class="fas fa-sign-out-alt"></i> Выйти
+          </button>
+        `;
+        document.getElementById('logoutBtn').addEventListener('click', () => {
           localStorage.removeItem('authToken');
-          localStorage.removeItem('user');
+          showNotification('Вы вышли из системы', 'info');
           window.location.href = '/login.html';
-        } else {
-          initializePage();
-        }
-      })
-      .catch(error => {
-        console.error('Ошибка проверки токена:', error);
-        localStorage.removeItem('authToken');
-        localStorage.removeItem('user');
+        });
+      } else {
+        // На случай, если токен пропал во время сессии
         window.location.href = '/login.html';
+      }
+    }
+
+    function showNotification(message, type = 'info') {
+      const notif = document.createElement('div');
+      notif.className = 'notification';
+      notif.textContent = message;
+      document.getElementById('notifications').appendChild(notif);
+      setTimeout(() => notif.remove(), 3000);
+    }
+
+    function formatTime(seconds) {
+      if (typeof seconds !== 'number' || isNaN(seconds)) seconds = 0;
+      const mins = Math.floor(seconds / 60);
+      const secs = Math.floor(seconds % 60);
+      return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+    }
+
+    function renderRooms() {
+      const roomList = document.getElementById('roomList');
+      if (rooms.length === 0) {
+        roomList.innerHTML = `
+          <div class="empty-state">
+            <i class="fas fa-users"></i>
+            <h3>Нет активных комнат</h3>
+            <p>Создайте новую комнату, чтобы начать совместный просмотр</p>
+          </div>
+        `;
+        return;
+      }
+
+      roomList.innerHTML = rooms.map(room => `
+        <div class="room-card" data-id="${room.id}">
+          <h3>
+            ${room.name}
+            ${room.hasPassword ? '<i class="fas fa-lock" title="Защищена паролем"></i>' : '<i class="fas fa-lock-open" title="Публичная"></i>'}
+          </h3>
+          <div class="room-info">
+            Пользователей: ${Object.keys(room.users || {}).length}
+          </div>
+          ${room.video ? `
+            <div class="video-info">
+              <strong>Видео:</strong> ${room.video.title || 'Без названия'}<br>
+              <small>Текущее время: ${formatTime(room.video.currentTime)}</small><br>
+              <small>Статус: ${room.video.isPlaying ? 'Играет' : 'Пауза'}</small>
+            </div>
+          ` : '<div class="video-info"><em>Видео не загружено</em></div>'}
+          <input type="password" class="password-input" placeholder="Пароль комнаты" data-room-id="${room.id}">
+          <div class="room-actions">
+            <button class="join-btn" data-room-id="${room.id}">Войти</button>
+          </div>
+        </div>
+      `).join('');
+
+      // Обработчики кнопок входа
+      document.querySelectorAll('.join-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const roomId = btn.dataset.roomId;
+          const room = rooms.find(r => r.id === roomId);
+          const passwordInput = document.querySelector(`.password-input[data-room-id="${roomId}"]`);
+          
+          let password = '';
+          if (room && room.hasPassword) {
+            password = passwordInput.value.trim();
+            if (!password) {
+              showNotification('Введите пароль для этой комнаты', 'error');
+              passwordInput.focus();
+              return;
+            }
+          }
+
+          sessionStorage.setItem('roomPassword', password);
+          window.location.href = `/player.html?room=${roomId}`;
+        });
       });
-    });
 
-    let socket;
-    let authToken = localStorage.getItem('authToken');
+      // Показываем поле пароля только если комната защищена
+      document.querySelectorAll('.password-input').forEach(input => {
+        const room = rooms.find(r => r.id === input.dataset.roomId);
+        if (room && room.hasPassword) {
+          input.style.display = 'block';
+        }
+      });
+    }
 
-    function initializePage() {
-      socket = io();
+    // Загрузка списка комнат через сокет
+    function loadRooms() {
+      socket.emit('get-rooms', (data) => {
+        rooms = data || [];
+        renderRooms();
+      });
+    }
 
-      setupDragAndDrop();
+    // Создание комнаты через сокет
+    document.getElementById('createRoomBtn').addEventListener('click', () => {
+      const name = prompt('Введите название комнаты:');
+      if (!name || name.trim() === '') {
+        showNotification('Название не может быть пустым', 'error');
+        return;
+      }
 
-      socket.on('connect', () => {
-        console.log('Сокет подключен');
-        updateAuthUI();
-        loadRoomsJson();
-
-        const urlParams = new URLSearchParams(window.location.search);
-        const roomId = urlParams.get('room');
-        if (roomId) {
-          redirectToPlayerWithTime(roomId);
+      const isProtected = confirm('Сделать комнату приватной (с паролем)?');
+      let password = null;
+      if (isProtected) {
+        password = prompt('Введите пароль для комнаты:');
+        if (!password || password.trim() === '') {
+          showNotification('Пароль не может быть пустым', 'error');
           return;
         }
-
-        loadRoomList();
-      });
-
-      socket.on('room-list', (rooms) => {
-        updateRoomListDisplay(rooms);
-      });
-
-      socket.on('room-update', (update) => {
-        if (update.roomId && (update.videoId !== undefined || update.currentTime !== undefined)) {
-          roomStates[update.roomId] = {
-            ...roomStates[update.roomId],
-            videoId: update.videoId,
-            currentTime: update.currentTime
-          };
-          updateRoomDisplay(update.roomId);
-        }
-      });
-
-      socket.on('disconnect', () => {
-        console.log('Соединение с сервером потеряно.');
-      });
-
-      socket.on('reconnect', () => {
-        console.log('Соединение восстановлено.');
-        loadRoomList();
-        loadRoomsJson();
-      });
-    }
-
-    function setupDragAndDrop() {
-      const dropZone = document.getElementById('dropZone');
-      const roomSection = document.querySelector('.room-section');
-
-      roomSection.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        dropZone.classList.add('active');
-      });
-
-      roomSection.addEventListener('dragleave', (e) => {
-        e.preventDefault();
-        if (e.relatedTarget && !roomSection.contains(e.relatedTarget)) {
-          dropZone.classList.remove('active');
-        }
-      });
-
-      roomSection.addEventListener('drop', (e) => {
-        e.preventDefault();
-        dropZone.classList.remove('active');
-
-        const files = e.dataTransfer.files;
-        if (files.length > 0) {
-          handleFileDrop(files[0]);
-        }
-      });
-    }
-
-    function handleFileDrop(file) {
-      if (!file.type.startsWith('video/')) {
-        showNotification('Пожалуйста, перетащите видеофайл', 'error');
-        return;
+        password = password.trim();
       }
 
-      // Создаем временное имя комнаты на основе имени файла
-      const fileName = file.name.replace(/\.[^/.]+$/, ""); // Убираем расширение
-      const roomName = fileName.length > 50 ? fileName.substring(0, 50) : fileName;
-
-      // Создаем комнату с указанным именем
-      socket.emit('create-room', { name: roomName }, (res) => {
-        if (res && res.success && res.id) {
-          // Создаем URL для файла и передаем его в плеер
-          const fileUrl = URL.createObjectURL(file);
-          const url = `/player.html?room=${res.id}&file=${encodeURIComponent(fileUrl)}`;
-          window.location.href = url;
-        } else {
-          showNotification('Не удалось создать комнату: ' + (res?.error || 'Неизвестная ошибка'), 'error');
-        }
-      });
-    }
-
-    function redirectToPlayerWithTime(roomId) {
-      let url = `/player.html?room=${roomId}`;
-      if (roomsData) {
-        const roomConfig = roomsData.find(r => r.id === roomId);
-        if (roomConfig && typeof roomConfig.startTime === 'number') {
-          url += `&time=${roomConfig.startTime}`;
-        }
-      }
-      window.location.href = url;
-    }
-
-    function apiCall(endpoint, method = 'GET', data = null) {
-      const headers = { 'Content-Type': 'application/json' };
-      if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
-
-      return fetch(`/api${endpoint}`, { method, headers, body: data ? JSON.stringify(data) : null })
-        .then(response => {
-          if (!response.ok) {
-            if (response.status === 415) {
-              showNotification('Неподдерживаемый тип файла', 'error');
-              return { success: false, error: 'Неподдерживаемый тип файла' };
-            }
-            if (response.status === 401 || response.status === 403) {
-              handleLogout();
-              throw new Error('Сессия истекла. Пожалуйста, войдите снова.');
-            }
-            return response.json().then(err => { throw err; });
+      socket.emit('create-room', { name: name.trim(), password }, (res) => {
+        if (res.success) {
+          showNotification(`Комната "${name}" создана`, 'success');
+          if (password) {
+            sessionStorage.setItem('roomPassword', password);
           }
-          return response.json();
-        });
-    }
-
-    function updateAuthUI() {
-      const authControls = document.getElementById('authControls');
-      const authForms = document.getElementById('authForms');
-
-      if (authToken) {
-        apiCall('/auth/profile', 'GET')
-          .then(data => {
-            if (data.success) {
-              authControls.innerHTML = `
-                <div class="user-info">
-                  <a href="/user-profile.html" class="profile-link">${data.user.username}</a>
-                  <button class="logout-btn" onclick="handleLogout()">Выйти</button>
-                </div>
-              `;
-              authForms.style.display = 'none';
-            } else {
-              handleLogout();
-            }
-          })
-          .catch(err => {
-            console.error('Ошибка проверки токена:', err);
-            handleLogout();
-          });
-      } else {
-        authControls.innerHTML = `
-          <button class="login-btn" onclick="showAuthForm('login')">Войти</button>
-          <button class="register-btn" onclick="showAuthForm('register')">Регистрация</button>
-        `;
-        authForms.style.display = 'none';
-      }
-    }
-
-    function showAuthForm(formType) {
-      const loginForm = document.getElementById('loginForm');
-      const registerForm = document.getElementById('registerForm');
-      const authForms = document.getElementById('authForms');
-
-      if (formType === 'login') {
-        loginForm.style.display = 'block';
-        registerForm.style.display = 'none';
-      } else {
-        loginForm.style.display = 'none';
-        registerForm.style.display = 'block';
-      }
-      authForms.style.display = 'block';
-    }
-
-    async function handleLogin() {
-      const username = document.getElementById('loginUsername').value.trim();
-      const password = document.getElementById('loginPassword').value;
-      if (!username || !password) {
-        showNotification('Введите имя и пароль', 'error');
-        return;
-      }
-
-      try {
-        const response = await apiCall('/auth/login', 'POST', { username, password });
-        if (response.success && response.token) {
-          localStorage.setItem('authToken', response.token);
-          authToken = response.token;
-          showNotification('Успешный вход', 'success');
-          updateAuthUI();
-          document.getElementById('authForms').style.display = 'none';
-          window.location.href = '/user-profile.html';
-        } else {
-          showNotification(response.error || 'Ошибка входа', 'error');
-        }
-      } catch (err) {
-        showNotification(err.message || 'Ошибка входа', 'error');
-      }
-    }
-
-    async function handleRegister() {
-      const username = document.getElementById('registerUsername').value.trim();
-      const password = document.getElementById('registerPassword').value;
-      if (!username || !password) {
-        showNotification('Введите имя и пароль', 'error');
-        return;
-      }
-      if (password.length < 6) {
-        showNotification('Пароль должен быть не менее 6 символов', 'error');
-        return;
-      }
-
-      try {
-        const response = await apiCall('/auth/register', 'POST', { username, password });
-        if (response.success) {
-          showNotification('Регистрация успешна', 'success');
-          showAuthForm('login');
-        } else {
-          showNotification(response.error || 'Ошибка регистрации', 'error');
-        }
-      } catch (err) {
-        showNotification(err.message || 'Ошибка регистрации', 'error');
-      }
-    }
-
-    function handleLogout() {
-      localStorage.removeItem('authToken');
-      localStorage.removeItem('user');
-      authToken = null;
-      updateAuthUI();
-      showNotification('Вы вышли из системы', 'success');
-      document.getElementById('authForms').style.display = 'none';
-      window.location.href = '/login.html';
-    }
-
-    document.getElementById('createRoomBtn').addEventListener('click', () => {
-      const roomName = document.getElementById('roomName').value.trim();
-      if (!roomName) {
-        showNotification('Введите название комнаты', 'error');
-        return;
-      }
-
-      socket.emit('create-room', { name: roomName }, (res) => {
-        if (res && res.success && res.id) {
           window.location.href = `/player.html?room=${res.id}`;
         } else {
-          showNotification('Не удалось создать комнату: ' + (res?.error || 'Неизвестная ошибка'), 'error');
+          showNotification('Ошибка создания комнаты: ' + (res.error || 'Неизвестная ошибка'), 'error');
         }
       });
     });
 
-    document.getElementById('createRoomNoJoinBtn').addEventListener('click', () => {
-      const roomName = document.getElementById('roomName').value.trim();
-      if (!roomName) {
-        showNotification('Введите название комнаты', 'error');
-        return;
-      }
-
-      socket.emit('create-room', { name: roomName }, (res) => {
-        if (res && res.success && res.id) {
-          showNotification(`Комната создана: ${res.name}`, 'success');
-        } else {
-          showNotification('Не удалось создать комнату: ' + (res?.error || 'Неизвестная ошибка'), 'error');
-        }
-      });
+    // Инициализация
+    window.addEventListener('DOMContentLoaded', () => {
+      updateAuthControls(); // Показываем нужные кнопки
+      loadRooms(); // Первый запрос сразу при загрузке
+      setInterval(loadRooms, 3000); // Затем каждые 3 секунды
     });
-
-    function loadRoomList() {
-      socket.emit('get-rooms', (rooms) => {
-        updateRoomListDisplay(rooms);
-      });
-    }
-
-    function updateRoomListDisplay(rooms) {
-      const roomList = document.getElementById('roomList');
-      roomList.innerHTML = '';
-
-      if (!rooms || rooms.length === 0) {
-        roomList.innerHTML = '<div class="room-item">Нет доступных комнат</div>';
-        return;
-      }
-
-      rooms.forEach(room => {
-        const div = document.createElement('div');
-        div.className = 'room-item';
-        div.dataset.roomId = room.id;
-
-        const userCount = room.users ? Object.keys(room.users).length : 0;
-
-        div.innerHTML = `
-          <div class="room-info">
-            <div class="room-name">${room.name}</div>
-            <div class="room-users">${userCount} пользователей</div>
-            <div class="room-video">Видео: <span class="video-title">—</span></div>
-            <div class="room-time">Время: <span class="current-time">0</span> сек</div>
-          </div>
-          <div class="room-actions">
-            <button class="action-btn delete-btn" data-id="${room.id}"><i class="fas fa-trash"></i></button>
-          </div>
-        `;
-        roomList.appendChild(div);
-
-        div.addEventListener('click', (e) => {
-          if (e.target.closest('.delete-btn')) return;
-          let url = `/player.html?room=${room.id}`;
-          if (roomsData) {
-            const roomConfig = roomsData.find(r => r.id === room.id);
-            if (roomConfig && typeof roomConfig.startTime === 'number') {
-              url += `&time=${roomConfig.startTime}`;
-            }
-          }
-          window.location.href = url;
-        });
-
-        div.querySelector('.delete-btn').addEventListener('click', (e) => {
-          e.stopPropagation();
-          if (confirm(`Удалить комнату "${room.name}"?`)) {
-            socket.emit('delete-room', { roomId: room.id }, (res) => {
-              if (!(res && res.success)) {
-                const msg = res?.message || res?.error || 'Неизвестная ошибка';
-                showNotification('Не удалось удалить комнату: ' + msg, 'error');
-              }
-            });
-          }
-        });
-
-        if (roomStates[room.id]) {
-          updateRoomDisplay(room.id);
-        }
-      });
-    }
-
-    function updateRoomDisplay(roomId) {
-      const roomElement = document.querySelector(`.room-item[data-room-id="${roomId}"]`);
-      if (!roomElement) return;
-
-      const state = roomStates[roomId] || {};
-      const videoTitleEl = roomElement.querySelector('.video-title');
-      const timeEl = roomElement.querySelector('.current-time');
-
-      let videoTitle = '—';
-      if (state.videoId && roomsData) {
-        const video = roomsData.find(v => v.id === state.videoId);
-        videoTitle = video ? (video.title || video.id) : state.videoId;
-      } else if (state.videoId) {
-        videoTitle = state.videoId;
-      }
-
-      videoTitleEl.textContent = videoTitle;
-      timeEl.textContent = state.currentTime != null ? Math.floor(state.currentTime) : '0';
-    }
-
-    function showNotification(message, type) {
-      const notification = document.createElement('div');
-      notification.className = `notification ${type}`;
-      notification.innerHTML = `
-        <span>${message}</span>
-        <button class="notification-close" onclick="this.parentElement.remove()">&times;</button>
-      `;
-      document.getElementById('notifications').appendChild(notification);
-      setTimeout(() => {
-        if (notification.parentNode) notification.remove();
-      }, 5000);
-    }
   </script>
 </body>
 </html>

@@ -271,6 +271,19 @@
       border-radius: 8px;
       box-shadow: 0 4px 12px var(--shadow);
     }
+    #roomPasswordForm {
+      margin-bottom: 0.5rem;
+    }
+    #roomPasswordInput {
+      width: 100%;
+      padding: 0.5rem;
+      border: 1px solid var(--border);
+      background: var(--bg-darker);
+      color: var(--text);
+      border-radius: 4px;
+      font-size: 0.95rem;
+      autocomplete: current-password;
+    }
     #uploadBtn {
       display: flex;
       align-items: center;
@@ -670,6 +683,9 @@
         <video id="videoPlayer" width="100%" controls></video>
       </div>
       <div class="upload-section">
+        <form id="roomPasswordForm">
+          <input type="password" id="roomPasswordInput" autocomplete="current-password" placeholder="Пароль комнаты (если есть)">
+        </form>
         <button id="uploadBtn"><i class="fas fa-upload"></i> Upload Video</button>
         <input type="file" id="uploadInput" accept="video/*" style="display:none;">
         <div class="progress-bar" style="display:none;">
@@ -714,6 +730,15 @@
   </div>
   <input type="file" id="uploadInputExplorer" accept="video/*" style="display:none;">
   <script>
+    // === ПРОВЕРКА АВТОРИЗАЦИИ ===
+    (function checkAuth() {
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        window.location.href = '/login.html';
+        return;
+      }
+    })();
+
     const socket = io();
     let joinedRoom = null;
     let currentVideoFile = null;
@@ -727,13 +752,40 @@
     }
     let moveBuffer = null;
 
+    function formatTime(seconds) {
+      if (isNaN(seconds) || seconds < 0) return '00:00:00';
+      const hrs = Math.floor(seconds / 3600);
+      const mins = Math.floor((seconds % 3600) / 60);
+      const secs = Math.floor(seconds % 60);
+      if (hrs > 0) {
+        return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+      } else {
+        return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+      }
+    }
+
     function joinRoom() {
-      const name = localStorage.getItem('userName') || '';
-      socket.emit('join-room', { roomId, name }, res => {
+      const name = localStorage.getItem('userName') || prompt('Введите ваше имя:') || `User${Math.floor(Math.random()*10000)}`;
+      const password = sessionStorage.getItem('roomPassword') || 
+                      (document.getElementById('roomPasswordInput')?.value.trim() || '');
+      
+      socket.emit('join-room', { roomId, name, password }, res => {
         if (!(res && res.success)) {
-          alert(res && res.error ? res.error : 'Ошибка входа в комнату');
-          window.location.href = '/select-room.html';
+          if (res?.error === 'Invalid password') {
+            sessionStorage.removeItem('roomPassword');
+            const newPass = prompt('Неверный пароль. Введите правильный:');
+            if (newPass !== null) {
+              sessionStorage.setItem('roomPassword', newPass);
+              joinRoom();
+            } else {
+              window.location.href = '/select-room.html';
+            }
+          } else {
+            alert(res?.error || 'Ошибка входа в комнату');
+            window.location.href = '/select-room.html';
+          }
         } else {
+          sessionStorage.removeItem('roomPassword');
           joinedRoom = roomId;
           userName = res.room.name;
           updateExplorerBreadcrumb();
@@ -757,7 +809,8 @@
           const video = document.getElementById('videoPlayer');
           const statusEl = document.getElementById('status');
           video.src = `/videos/${roomInfo.currentVideo}`;
-          statusEl.innerHTML = `Video loaded from state: ${roomInfo.currentVideo.split('/').pop()}`;
+          const formattedTime = formatTime(roomInfo.currentTime || 0);
+          statusEl.innerHTML = `Video: ${roomInfo.currentVideo.split('/').pop()} | Time: ${formattedTime}`;
           currentVideoFile = roomInfo.currentVideo;
           isVideoReady = false;
           video.addEventListener('loadedmetadata', function onLoadedMetadata() {
@@ -782,6 +835,11 @@
     window.addEventListener('DOMContentLoaded', () => {
       if (!roomId) return window.location.href = '/select-room.html';
       localStorage.setItem('lastRoomId', roomId);
+      joinRoom();
+    });
+
+    document.getElementById('roomPasswordForm')?.addEventListener('submit', (e) => {
+      e.preventDefault();
       joinRoom();
     });
 
@@ -811,6 +869,7 @@
 
     const uploadBtn = document.getElementById('uploadBtn');
     const uploadInput = document.getElementById('uploadInput');
+
     uploadBtn.addEventListener('click', () => uploadInput.click());
 
     function handleFileUpload(file) {
@@ -833,9 +892,9 @@
           if (data.success) {
             showNotification(`Video uploaded: ${data.file}`, 'success');
             loadAndRenderExplorerForPath(currentExplorerPath);
-            // Set as current video
             video.src = `/videos/${data.file}`;
-            statusEl.innerHTML = `Video loaded: ${data.file.split('/').pop()}`;
+            const fileName = data.file.split('/').pop();
+            statusEl.innerHTML = `Video: ${fileName} | Time: 00:00`;
             currentVideoFile = data.file;
             isVideoReady = false;
             socket.emit('select-video', { roomId: joinedRoom, filename: data.file });
@@ -877,15 +936,11 @@
     videoDropZone.addEventListener('drop', (e) => {
       e.preventDefault();
       videoDropZone.style.backgroundColor = '';
-
-      // Случай 1: файл из ОС
       const files = e.dataTransfer.files;
       if (files.length > 0 && files[0].type.startsWith('video/')) {
         handleFileUpload(files[0]);
         return;
       }
-
-      // Случай 2: элемент из File Explorer (внутренний путь)
       const path = e.dataTransfer.getData('text/plain');
       if (path && !path.endsWith('/')) {
         const fileName = path.split('/').pop();
@@ -894,33 +949,29 @@
         if (ext && supportedFormats.includes(ext)) {
           highlightSelectedVideo(path);
           video.src = `/videos/${path}`;
-          statusEl.innerHTML = `Video loaded: ${fileName}`;
+          statusEl.innerHTML = `Video: ${fileName} | Time: 00:00`;
           currentVideoFile = path;
           isVideoReady = false;
           socket.emit('select-video', { roomId: joinedRoom, filename: path });
           return;
         }
       }
-
       showNotification('Only video files are supported', 'error');
     });
 
     video.addEventListener('loadedmetadata', () => isVideoReady = true);
-
     video.addEventListener('play', () => {
       if (isVideoReady) {
         socket.emit('video-command', { type: 'play', roomId: joinedRoom });
         socket.emit('play-video', { roomId: joinedRoom, time: video.currentTime });
       }
     });
-
     video.addEventListener('pause', () => {
       if (isVideoReady) {
         socket.emit('video-command', { type: 'pause', roomId: joinedRoom });
         socket.emit('pause-video', { roomId: joinedRoom, time: video.currentTime });
       }
     });
-
     video.addEventListener('seeked', () => {
       if (isVideoReady) {
         const now = Date.now();
@@ -960,7 +1011,8 @@
 
     socket.on('video-updated', (filename) => {
       video.src = `/videos/${filename}`;
-      statusEl.innerHTML = `Video loaded: ${filename.split('/').pop()}`;
+      const fileName = filename.split('/').pop();
+      statusEl.innerHTML = `Video: ${fileName} | Time: 00:00`;
       currentVideoFile = filename;
       isVideoReady = false;
       highlightSelectedVideo(filename);
@@ -973,7 +1025,6 @@
       if (state.currentVideo) {
         if (currentVideoFile !== state.currentVideo) {
           video.src = `/videos/${state.currentVideo}`;
-          statusEl.innerHTML = `Video loaded: ${state.currentVideo.split('/').pop()}`;
           currentVideoFile = state.currentVideo;
           isVideoReady = false;
         }
@@ -995,6 +1046,10 @@
     });
 
     function applyRoomStateToVideo(state) {
+      const formattedTime = formatTime(state.currentTime || 0);
+      const videoName = state.currentVideo ? state.currentVideo.split('/').pop() : 'No video';
+      statusEl.innerHTML = `Video: ${videoName} | Time: ${formattedTime}`;
+
       if (Math.abs(video.currentTime - state.currentTime) > 0.5) {
         video.currentTime = state.currentTime;
       }
@@ -1050,6 +1105,9 @@
         }
       });
     }
+
+    // === ОСТАЛЬНОЙ КОД (File Explorer, move, delete и т.д.) ОСТАЛСЯ БЕЗ ИЗМЕНЕНИЙ ===
+    // ... (весь остальной JS из вашего файла, начиная с currentExplorerPath и ниже)
 
     let currentExplorerPath = '';
     let selectedItems = new Set();
@@ -1253,7 +1311,8 @@
                     }
                     highlightSelectedVideo(item.path);
                     video.src = `/videos/${item.name}`;
-                    statusEl.innerHTML = `Video loaded: ${fileName}`;
+                    const formattedTime = formatTime(0);
+                    statusEl.innerHTML = `Video: ${fileName} | Time: ${formattedTime}`;
                     currentVideoFile = item.name;
                     isVideoReady = false;
                     socket.emit('select-video', { roomId: joinedRoom, filename: item.name });

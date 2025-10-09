@@ -1,6 +1,7 @@
-// services/roomService.js
+// services/RoomService.js
 const fs = require('fs');
 const path = require('path');
+const { nanoid } = require('nanoid'); // Для генерации коротких уникальных ID
 
 class RoomService {
   constructor() {
@@ -24,7 +25,6 @@ class RoomService {
               });
             }
 
-            // Загружаем очередь YouTube, если есть
             const youtubeQueue = Array.isArray(roomData.youtubeQueue)
               ? roomData.youtubeQueue
               : [];
@@ -33,11 +33,12 @@ class RoomService {
               id: roomData.id,
               name: roomData.name,
               ownerId: roomData.ownerId,
+              password: roomData.password || null,
               users: usersMap,
               currentVideo: roomData.currentVideo || null,
               currentTime: typeof roomData.currentTime === 'number' ? roomData.currentTime : 0,
               isPlaying: !!roomData.isPlaying,
-              youtubeQueue // ← НОВОЕ: очередь YouTube
+              youtubeQueue
             });
           });
 
@@ -63,42 +64,49 @@ class RoomService {
 
       const roomsArray = Array.from(this.rooms.values()).map(room => {
         const usersObject = {};
-        room.users.forEach((userData, socketId) => {
-          usersObject[socketId] = userData;
-        });
+        if (room.users && typeof room.users.forEach === 'function') {
+          room.users.forEach((userData, socketId) => {
+            usersObject[socketId] = userData;
+          });
+        }
 
         return {
           id: room.id,
           name: room.name,
           ownerId: room.ownerId,
+          password: room.password, // Пароль хранится в файле (в открытом виде)
           users: usersObject,
           currentVideo: room.currentVideo,
           currentTime: room.currentTime,
           isPlaying: room.isPlaying,
-          youtubeQueue: room.youtubeQueue || [] // ← Сохраняем очередь
+          youtubeQueue: room.youtubeQueue || []
         };
       });
 
       fs.writeFileSync(this.roomsFilePath, JSON.stringify(roomsArray, null, 2), 'utf8');
-      console.log(`[RoomService] Сохранено ${roomsArray.length} комнат в файл.`);
+      console.log(`[ROOMS.JSON] Updated at ${new Date().toISOString()}`);
     } catch (error) {
       console.error(`[RoomService] Ошибка при сохранении комнат в файл:`, error.message);
     }
   }
 
+  // Возвращает данные комнаты БЕЗ пароля (безопасно для клиента)
   getRoom(roomId) {
     const room = this.rooms.get(roomId);
     if (!room) return null;
 
     const usersObject = {};
-    room.users.forEach((userData, socketId) => {
-      usersObject[socketId] = userData;
-    });
+    if (room.users && typeof room.users.forEach === 'function') {
+      room.users.forEach((userData, socketId) => {
+        usersObject[socketId] = userData;
+      });
+    }
 
     return {
       id: room.id,
       name: room.name,
       ownerId: room.ownerId,
+      hasPassword: !!room.password,
       users: usersObject,
       currentVideo: room.currentVideo,
       currentTime: room.currentTime,
@@ -111,14 +119,17 @@ class RoomService {
     const allRooms = [];
     for (const [id, room] of this.rooms.entries()) {
       const usersObject = {};
-      room.users.forEach((userData, socketId) => {
-        usersObject[socketId] = userData;
-      });
+      if (room.users && typeof room.users.forEach === 'function') {
+        room.users.forEach((userData, socketId) => {
+          usersObject[socketId] = userData;
+        });
+      }
 
       allRooms.push({
         id: room.id,
         name: room.name,
         ownerId: room.ownerId,
+        hasPassword: !!room.password,
         users: usersObject,
         currentVideo: room.currentVideo,
         currentTime: room.currentTime,
@@ -157,7 +168,6 @@ class RoomService {
       if (updates.hasOwnProperty('currentVideo')) room.currentVideo = updates.currentVideo;
       if (updates.hasOwnProperty('currentTime')) room.currentTime = updates.currentTime;
       if (updates.hasOwnProperty('isPlaying')) room.isPlaying = updates.isPlaying;
-      // Очередь обновляется отдельными методами
       this.saveRoomsToFile();
     }
   }
@@ -170,29 +180,43 @@ class RoomService {
     }
   }
 
-  joinRoom(roomId, socketId, name) {
+  joinRoom(roomId, socketId, name, providedPassword = null) {
     const room = this.rooms.get(roomId);
-    if (!room) return null;
+    if (!room) {
+      return { success: false, error: 'Room not found' };
+    }
+
+    if (room.password !== null && room.password !== undefined) {
+      if (providedPassword !== room.password) {
+        return { success: false, error: 'Invalid password' };
+      }
+    }
 
     room.users.set(socketId, {
       name: name,
       socketId: socketId
     });
 
-    return room;
+    this.saveRoomsToFile();
+
+    return {
+      success: true,
+      room: this.getRoom(roomId)
+    };
   }
 
-  createRoom(name, ownerSocketId) {
-    const id = this.generateRoomId();
+  createRoom(name, ownerSocketId, password = null) {
+    const id = nanoid(9); // Генерируем короткий уникальный ID, например: "7UsaCq0Qf"
     const newRoom = {
       id,
       name,
       ownerId: ownerSocketId,
+      password,
       users: new Map(),
       currentVideo: null,
       currentTime: 0,
       isPlaying: false,
-      youtubeQueue: [] // ← НОВОЕ: пустая очередь при создании
+      youtubeQueue: []
     };
     this.rooms.set(id, newRoom);
     this.saveRoomsToFile();
@@ -240,12 +264,6 @@ class RoomService {
       return next;
     }
     return null;
-  }
-
-  // === КОНЕЦ МЕТОДОВ ОЧЕРЕДИ ===
-
-  generateRoomId() {
-    return Math.random().toString(36).substring(2, 11);
   }
 
   shutdown() {

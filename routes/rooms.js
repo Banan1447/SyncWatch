@@ -1,74 +1,66 @@
 // routes/rooms.js
 const express = require('express');
-const fs = require('fs');
-const path = require('path');
-const router = express.Router();
-
-// Путь к файлу комнат: корень проекта → папка js → rooms.json
-const ROOMS_FILE = path.join(__dirname, '../json/rooms.json');
 
 /**
- * Чтение комнат из файла
+ * Фабрика маршрутов комнат
+ * @param {import('../services/roomService').default} roomService - Единый экземпляр RoomService
+ * @returns {express.Router}
  */
-function readRooms() {
-  try {
-    const data = fs.readFileSync(ROOMS_FILE, 'utf8');
-    const parsed = JSON.parse(data);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (err) {
-    console.error('Ошибка чтения rooms.json:', err.message);
-    return [];
-  }
-}
+module.exports = (roomService) => {
+  const router = express.Router();
 
-/**
- * Запись комнат в файл
- */
-function writeRooms(rooms) {
-  try {
-    fs.writeFileSync(ROOMS_FILE, JSON.stringify(rooms, null, 2), 'utf8');
-    return true;
-  } catch (err) {
-    console.error('Ошибка записи rooms.json:', err.message);
-    return false;
-  }
-}
+  /**
+   * POST /api/rooms
+   * Создаёт новую комнату
+   * Тело запроса: { name: string, password?: string }
+   */
+  router.post('/', (req, res) => {
+    const { name, password } = req.body;
 
-/**
- * GET /api/admin/rooms
- * Возвращает список всех комнат
- */
-router.get('/', (req, res) => {
-  const rooms = readRooms();
-  res.json({ success: true, rooms });
-});
+    if (!name || typeof name !== 'string' || name.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        error: 'Название комнаты обязательно'
+      });
+    }
 
-/**
- * DELETE /api/admin/rooms/:id
- * Удаляет комнату по ID
- */
-router.delete('/:id', (req, res) => {
-  const { id } = req.params;
-  const rooms = readRooms();
-  const roomIndex = rooms.findIndex(room => room.id === id);
+    // Создаём комнату через RoomService (единая точка управления)
+    const newRoom = roomService.createRoom(name.trim(), 'rest-api-user', password ? password.trim() : null);
 
-  if (roomIndex === -1) {
-    return res.status(404).json({
-      success: false,
-      error: 'Комната не найдена'
+    res.status(201).json({
+      success: true,
+      id: newRoom.id,
+      name: newRoom.name
     });
-  }
+  });
 
-  rooms.splice(roomIndex, 1);
+  /**
+   * GET /api/rooms
+   * Возвращает список всех комнат (без паролей!)
+   */
+  router.get('/', (req, res) => {
+    const allRooms = roomService.getAllRooms();
+    // RoomService.getAllRooms() уже возвращает комнаты без паролей (см. hasPassword)
+    res.json({ success: true, rooms: allRooms });
+  });
 
-  if (writeRooms(rooms)) {
+  /**
+   * DELETE /api/rooms/:id
+   * Удаляет комнату по ID
+   */
+  router.delete('/:id', (req, res) => {
+    const { id } = req.params;
+    const result = roomService.deleteRoom(id, 'rest-api-user');
+
+    if (!result.success) {
+      return res.status(404).json({
+        success: false,
+        error: result.message || 'Комната не найдена'
+      });
+    }
+
     res.json({ success: true, message: 'Комната успешно удалена' });
-  } else {
-    res.status(500).json({
-      success: false,
-      error: 'Ошибка при сохранении файла'
-    });
-  }
-});
+  });
 
-module.exports = router;
+  return router;
+};
