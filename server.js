@@ -28,7 +28,7 @@ const healthRoutes = require('./routes/health');
 const filesRoutes = require('./routes/files');
 const videosRoutes = require('./routes/videos');
 const transcodeRoutes = require('./routes/transcode');
-const roomsRoutes = require('./routes/rooms'); // Используем только этот маршрут
+const roomsRoutes = require('./routes/rooms');
 
 class SyncWatchServer {
   constructor() {
@@ -41,7 +41,6 @@ class SyncWatchServer {
       }
     });
 
-    // Единый экземпляр RoomService для всего приложения
     this.roomService = new RoomService();
     this.authService = new AuthService();
     this.transcodeService = new TranscodeService();
@@ -61,8 +60,6 @@ class SyncWatchServer {
     this.setupFileUpload();
   }
 
-  // === МЕТОДЫ ДЛЯ СОХРАНЕНИЯ СОСТОЯНИЙ ===
-
   loadRoomStates() {
     try {
       if (!fs.existsSync(this.ROOM_STATES_FILE)) {
@@ -71,7 +68,6 @@ class SyncWatchServer {
       }
 
       const data = fs.readFileSync(this.ROOM_STATES_FILE, 'utf8').trim();
-      
       if (!data) {
         console.log('⚠️ Файл room-states.json пуст — игнорируем');
         return;
@@ -82,15 +78,14 @@ class SyncWatchServer {
         this.roomService.updateRoomState(roomId, {
           currentVideo: state.currentVideo,
           currentTime: state.currentTime,
-          isPlaying: state.isPlaying
+          isPlaying: state.isPlaying,
+          duration: state.duration // ← добавлено
         });
       }
       console.log('✅ Состояния комнат загружены из room-states.json');
     } catch (err) {
       console.error('❌ Ошибка загрузки состояний комнат:', err.message);
       console.warn('⚠️ Файл room-states.json повреждён или содержит недопустимый JSON. Он будет перезаписан при следующем сохранении.');
-      
-      // Удаляем повреждённый файл, чтобы избежать повторных ошибок
       try {
         fs.unlinkSync(this.ROOM_STATES_FILE);
         console.log('🗑️ Повреждённый room-states.json удалён');
@@ -110,7 +105,8 @@ class SyncWatchServer {
           statesToSave[room.id] = {
             currentVideo: room.currentVideo || null,
             currentTime: typeof room.currentTime === 'number' ? room.currentTime : 0,
-            isPlaying: !!room.isPlaying
+            isPlaying: !!room.isPlaying,
+            duration: typeof room.duration === 'number' ? room.duration : 0 // ← сохраняем длительность
           };
         }
       }
@@ -134,8 +130,6 @@ class SyncWatchServer {
     console.log('🔁 Автосохранение состояний комнат запущено (каждые 5 сек)');
   }
 
-  // === ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ДЛЯ YOUTUBE ===
-
   extractYouTubeId(url) {
     const regExp = /^.*(youtu\.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]{11}).*/;
     const match = url.match(regExp);
@@ -150,13 +144,10 @@ class SyncWatchServer {
     return (h ? `${h}h ` : '') + (m ? `${m}m ` : '') + `${s}s`;
   }
 
-  // === КОНЕЦ ВСПОМОГАТЕЛЬНЫХ МЕТОДОВ ===
-
   setupMiddleware() {
     this.app.use(express.json({ limit: '50mb' }));
     this.app.use(express.urlencoded({ extended: true }));
     this.app.use(logRequests);
-
     console.log('[DEBUG] publicDirectory =', config.publicDirectory);
     this.app.use(express.static(config.publicDirectory));
     this.app.use('/videos', express.static(config.videoDir));
@@ -177,9 +168,7 @@ class SyncWatchServer {
     this.app.use('/api/files', filesRoutes);
     this.app.use('/api/videos', videosRoutes);
     this.app.use('/api/transcode', transcodeRoutes);
-    this.app.use('/api/rooms', roomsRoutes); // ЕДИНСТВЕННЫЙ маршрут для комнат
-
-    // УДАЛЕНЫ: /api/sessions — дублирует /api/rooms
+    this.app.use('/api/rooms', roomsRoutes);
 
     this.app.post('/api/auth/login', async (req, res) => {
       try {
@@ -415,20 +404,60 @@ class SyncWatchServer {
     this.io.on('connection', (socket) => {
       console.log(`[SOCKET] User connected: ${socket.id}`);
 
-      // ✅ ИСПРАВЛЕННЫЙ ОБРАБОТЧИК get-rooms — возвращает данные о видео в нужном формате
+      // ✅ NEW: Принимаем статус от каждого пользователя
+      socket.on('video-status', (data) => {
+        const { roomId, currentTime, isPlaying, videoFile } = data;
+        if (!roomId) return;
+
+        this.roomService.updateRoomState(roomId, {
+          currentTime: currentTime,
+          isPlaying: isPlaying,
+          currentVideo: videoFile
+        });
+
+        const room = this.roomService.getRoom(roomId);
+        if (room) {
+          this.io.emit('room-update', {
+            roomId: roomId,
+            currentTime: currentTime,
+            isPlaying: isPlaying,
+            videoTitle: videoFile ? videoFile.split('/').pop() : null,
+            duration: room.duration || 0
+          });
+        }
+      });
+
+      // ✅ NEW: Принимаем метаданные (длительность)
+      socket.on('video-metadata', (data) => {
+        const { roomId, duration, filename } = data;
+        if (!roomId || typeof duration !== 'number') return;
+
+        this.roomService.updateRoomState(roomId, {
+          duration: duration,
+          currentVideo: filename
+        });
+
+        const room = this.roomService.getRoom(roomId);
+        if (room) {
+          this.io.emit('room-update', {
+            roomId: roomId,
+            duration: duration,
+            videoTitle: filename ? filename.split('/').pop() : null,
+            currentTime: room.currentTime || 0,
+            isPlaying: !!room.isPlaying
+          });
+        }
+      });
+
       socket.on('get-rooms', (callback) => {
-        console.log(`[SOCKET] ${socket.id} requested room list`);
-        
         const rawRooms = this.roomService.getAllRooms();
         const roomsForClient = rawRooms.map(room => {
           let videoTitle = null;
           if (room.currentVideo) {
-            // Простая эвристика: если строка длиной 11 — YouTube ID
             if (typeof room.currentVideo === 'string' && room.currentVideo.length === 11) {
               videoTitle = `YouTube: ${room.currentVideo}`;
             } else {
-              // Иначе — имя файла
-              videoTitle = room.currentVideo;
+              videoTitle = room.currentVideo.split('/').pop();
             }
           }
 
@@ -440,41 +469,27 @@ class SyncWatchServer {
             video: room.currentVideo ? {
               title: videoTitle || 'Без названия',
               currentTime: typeof room.currentTime === 'number' ? room.currentTime : 0,
-              isPlaying: !!room.isPlaying
+              isPlaying: !!room.isPlaying,
+              duration: typeof room.duration === 'number' ? room.duration : 0
             } : null
           };
         });
 
-        if (callback) {
-          callback(roomsForClient);
-        }
+        if (callback) callback(roomsForClient);
       });
 
       socket.on('delete-room', (data, callback) => {
         const { roomId } = data;
-        console.log(`[SOCKET] ${socket.id} requested deletion of room ${roomId}`);
         const result = this.roomService.deleteRoom(roomId, socket.id);
-        console.log(`[SOCKET] Result of deleting room ${roomId}:`, result);
         if (result.success) {
-          console.log(`[SOCKET] Room ${roomId} deleted by ${socket.id}`);
           this.io.emit('room-list', this.roomService.getAllRooms());
-          if (callback && typeof callback === 'function') {
-            const response = { success: true, message: result.message };
-            console.log(`[SOCKET] Sending success response to ${socket.id}:`, response);
-            callback(response);
-          }
+          if (callback) callback({ success: true, message: result.message });
         } else {
-          console.log(`[SOCKET] Error deleting room ${roomId} by ${socket.id}:`, result.message);
-          if (callback && typeof callback === 'function') {
-            const response = { success: false, message: result.message };
-            console.log(`[SOCKET] Sending error response to ${socket.id}:`, response);
-            callback(response);
-          }
+          if (callback) callback({ success: false, message: result.message });
         }
       });
 
-      // === YOUTUBE QUEUE EVENTS ===
-
+      // === YouTube и остальные события без изменений ===
       socket.on('queue-add-youtube', async (data, callback) => {
         const { roomId, url } = data;
         try {
@@ -551,26 +566,16 @@ class SyncWatchServer {
         this.io.to(roomId).emit('queue-updated', room.youtubeQueue);
       });
 
-      // === ОСТАЛЬНЫЕ СОКЕТ-СОБЫТИЯ ===
-
       socket.on('video-command', (data) => {
-        console.log(`[SOCKET] Received video-command from ${socket.id}:`, data);
         if (data.roomId) {
-          console.log(`[SOCKET] Broadcasting video-command to room ${data.roomId}`);
           socket.to(data.roomId).emit('video-command', data);
-        } else {
-          console.warn(`[SOCKET] video-command received without roomId from ${socket.id}`);
         }
       });
 
       socket.on('select-video', (data) => {
-        console.log(`[SOCKET] Received select-video from ${socket.id}:`, data);
         if (data.roomId && data.filename) {
-          console.log(`[SOCKET] Broadcasting video-updated to room ${data.roomId} with file ${data.filename}`);
           this.io.in(data.roomId).emit('video-updated', data.filename);
           this.roomService.updateRoomState(data.roomId, { currentVideo: data.filename });
-        } else {
-          console.warn(`[SOCKET] select-video received without roomId or filename from ${socket.id}`);
         }
       });
 
@@ -584,40 +589,31 @@ class SyncWatchServer {
         }
       });
 
-      // ✅ ИСПРАВЛЕННЫЙ ОБРАБОТЧИК join-room
       socket.on('join-room', (data, callback) => {
-        console.log(`[SOCKET] ${socket.id} attempting to join room ${data.roomId} as ${data.name || 'Anonymous'}`);
-        
         if (!data.roomId || !data.name) {
-          console.log(`[SOCKET] Missing roomId or name for join-room from ${socket.id}`);
           if (callback) callback({ success: false, error: 'Missing roomId or name' });
           return;
         }
 
         const result = this.roomService.joinRoom(data.roomId, socket.id, data.name, data.password);
-        
         if (!result || !result.success) {
-          console.log(`[SOCKET] ${socket.id} failed to join room ${data.roomId}: ${result?.error || 'Unknown error'}`);
           if (callback) callback({ success: false, error: result?.error || 'Failed to join room' });
           return;
         }
 
         const room = result.room;
         if (!room) {
-          console.error(`[SOCKET] joinRoom returned success but no room data for ${data.roomId}`);
           if (callback) callback({ success: false, error: 'Room data unavailable' });
           return;
         }
 
-        console.log(`[SOCKET] ${socket.id} successfully joined room ${data.roomId}`);
         socket.join(data.roomId);
         socket.emit('room-joined', room);
-
-        // ✅ room.users — уже обычный объект {}, НЕ Map!
         socket.emit('room-state', {
           currentVideo: room.currentVideo || null,
           currentTime: typeof room.currentTime === 'number' ? room.currentTime : 0,
           isPlaying: !!room.isPlaying,
+          duration: typeof room.duration === 'number' ? room.duration : 0,
           users: room.users
         });
 
@@ -630,10 +626,7 @@ class SyncWatchServer {
         if (callback) {
           callback({ 
             success: true, 
-            room: {
-              id: room.id,
-              name: room.name,
-            } 
+            room: { id: room.id, name: room.name }
           });
         }
       });
@@ -643,22 +636,13 @@ class SyncWatchServer {
         socket.leave(data.roomId);
         socket.to(data.roomId).emit('user-left', { socketId: socket.id });
         this.io.emit('room-list', this.roomService.getAllRooms());
-        if (callback) {
-          callback({ success: true });
-        }
+        if (callback) callback({ success: true });
       });
 
       socket.on('kick-user', (data, callback) => {
         const { roomId, targetUserId } = data;
-        console.log(`[SOCKET] ${socket.id} requested to kick user ${targetUserId} from room ${roomId}`);
-
         const room = this.roomService.getRoom(roomId);
-        if (!room) {
-          if (callback) callback({ success: false, error: 'Room not found' });
-          return;
-        }
-
-        if (!room.users || !room.users[targetUserId]) {
+        if (!room || !room.users || !room.users[targetUserId]) {
           if (callback) callback({ success: false, error: 'User not in room' });
           return;
         }
@@ -672,15 +656,11 @@ class SyncWatchServer {
         this.roomService.leaveRoom(roomId, targetUserId);
         socket.to(roomId).emit('user-left', { socketId: targetUserId });
         this.io.emit('room-list', this.roomService.getAllRooms());
-
-        console.log(`[SOCKET] User ${targetUserId} kicked from room ${roomId} by ${socket.id}`);
         if (callback) callback({ success: true, message: 'User kicked successfully' });
       });
 
       socket.on('kick-all', (data, callback) => {
         const { roomId } = data;
-        console.log(`[SOCKET] ${socket.id} requested to kick ALL users from room ${roomId}`);
-
         const room = this.roomService.getRoom(roomId);
         if (!room) {
           if (callback) callback({ success: false, error: 'Room not found' });
@@ -688,7 +668,6 @@ class SyncWatchServer {
         }
 
         const usersToKick = Object.keys(room.users || {}).filter(uid => uid !== socket.id);
-
         if (usersToKick.length === 0) {
           if (callback) callback({ success: true, message: 'No other users to kick' });
           return;
@@ -705,16 +684,10 @@ class SyncWatchServer {
 
         socket.to(roomId).emit('user-left', { socketId: usersToKick });
         this.io.emit('room-list', this.roomService.getAllRooms());
-
-        console.log(`[SOCKET] Kicked ${usersToKick.length} users from room ${roomId} by ${socket.id}`);
         if (callback) callback({ success: true, message: `Kicked ${usersToKick.length} users` });
       });
 
       socket.on('play-video', (data) => {
-        console.log(`[VIDEO] 🟢 play-video from ${socket.id}:`, JSON.stringify(data, null, 2));
-        if (data.time === undefined) {
-          console.warn(`[VIDEO] ⚠️ WARNING: 'time' is missing in play-video event!`);
-        }
         this.roomService.updateRoomState(data.roomId, { 
           isPlaying: true,
           currentTime: data.time || 0
@@ -723,10 +696,6 @@ class SyncWatchServer {
       });
 
       socket.on('pause-video', (data) => {
-        console.log(`[VIDEO] ⏸️ pause-video from ${socket.id}:`, JSON.stringify(data, null, 2));
-        if (data.time === undefined) {
-          console.warn(`[VIDEO] ⚠️ WARNING: 'time' is missing in pause-video event!`);
-        }
         this.roomService.updateRoomState(data.roomId, { 
           isPlaying: false,
           currentTime: data.time || 0
@@ -735,16 +704,11 @@ class SyncWatchServer {
       });
 
       socket.on('seek-video', (data) => {
-        console.log(`[VIDEO] 🔍 seek-video from ${socket.id}:`, JSON.stringify(data, null, 2));
-        if (data.time === undefined) {
-          console.warn(`[VIDEO] ⚠️ WARNING: 'time' is missing in seek-video event!`);
-        }
         this.roomService.updateRoomState(data.roomId, { currentTime: data.time || 0 });
         socket.to(data.roomId).emit('video-seek', data);
       });
 
       socket.on('change-video', (data) => {
-        console.log(`[VIDEO] 📼 change-video from ${socket.id}:`, JSON.stringify(data, null, 2));
         this.roomService.updateRoomState(data.roomId, { currentVideo: data.videoUrl });
         socket.to(data.roomId).emit('video-changed', data);
       });
@@ -764,7 +728,6 @@ class SyncWatchServer {
         const rooms = this.roomService.getAllRooms();
         rooms.forEach(room => {
           if (room.users && room.users[socket.id]) {
-            console.log(`[SOCKET CLEANUP] Removing disconnected user ${socket.id} from room ${room.id}`);
             this.roomService.leaveRoom(room.id, socket.id);
             socket.to(room.id).emit('user-left', { socketId: socket.id });
           }
@@ -773,36 +736,23 @@ class SyncWatchServer {
       });
     });
 
+    // Интервал для резервной рассылки (например, для YouTube)
     this.roomUpdateInterval = setInterval(() => {
       try {
         const allRooms = this.roomService.getAllRooms();
-        
-        const roomsData = allRooms.map(room => ({
-          id: room.id,
-          name: room.name,
-          users: room.users ? Object.keys(room.users).length : 0,
-          currentVideo: room.currentVideo || null,
-          currentTime: typeof room.currentTime === 'number' ? room.currentTime : 0,
-          isPlaying: !!room.isPlaying
-        }));
-
-        const jsonDir = path.join(__dirname, 'json');
-        const roomsJsonPath = path.join(jsonDir, 'rooms.json');
-
-        roomsData.forEach(room => {
-          if (room.id) {
+        allRooms.forEach(room => {
+          if (room.id && room.currentVideo) {
             this.io.emit('room-update', {
               roomId: room.id,
-              videoId: room.currentVideo,
-              currentTime: room.currentTime
+              currentTime: typeof room.currentTime === 'number' ? room.currentTime : 0,
+              isPlaying: !!room.isPlaying,
+              videoTitle: room.currentVideo ? room.currentVideo.split('/').pop() : null,
+              duration: typeof room.duration === 'number' ? room.duration : 0
             });
           }
         });
-
-        console.log(`[ROOMS.JSON] Updated at ${new Date().toISOString()}`);
-
       } catch (err) {
-        console.error('[ROOMS.JSON] Error updating rooms.json:', err);
+        console.error('[ROOM-UPDATE] Error:', err);
       }
     }, 1000);
   }
@@ -824,9 +774,7 @@ class SyncWatchServer {
 
     const shutdown = () => {
       console.log('Shutting down server...');
-      if (this.roomUpdateInterval) {
-        clearInterval(this.roomUpdateInterval);
-      }
+      if (this.roomUpdateInterval) clearInterval(this.roomUpdateInterval);
       if (this.roomStatesAutosaveInterval) {
         clearInterval(this.roomStatesAutosaveInterval);
         this.saveRoomStates();

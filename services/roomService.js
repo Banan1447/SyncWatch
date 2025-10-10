@@ -38,6 +38,7 @@ class RoomService {
               currentVideo: roomData.currentVideo || null,
               currentTime: typeof roomData.currentTime === 'number' ? roomData.currentTime : 0,
               isPlaying: !!roomData.isPlaying,
+              duration: typeof roomData.duration === 'number' ? roomData.duration : 0, // ← добавлено
               youtubeQueue
             });
           });
@@ -74,11 +75,12 @@ class RoomService {
           id: room.id,
           name: room.name,
           ownerId: room.ownerId,
-          password: room.password, // Пароль хранится в файле (в открытом виде)
+          password: room.password,
           users: usersObject,
           currentVideo: room.currentVideo,
           currentTime: room.currentTime,
           isPlaying: room.isPlaying,
+          duration: room.duration, // ← сохраняем
           youtubeQueue: room.youtubeQueue || []
         };
       });
@@ -111,6 +113,7 @@ class RoomService {
       currentVideo: room.currentVideo,
       currentTime: room.currentTime,
       isPlaying: room.isPlaying,
+      duration: room.duration, // ← возвращаем
       youtubeQueue: room.youtubeQueue || []
     };
   }
@@ -134,6 +137,7 @@ class RoomService {
         currentVideo: room.currentVideo,
         currentTime: room.currentTime,
         isPlaying: room.isPlaying,
+        duration: room.duration, // ← возвращаем
         youtubeQueue: room.youtubeQueue || []
       });
     }
@@ -162,12 +166,17 @@ class RoomService {
     }
   }
 
+  // ✅ ИСПРАВЛЕНО: теперь обновляются ВСЕ поля, включая duration
   updateRoomState(roomId, updates) {
     const room = this.rooms.get(roomId);
     if (room) {
-      if (updates.hasOwnProperty('currentVideo')) room.currentVideo = updates.currentVideo;
-      if (updates.hasOwnProperty('currentTime')) room.currentTime = updates.currentTime;
-      if (updates.hasOwnProperty('isPlaying')) room.isPlaying = updates.isPlaying;
+      // Обновляем только разрешённые поля
+      const allowedFields = ['currentVideo', 'currentTime', 'isPlaying', 'duration'];
+      for (const field of allowedFields) {
+        if (updates.hasOwnProperty(field)) {
+          room[field] = updates[field];
+        }
+      }
       this.saveRoomsToFile();
     }
   }
@@ -206,7 +215,7 @@ class RoomService {
   }
 
   createRoom(name, ownerSocketId, password = null) {
-    const id = nanoid(9); // Генерируем короткий уникальный ID, например: "7UsaCq0Qf"
+    const id = nanoid(9);
     const newRoom = {
       id,
       name,
@@ -216,6 +225,7 @@ class RoomService {
       currentVideo: null,
       currentTime: 0,
       isPlaying: false,
+      duration: 0, // ← инициализируем
       youtubeQueue: []
     };
     this.rooms.set(id, newRoom);

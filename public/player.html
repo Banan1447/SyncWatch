@@ -744,6 +744,7 @@
     let isVideoReady = false;
     let lastSeekSent = 0;
     let userName = null;
+    let videoDuration = 0; // ← НОВОЕ: длительность видео
     const urlParams = new URLSearchParams(window.location.search);
     const roomId = urlParams.get('room');
     if (!roomId) {
@@ -751,24 +752,59 @@
     }
     let moveBuffer = null;
 
+    // === ФОРМАТ ВРЕМЕНИ С ДЛИТЕЛЬНОСТЬЮ ===
+    function formatStatusTimeWithDuration(current, duration) {
+      const format = (seconds) => {
+        if (isNaN(seconds) || seconds < 0) seconds = 0;
+        const hrs = Math.floor(seconds / 3600);
+        const mins = Math.floor((seconds % 3600) / 60);
+        const secs = Math.floor(seconds % 60);
+        if (hrs > 0) {
+          return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        } else {
+          return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+      };
+      return `${format(current)} / ${format(duration)}`;
+    }
+
     // === ЛОКАЛЬНОЕ ОБНОВЛЕНИЕ ВРЕМЕНИ ===
     let localTimeUpdateInterval = null;
-
     function startLocalTimeUpdate(videoElement, videoPath) {
       if (localTimeUpdateInterval) clearInterval(localTimeUpdateInterval);
       localTimeUpdateInterval = setInterval(() => {
         if (!videoElement || videoElement.paused) return;
         const currentTime = videoElement.currentTime;
-        const timeStr = formatStatusTime(currentTime);
+        const timeStr = formatStatusTimeWithDuration(currentTime, videoDuration);
         const videoName = videoPath ? videoPath.split('/').pop() : '—';
         document.getElementById('status').textContent = `Video: ${videoName} | Time: ${timeStr}`;
       }, 1000);
     }
-
     function stopLocalTimeUpdate() {
       if (localTimeUpdateInterval) {
         clearInterval(localTimeUpdateInterval);
         localTimeUpdateInterval = null;
+      }
+    }
+
+    // === ОТПРАВКА СТАТУСА НА СЕРВЕР ===
+    let videoStatusSyncInterval = null;
+    function startVideoStatusSync(videoElement) {
+      stopVideoStatusSync();
+      videoStatusSyncInterval = setInterval(() => {
+        if (!videoElement || !isVideoReady || videoElement.paused || !joinedRoom) return;
+        socket.emit('video-status', {
+          roomId: joinedRoom,
+          currentTime: videoElement.currentTime,
+          isPlaying: true,
+          videoFile: currentVideoFile
+        });
+      }, 1000);
+    }
+    function stopVideoStatusSync() {
+      if (videoStatusSyncInterval) {
+        clearInterval(videoStatusSyncInterval);
+        videoStatusSyncInterval = null;
       }
     }
 
@@ -783,6 +819,7 @@
         return null;
       }
     }
+
     function joinRoom() {
       const token = localStorage.getItem('authToken');
       if (!token) {
@@ -817,56 +854,56 @@
         }
       });
     }
-    function formatStatusTime(seconds) {
-      if (isNaN(seconds) || seconds < 0) seconds = 0;
-      const hrs = Math.floor(seconds / 3600);
-      const mins = Math.floor((seconds % 3600) / 60);
-      const secs = Math.floor(seconds % 60);
-      if (hrs > 0) {
-        return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-      } else {
-        return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-      }
-    }
+
     function updateVideoStatus(videoPath, currentTime, isPlaying) {
       const videoName = videoPath ? (typeof videoPath === 'string' ? videoPath.split('/').pop() : '—') : '—';
-      const timeStr = formatStatusTime(currentTime);
+      const timeStr = formatStatusTimeWithDuration(currentTime, videoDuration);
       document.getElementById('status').innerHTML = `Video: ${videoName} | Time: ${timeStr}`;
     }
+
     window.addEventListener('DOMContentLoaded', () => {
       if (!roomId) return window.location.href = '/select-room.html';
       localStorage.setItem('lastRoomId', roomId);
       joinRoom();
     });
+
     document.getElementById('roomPasswordForm')?.addEventListener('submit', (e) => {
       e.preventDefault();
       joinRoom();
     });
+
     const video = document.getElementById('videoPlayer');
     const statusEl = document.getElementById('status');
     const leaveRoomBtn = document.getElementById('leaveRoomBtn');
     const usersToggle = document.getElementById('usersToggle');
     const usersDropdown = document.getElementById('usersDropdown');
     const videoDropZone = document.getElementById('videoDropZone');
+
     leaveRoomBtn.addEventListener('click', () => {
+      stopVideoStatusSync();
       socket.emit('leave-room', { roomId }, () => {
         window.location.href = '/select-room.html';
       });
     });
+
     usersToggle.addEventListener('click', (e) => {
       e.stopPropagation();
       usersDropdown.classList.toggle('show');
     });
+
     document.addEventListener('click', (e) => {
       if (!usersToggle.contains(e.target) && !usersDropdown.contains(e.target)) {
         usersDropdown.classList.remove('show');
       }
     });
+
     const uploadBtn = document.getElementById('uploadBtn');
     const uploadInput = document.getElementById('uploadInput');
     uploadBtn.addEventListener('click', () => uploadInput.click());
+
     function handleFileUpload(file) {
-      stopLocalTimeUpdate(); // ← остановка при новом видео
+      stopLocalTimeUpdate();
+      stopVideoStatusSync();
       const formData = new FormData();
       formData.append('video', file);
       const progressBar = document.querySelector('.progress-bar');
@@ -887,13 +924,19 @@
             showNotification(`Video uploaded: ${data.file}`, 'success');
             video.src = `/videos/${data.file}`;
             const fileName = data.file.split('/').pop();
-            statusEl.innerHTML = `Video: ${fileName} | Time: 00:00`;
+            videoDuration = 0;
+            statusEl.innerHTML = `Video: ${fileName} | Time: 00:00 / ??`;
             currentVideoFile = data.file;
             isVideoReady = false;
             socket.emit('select-video', { roomId: joinedRoom, filename: data.file });
             video.addEventListener('loadedmetadata', () => {
               isVideoReady = true;
-              video.play().catch(() => {});
+              videoDuration = video.duration;
+              socket.emit('video-metadata', {
+                roomId: joinedRoom,
+                duration: videoDuration,
+                filename: data.file
+              });
             }, { once: true });
           } else {
             showNotification('Upload failed', 'error');
@@ -905,21 +948,26 @@
       xhr.open('POST', '/upload');
       xhr.send(formData);
     }
+
     uploadInput.addEventListener('change', (e) => {
       const file = e.target.files[0];
       if (file) handleFileUpload(file);
     });
+
     videoDropZone.addEventListener('dragover', (e) => {
       e.preventDefault();
       e.dataTransfer.dropEffect = 'copy';
       videoDropZone.style.backgroundColor = 'rgba(74, 144, 226, 0.1)';
     });
+
     videoDropZone.addEventListener('dragenter', (e) => {
       e.preventDefault();
     });
+
     videoDropZone.addEventListener('dragleave', () => {
       videoDropZone.style.backgroundColor = '';
     });
+
     videoDropZone.addEventListener('drop', (e) => {
       e.preventDefault();
       videoDropZone.style.backgroundColor = '';
@@ -934,33 +982,58 @@
         const ext = fileName.split('.').pop()?.toLowerCase();
         const supportedFormats = ['mp4', 'webm', 'ogg', 'mov', 'avi', 'mkv'];
         if (ext && supportedFormats.includes(ext)) {
-          stopLocalTimeUpdate(); // ← остановка при смене видео
+          stopLocalTimeUpdate();
+          stopVideoStatusSync();
           highlightSelectedVideo(path);
           video.src = `/videos/${path}`;
-          statusEl.innerHTML = `Video: ${fileName} | Time: 00:00`;
+          videoDuration = 0;
+          statusEl.innerHTML = `Video: ${fileName} | Time: 00:00 / ??`;
           currentVideoFile = path;
           isVideoReady = false;
           socket.emit('select-video', { roomId: joinedRoom, filename: path });
+          video.addEventListener('loadedmetadata', () => {
+            isVideoReady = true;
+            videoDuration = video.duration;
+            socket.emit('video-metadata', {
+              roomId: joinedRoom,
+              duration: videoDuration,
+              filename: path
+            });
+          }, { once: true });
           return;
         }
       }
       showNotification('Only video files are supported', 'error');
     });
-    video.addEventListener('loadedmetadata', () => isVideoReady = true);
+
+    video.addEventListener('loadedmetadata', () => {
+      isVideoReady = true;
+      videoDuration = video.duration;
+      socket.emit('video-metadata', {
+        roomId: joinedRoom,
+        duration: videoDuration,
+        filename: currentVideoFile
+      });
+    });
+
     video.addEventListener('play', () => {
       if (isVideoReady) {
         socket.emit('video-command', { type: 'play', roomId: joinedRoom });
         socket.emit('play-video', { roomId: joinedRoom, time: video.currentTime });
-        startLocalTimeUpdate(video, currentVideoFile); // ← запуск локального обновления
+        startLocalTimeUpdate(video, currentVideoFile);
+        startVideoStatusSync(video);
       }
     });
+
     video.addEventListener('pause', () => {
       if (isVideoReady) {
         socket.emit('video-command', { type: 'pause', roomId: joinedRoom });
         socket.emit('pause-video', { roomId: joinedRoom, time: video.currentTime });
-        stopLocalTimeUpdate(); // ← остановка при паузе
+        stopLocalTimeUpdate();
+        stopVideoStatusSync();
       }
     });
+
     video.addEventListener('seeked', () => {
       if (isVideoReady) {
         const now = Date.now();
@@ -972,13 +1045,16 @@
       }
     });
 
-    // === ОСНОВНОЕ ИЗМЕНЕНИЕ: обработка room-state ===
     socket.on('room-state', (state) => {
-      stopLocalTimeUpdate(); // ← остановка при смене состояния комнаты
+      stopLocalTimeUpdate();
+      stopVideoStatusSync();
       roomState = state;
       const videoUrl = state.currentVideo;
       const currentTime = state.currentTime || 0;
       const isPlaying = state.isPlaying;
+      if (state.duration !== undefined) {
+        videoDuration = state.duration;
+      }
       updateVideoStatus(videoUrl, currentTime, isPlaying);
       if (videoUrl) {
         video.src = `/videos/${videoUrl}`;
@@ -987,9 +1063,11 @@
         video.addEventListener('loadedmetadata', () => {
           isVideoReady = true;
           video.currentTime = currentTime;
+          videoDuration = video.duration;
           if (isPlaying) {
             video.play().catch(() => {});
-            startLocalTimeUpdate(video, currentVideoFile); // ← запуск, если играет
+            startLocalTimeUpdate(video, currentVideoFile);
+            startVideoStatusSync(video);
           }
         }, { once: true });
       } else {
@@ -1001,28 +1079,35 @@
       renderUsersDropdown();
       loadAndRenderExplorerForPath(currentExplorerPath);
     });
+
     socket.on('video-play', (data) => {
       if (isVideoReady) {
         video.play().catch(() => {});
-        startLocalTimeUpdate(video, currentVideoFile); // ← запуск при play от сервера
+        startLocalTimeUpdate(video, currentVideoFile);
+        startVideoStatusSync(video);
       }
       updateVideoStatus(currentVideoFile, data.time, true);
     });
+
     socket.on('video-pause', (data) => {
       if (isVideoReady) {
         video.pause();
-        stopLocalTimeUpdate(); // ← остановка при pause от сервера
+        stopLocalTimeUpdate();
+        stopVideoStatusSync();
       }
       updateVideoStatus(currentVideoFile, data.time, false);
     });
+
     socket.on('video-seek', (data) => {
       if (isVideoReady && Math.abs(video.currentTime - data.time) > 0.5) {
         video.currentTime = data.time;
       }
       updateVideoStatus(currentVideoFile, data.time, undefined);
     });
+
     socket.on('video-changed', (data) => {
-      stopLocalTimeUpdate(); // ← остановка при смене видео
+      stopLocalTimeUpdate();
+      stopVideoStatusSync();
       const videoUrl = data.videoUrl;
       const fileName = videoUrl ? videoUrl.split('/').pop() : '—';
       currentVideoFile = videoUrl;
@@ -1033,8 +1118,10 @@
         isVideoReady = false;
         video.addEventListener('loadedmetadata', () => {
           isVideoReady = true;
+          videoDuration = video.duration;
           video.play().catch(() => {});
-          startLocalTimeUpdate(video, currentVideoFile); // ← запуск после загрузки нового видео
+          startLocalTimeUpdate(video, currentVideoFile);
+          startVideoStatusSync(video);
         }, { once: true });
       } else {
         video.src = '';
@@ -1042,20 +1129,24 @@
       }
       loadAndRenderExplorerForPath(currentExplorerPath);
     });
+
     socket.on('video-command', (data) => {
       if (!isVideoReady || video.readyState < 1) return;
       if (data.type === 'play' && video.paused) {
         video.play().catch(() => {});
         startLocalTimeUpdate(video, currentVideoFile);
+        startVideoStatusSync(video);
       } else if (data.type === 'pause' && !video.paused) {
         video.pause();
         stopLocalTimeUpdate();
+        stopVideoStatusSync();
       } else if (data.type === 'seek' && typeof data.time === 'number') {
         if (Math.abs(video.currentTime - data.time) > 0.5) {
           video.currentTime = data.time;
         }
       }
     });
+
     function showNotification(message, type) {
       const notification = document.createElement('div');
       notification.className = `notification ${type}`;
@@ -1063,21 +1154,27 @@
       document.getElementById('notifications').appendChild(notification);
       setTimeout(() => notification.remove(), 3000);
     }
+
     socket.on('kicked-from-room', () => {
       stopLocalTimeUpdate();
+      stopVideoStatusSync();
       alert('You have been kicked from the room');
       window.location.href = '/select-room.html';
     });
+
     socket.on('video-updated', (filename) => {
-      stopLocalTimeUpdate(); // ← остановка при обновлении видео
+      stopLocalTimeUpdate();
+      stopVideoStatusSync();
       video.src = `/videos/${filename}`;
       const fileName = filename.split('/').pop();
-      statusEl.innerHTML = `Video: ${fileName} | Time: 00:00`;
+      videoDuration = 0;
+      statusEl.innerHTML = `Video: ${fileName} | Time: 00:00 / ??`;
       currentVideoFile = filename;
       isVideoReady = false;
       highlightSelectedVideo(filename);
       loadAndRenderExplorerForPath(currentExplorerPath);
     });
+
     let roomState = null;
     function renderUsersDropdown() {
       if (!roomState || !roomState.users) {
@@ -1124,6 +1221,7 @@
         }
       });
     }
+
     // === File Explorer code unchanged ===
     let currentExplorerPath = '';
     let selectedItems = new Set();
@@ -1318,14 +1416,25 @@
                         return;
                       }
                     }
-                    stopLocalTimeUpdate(); // ← остановка при выборе нового видео
+                    stopLocalTimeUpdate();
+                    stopVideoStatusSync();
                     highlightSelectedVideo(item.path);
                     video.src = `/videos/${item.name}`;
-                    const formattedTime = formatStatusTime(0);
+                    videoDuration = 0;
+                    const formattedTime = formatStatusTimeWithDuration(0, 0);
                     statusEl.innerHTML = `Video: ${fileName} | Time: ${formattedTime}`;
                     currentVideoFile = item.name;
                     isVideoReady = false;
                     socket.emit('select-video', { roomId: joinedRoom, filename: item.name });
+                    video.addEventListener('loadedmetadata', () => {
+                      isVideoReady = true;
+                      videoDuration = video.duration;
+                      socket.emit('video-metadata', {
+                        roomId: joinedRoom,
+                        duration: videoDuration,
+                        filename: item.name
+                      });
+                    }, { once: true });
                 }
             });
             if (item.type === 'folder') {

@@ -213,21 +213,14 @@
       <div class="logo-icon">S</div>
       <h1>SyncWatch</h1>
     </div>
-    <div class="controls" id="authControls">
-      <!-- Кнопки будут добавлены скриптом -->
-    </div>
+    <div class="controls" id="authControls"></div>
   </div>
 
   <button id="createRoomBtn" class="btn btn-primary">Создать новую комнату</button>
-
-  <div class="room-list" id="roomList">
-    <!-- Комнаты будут загружены сюда -->
-  </div>
-
+  <div class="room-list" id="roomList"></div>
   <div id="notifications"></div>
 
   <script>
-    // === ПРОВЕРКА АВТОРИЗАЦИИ ПРИ ЗАГРУЗКЕ ===
     (function() {
       const token = localStorage.getItem('authToken');
       if (!token) {
@@ -240,7 +233,6 @@
     const socket = io();
     let rooms = [];
 
-    // Извлечение данных из JWT
     function getUserInfo() {
       const token = localStorage.getItem('authToken');
       if (!token) return null;
@@ -255,13 +247,11 @@
       }
     }
 
-    // Получение имени пользователя для использования в комнате
     function getDisplayName() {
       const user = getUserInfo();
       return user?.username || 'User';
     }
 
-    // Обновление кнопок в шапке
     function updateAuthControls() {
       const controls = document.getElementById('authControls');
       const displayName = getDisplayName();
@@ -289,10 +279,15 @@
     }
 
     function formatTime(seconds) {
-      if (typeof seconds !== 'number' || isNaN(seconds)) seconds = 0;
-      const mins = Math.floor(seconds / 60);
-      const secs = Math.floor(seconds % 60);
+      if (typeof seconds !== 'number' || isNaN(seconds) || seconds < 0) seconds = 0;
+      const totalSecs = Math.floor(seconds);
+      const mins = Math.floor(totalSecs / 60);
+      const secs = totalSecs % 60;
       return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+    }
+
+    function formatTimeWithDuration(current, duration) {
+      return `${formatTime(current)} / ${formatTime(duration)}`;
     }
 
     function renderRooms() {
@@ -325,7 +320,7 @@
           ${room.video ? `
             <div class="video-info">
               <strong>Видео:</strong> ${room.video.title || 'Без названия'}<br>
-              <small>Текущее время: <span class="current-time">${formatTime(room.video.currentTime)}</span></small><br>
+              <small>Текущее время: <span class="current-time">${formatTimeWithDuration(room.video.currentTime, room.video.duration)}</span></small><br>
               <small>Статус: ${room.video.isPlaying ? 'Играет' : 'Пауза'}</small>
             </div>
           ` : '<div class="video-info"><em>Видео не загружено</em></div>'}
@@ -336,65 +331,50 @@
         </div>
       `).join('');
 
-      // Обработчики кнопок входа — БЕЗ ЗАПРОСА ИМЕНИ
       document.querySelectorAll('.join-btn').forEach(btn => {
         btn.addEventListener('click', () => {
           const roomId = btn.dataset.roomId;
           const room = rooms.find(r => r.id === roomId);
           const passwordInput = document.querySelector(`.password-input[data-room-id="${roomId}"]`);
-          
-          let password = '';
-          if (room && room.hasPassword) {
-            password = passwordInput.value.trim();
-            if (!password) {
-              showNotification('Введите пароль для этой комнаты', 'error');
-              passwordInput.focus();
-              return;
-            }
-          }
-
-          const displayName = getDisplayName();
-          if (!displayName) {
-            showNotification('Не удалось определить ваше имя. Попробуйте войти снова.', 'error');
+          let password = room?.hasPassword ? passwordInput.value.trim() : '';
+          if (room?.hasPassword && !password) {
+            showNotification('Введите пароль для этой комнаты', 'error');
+            passwordInput.focus();
             return;
           }
-
+          const displayName = getDisplayName();
+          if (!displayName) {
+            showNotification('Не удалось определить ваше имя', 'error');
+            return;
+          }
           sessionStorage.setItem('roomPassword', password);
           sessionStorage.setItem('userName', displayName);
           window.location.href = `/player.html?room=${roomId}`;
         });
       });
 
-      // Обработчики кнопок удаления
       document.querySelectorAll('.delete-room-btn').forEach(btn => {
         btn.addEventListener('click', () => {
           const roomId = btn.dataset.roomId;
           const room = rooms.find(r => r.id === roomId);
-          if (!confirm(`Удалить комнату "${room.name}"? Это действие нельзя отменить.`)) {
-            return;
-          }
-
-          socket.emit('delete-room', { roomId }, (response) => {
-            if (response && response.success) {
+          if (!confirm(`Удалить комнату "${room.name}"?`)) return;
+          socket.emit('delete-room', { roomId }, (res) => {
+            if (res?.success) {
               showNotification(`Комната "${room.name}" удалена`, 'success');
               loadRooms();
             } else {
-              showNotification('Ошибка удаления: ' + (response?.message || 'Неизвестная ошибка'), 'error');
+              showNotification('Ошибка: ' + (res?.message || 'неизвестно'), 'error');
             }
           });
         });
       });
 
-      // Показываем поле пароля только если комната защищена
       document.querySelectorAll('.password-input').forEach(input => {
         const room = rooms.find(r => r.id === input.dataset.roomId);
-        if (room && room.hasPassword) {
-          input.style.display = 'block';
-        }
+        if (room && room.hasPassword) input.style.display = 'block';
       });
     }
 
-    // Загрузка списка комнат через сокет
     function loadRooms() {
       socket.emit('get-rooms', (data) => {
         rooms = data || [];
@@ -402,57 +382,62 @@
       });
     }
 
-    // === ОБНОВЛЕНИЕ ВРЕМЕНИ КАЖДУЮ СЕКУНДУ ЧЕРЕЗ СОКЕТ ===
     socket.on('room-update', (update) => {
       const room = rooms.find(r => r.id === update.roomId);
-      if (room && room.video) {
-        room.video.currentTime = update.currentTime || 0;
-        room.video.isPlaying = true; // сервер отправляет только при воспроизведении
+      if (!room) return;
 
-        const timeEl = document.querySelector(`.room-card[data-id="${update.roomId}"] .current-time`);
-        if (timeEl) {
-          timeEl.textContent = formatTime(update.currentTime || 0);
+      if (!room.video) room.video = {};
+      room.video.currentTime = update.currentTime || 0;
+      room.video.isPlaying = update.isPlaying !== undefined ? update.isPlaying : false;
+      if (update.videoTitle !== undefined) {
+        room.video.title = update.videoTitle;
+      }
+      if (update.duration !== undefined) {
+        room.video.duration = update.duration;
+      }
+
+      const card = document.querySelector(`.room-card[data-id="${update.roomId}"]`);
+      if (!card) return;
+
+      const timeEl = card.querySelector('.current-time');
+      const statusEl = card.querySelector('.video-info small:nth-of-type(2)');
+
+      if (timeEl) {
+        const dur = room.video.duration || 0;
+        timeEl.textContent = formatTimeWithDuration(update.currentTime || 0, dur);
+      }
+      if (statusEl) {
+        statusEl.textContent = `Статус: ${update.isPlaying ? 'Играет' : 'Пауза'}`;
+      }
+
+      if (update.videoTitle !== undefined) {
+        const videoTitleEl = card.querySelector('.video-info strong');
+        if (videoTitleEl) {
+          videoTitleEl.textContent = `Видео: ${update.videoTitle || 'Без названия'}`;
         }
       }
     });
 
-    // Создание комнаты через сокет
     document.getElementById('createRoomBtn').addEventListener('click', () => {
-      const name = prompt('Введите название комнаты:');
-      if (!name || name.trim() === '') {
-        showNotification('Название не может быть пустым', 'error');
-        return;
-      }
-
-      const isProtected = confirm('Сделать комнату приватной (с паролем)?');
-      let password = null;
-      if (isProtected) {
-        password = prompt('Введите пароль для комнаты:');
-        if (!password || password.trim() === '') {
-          showNotification('Пароль не может быть пустым', 'error');
-          return;
-        }
-        password = password.trim();
-      }
+      const name = prompt('Название комнаты:');
+      if (!name?.trim()) return showNotification('Название обязательно', 'error');
+      const isProtected = confirm('Сделать приватной?');
+      let password = isProtected ? prompt('Пароль:')?.trim() : null;
+      if (isProtected && !password) return showNotification('Пароль обязателен', 'error');
 
       socket.emit('create-room', { name: name.trim(), password }, (res) => {
         if (res.success) {
-          showNotification(`Комната "${name}" создана`, 'success');
-          if (password) {
-            sessionStorage.setItem('roomPassword', password);
-          }
+          if (password) sessionStorage.setItem('roomPassword', password);
           window.location.href = `/player.html?room=${res.id}`;
         } else {
-          showNotification('Ошибка создания комнаты: ' + (res.error || 'Неизвестная ошибка'), 'error');
+          showNotification('Ошибка: ' + (res.error || 'неизвестно'), 'error');
         }
       });
     });
 
-    // Инициализация
     window.addEventListener('DOMContentLoaded', () => {
       updateAuthControls();
-      loadRooms(); // Первый запрос сразу при загрузке
-      // Убран setInterval(loadRooms, 3000) — теперь обновление времени через room-update
+      loadRooms();
     });
   </script>
 </body>
