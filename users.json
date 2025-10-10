@@ -12,7 +12,7 @@
     "username": "Artur",
     "email": "a@daw.ri",
     "password": "$2b$10$dZQ80R.0F8m3Jvw.FDKsMO/Dtu4ibHJviZa2OzZlLU03uWiH82qeK",
-    "role": "user",
+    "role": "admin",
     "createdAt": "2025-10-04T22:56:24.717Z"
   },
   {
@@ -20,7 +20,7 @@
     "username": "phonearch",
     "email": "as@rt.ru",
     "password": "$2b$10$Z1saReYTn7Tq5l3Nh5BCEeKxpSbzMhZOm4j652K.lYi6kWofKpKqe",
-    "role": "user",
+    "role": "admin",
     "createdAt": "2025-10-05T01:36:10.354Z"
   },
   {
