@@ -449,6 +449,7 @@ class SyncWatchServer {
         }
       });
 
+      // ✅ ИСПРАВЛЕНО: используем room.hasPassword напрямую
       socket.on('get-rooms', (callback) => {
         const rawRooms = this.roomService.getAllRooms();
         const roomsForClient = rawRooms.map(room => {
@@ -464,7 +465,7 @@ class SyncWatchServer {
           return {
             id: room.id,
             name: room.name,
-            hasPassword: !!room.password,
+            hasPassword: room.hasPassword, // ← ЕДИНСТВЕННОЕ ИЗМЕНЕНИЕ
             users: room.users || {},
             video: room.currentVideo ? {
               title: videoTitle || 'Без названия',

@@ -8,6 +8,7 @@
     "currentVideo": null,
     "currentTime": 0,
     "isPlaying": false,
+    "duration": 0,
     "youtubeQueue": []
   },
   {
@@ -17,8 +18,9 @@
     "password": "3",
     "users": {},
     "currentVideo": "Solo_Leveling_Ep01.mp4",
-    "currentTime": 788.953028,
+    "currentTime": 456.922326,
     "isPlaying": false,
+    "duration": 1422.003,
     "youtubeQueue": []
   },
   {
@@ -27,9 +29,22 @@
     "ownerId": "h52ibTPVlV3jkgxTAAAJ",
     "password": null,
     "users": {},
+    "currentVideo": "Alien.Earth.S01E08.WEB-DLRip.RGzsRutracker.mp4",
+    "currentTime": 870.564544,
+    "isPlaying": false,
+    "duration": 2832.625,
+    "youtubeQueue": []
+  },
+  {
+    "id": "9AFOmrjFa",
+    "name": "4",
+    "ownerId": "6-NRyN51YaEyQ5ScAAAh",
+    "password": "4",
+    "users": {},
     "currentVideo": null,
     "currentTime": 0,
     "isPlaying": false,
+    "duration": 0,
     "youtubeQueue": []
   }
 ]

@@ -1,4 +1,3 @@
-// routes/rooms.js
 const express = require('express');
 
 /**
@@ -24,7 +23,7 @@ module.exports = (roomService) => {
       });
     }
 
-    // Создаём комнату через RoomService (единая точка управления)
+    // Создаём комнату через RoomService
     const newRoom = roomService.createRoom(name.trim(), 'rest-api-user', password ? password.trim() : null);
 
     res.status(201).json({
@@ -37,11 +36,26 @@ module.exports = (roomService) => {
   /**
    * GET /api/rooms
    * Возвращает список всех комнат (без паролей!)
+   * Но с флагом hasPassword: true/false
    */
   router.get('/', (req, res) => {
-    const allRooms = roomService.getAllRooms();
-    // RoomService.getAllRooms() уже возвращает комнаты без паролей (см. hasPassword)
-    res.json({ success: true, rooms: allRooms });
+    // Получаем все комнаты от RoomService
+    const rawRooms = roomService.getAllRooms(); // Предполагается, что это массив/итерируемый объект комнат
+
+    // Формируем публичные данные: НИКАКОГО пароля, только hasPassword
+    const publicRooms = (Array.isArray(rawRooms) ? rawRooms : Object.values(rawRooms)).map(room => {
+      // Убедимся, что у комнаты есть id и name как минимум
+      return {
+        id: room.id,
+        name: room.name,
+        users: room.users || {},
+        video: room.video || null,
+        // 🔑 Ключевая строка: определяем, есть ли пароль (без раскрытия самого пароля!)
+        hasPassword: !!room.password
+      };
+    });
+
+    res.json({ success: true, rooms: publicRooms });
   });
 
   /**

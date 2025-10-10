@@ -2,19 +2,24 @@
   "UX_6_VB-u": {
     "currentVideo": null,
     "currentTime": 0,
-    "isPlaying": false
+    "isPlaying": false,
+    "duration": 0
   },
   "wjdkmFdOo": {
     "currentVideo": "Solo_Leveling_Ep01.mp4",
-    "currentTime": 788.953028,
-    "isPlaying": false
+    "currentTime": 456.922326,
+    "isPlaying": false,
+    "duration": 1422.003
   },
   "CcVOwkiTG": {
+    "currentVideo": "Alien.Earth.S01E08.WEB-DLRip.RGzsRutracker.mp4",
+    "currentTime": 870.564544,
+    "isPlaying": false,
+    "duration": 2832.625
+  },
+  "9AFOmrjFa": {
     "currentVideo": null,
     "currentTime": 0,
-    "isPlaying": false
-  }
-}Time": 0,
     "isPlaying": false,
     "duration": 0
   }

@@ -308,7 +308,9 @@
           <h3>
             <div class="room-title">
               ${room.name}
-              ${room.hasPassword ? '<i class="fas fa-lock" title="Защищена паролем"></i>' : '<i class="fas fa-lock-open" title="Публичная"></i>'}
+              ${room.hasPassword 
+                ? '<i class="fas fa-lock" style="color: #8e44ad;" title="Защищена паролем"></i>' 
+                : '<i class="fas fa-lock-open" title="Публичная"></i>'}
             </div>
             <button class="delete-room-btn" data-room-id="${room.id}" title="Удалить комнату">
               <i class="fas fa-trash"></i>
