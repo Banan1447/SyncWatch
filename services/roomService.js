@@ -7,6 +7,7 @@ class RoomService {
   constructor() {
     this.rooms = new Map();
     this.roomsFilePath = path.join(__dirname, '..', 'json', 'rooms.json');
+    this.roomLogs = new Map(); // Логи для каждой комнаты
     this.loadRoomsFromFile();
   }
 
@@ -34,6 +35,7 @@ class RoomService {
               name: roomData.name,
               ownerId: roomData.ownerId,
               password: roomData.password || null,
+              allowedGroups: Array.isArray(roomData.allowedGroups) ? roomData.allowedGroups : [],
               users: usersMap,
               currentVideo: roomData.currentVideo || null,
               currentTime: typeof roomData.currentTime === 'number' ? roomData.currentTime : 0,
@@ -147,9 +149,35 @@ class RoomService {
   leaveRoom(roomId, socketId) {
     const room = this.rooms.get(roomId);
     if (room) {
+      const user = room.users.get(socketId);
+      const userName = user ? user.name : 'Unknown';
+
       room.users.delete(socketId);
+
+      // Логируем выход пользователя
+      this.logAction(roomId, 'user_left', socketId, userName, {
+        userCount: room.users.size
+      });
+
       this.saveRoomsToFile();
     }
+  }
+
+  // Обновление комнаты
+  updateRoom(roomId, updates) {
+    const room = this.rooms.get(roomId);
+    if (!room) {
+      return { success: false, error: 'Room not found' };
+    }
+
+    // Обновляем только разрешенные поля
+    if (updates.name !== undefined) room.name = updates.name;
+    if (updates.password !== undefined) room.password = updates.password;
+    if (updates.allowedGroups !== undefined) room.allowedGroups = Array.isArray(updates.allowedGroups) ? updates.allowedGroups : [];
+
+    this.saveRoomsToFile();
+
+    return { success: true, room: this.getRoom(roomId) };
   }
 
   deleteRoom(roomId, requestingSocketId) {
@@ -189,21 +217,39 @@ class RoomService {
     }
   }
 
-  joinRoom(roomId, socketId, name, providedPassword = null) {
+  joinRoom(roomId, socketId, name, providedPassword = null, userGroups = []) {
     const room = this.rooms.get(roomId);
     if (!room) {
       return { success: false, error: 'Room not found' };
     }
 
+    // Проверяем пароль
     if (room.password !== null && room.password !== undefined) {
       if (providedPassword !== room.password) {
         return { success: false, error: 'Invalid password' };
       }
     }
 
+    // Проверяем доступ по группам
+    if (room.allowedGroups && room.allowedGroups.length > 0) {
+      const hasAccess = room.allowedGroups.some(groupId =>
+        userGroups && userGroups.includes(groupId)
+      );
+
+      if (!hasAccess) {
+        return { success: false, error: 'Access denied: insufficient permissions' };
+      }
+    }
+
     room.users.set(socketId, {
       name: name,
       socketId: socketId
+    });
+
+    // Логируем присоединение пользователя
+    this.logAction(roomId, 'user_joined', socketId, name, {
+      userCount: room.users.size,
+      userGroups: userGroups
     });
 
     this.saveRoomsToFile();
@@ -214,13 +260,14 @@ class RoomService {
     };
   }
 
-  createRoom(name, ownerSocketId, password = null) {
+  createRoom(name, ownerSocketId, password = null, allowedGroups = []) {
     const id = nanoid(9);
     const newRoom = {
       id,
       name,
       ownerId: ownerSocketId,
       password,
+      allowedGroups: Array.isArray(allowedGroups) ? allowedGroups : [],
       users: new Map(),
       currentVideo: null,
       currentTime: 0,
@@ -274,6 +321,43 @@ class RoomService {
       return next;
     }
     return null;
+  }
+
+  // Логирование действий в комнате
+  logAction(roomId, action, userId, userName, details = {}) {
+    if (!this.roomLogs.has(roomId)) {
+      this.roomLogs.set(roomId, []);
+    }
+
+    const logEntry = {
+      id: nanoid(),
+      timestamp: new Date().toISOString(),
+      action,
+      userId,
+      userName,
+      details
+    };
+
+    const roomLogs = this.roomLogs.get(roomId);
+    roomLogs.push(logEntry);
+
+    // Ограничиваем количество логов (последние 1000 записей)
+    if (roomLogs.length > 1000) {
+      roomLogs.splice(0, roomLogs.length - 1000);
+    }
+
+    console.log(`[ROOM LOG] ${roomId}: ${userName} (${userId}) - ${action}`, details);
+  }
+
+  // Получение логов комнаты
+  getRoomLogs(roomId, limit = 50) {
+    const roomLogs = this.roomLogs.get(roomId) || [];
+    return roomLogs.slice(-limit); // Возвращаем последние логи
+  }
+
+  // Очистка логов комнаты
+  clearRoomLogs(roomId) {
+    this.roomLogs.delete(roomId);
   }
 
   shutdown() {

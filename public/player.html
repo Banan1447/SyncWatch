@@ -476,6 +476,39 @@
     .explorer-item .item-actions button:hover {
         color: var(--danger);
     }
+
+    .delete-drop-zone {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      right: 10px;
+      height: 60px;
+      background: #dc3545;
+      border: 2px dashed #fff;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: bold;
+      opacity: 0;
+      transition: all 0.3s ease;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    .delete-drop-zone.active {
+      opacity: 1;
+      pointer-events: auto;
+      background: #c82333;
+      border-color: #fff;
+      box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
+    }
+
+    .delete-drop-zone i {
+      font-size: 1.5rem;
+      margin-right: 0.5rem;
+    }
     .modal {
       display: none;
       position: fixed;
@@ -707,6 +740,10 @@
         </div>
         <div class="breadcrumb-panel" id="explorerBreadcrumb"></div>
         <div id="explorerList"></div>
+        <div id="deleteDropZone" class="delete-drop-zone">
+          <i class="fas fa-trash-alt"></i>
+          <span>Drop files here to delete</span>
+        </div>
       </div>
     </div>
   </div>
@@ -793,9 +830,18 @@
       stopVideoStatusSync();
       videoStatusSyncInterval = setInterval(() => {
         if (!videoElement || !isVideoReady || videoElement.paused || !joinedRoom) return;
+        // ✅ ИСПРАВЛЕНО: Проверяем, не достигло ли видео конца
+        const currentTime = videoElement.currentTime;
+        const duration = videoElement.duration || videoDuration;
+        if (duration > 0 && currentTime >= duration - 0.5) {
+          // Видео закончилось или близко к концу - останавливаем синхронизацию
+          stopVideoStatusSync();
+          socket.emit('pause-video', { roomId: joinedRoom, time: duration });
+          return;
+        }
         socket.emit('video-status', {
           roomId: joinedRoom,
-          currentTime: videoElement.currentTime,
+          currentTime: currentTime,
           isPlaying: true,
           videoFile: currentVideoFile
         });
@@ -832,7 +878,9 @@
       localStorage.setItem('userName', name);
       const password = sessionStorage.getItem('roomPassword') || 
                       (document.getElementById('roomPasswordInput')?.value.trim() || '');
-      socket.emit('join-room', { roomId, name, password }, res => {
+      // Получаем группы пользователя из токена или используем пустой массив
+      const userGroups = payload?.groups || [];
+      socket.emit('join-room', { roomId, name, password, userGroups }, res => {
         if (!(res && res.success)) {
           if (res?.error === 'Invalid password') {
             sessionStorage.removeItem('roomPassword');
@@ -1045,6 +1093,19 @@
       }
     });
 
+    // ✅ ИСПРАВЛЕНО: Обработчик окончания видео
+    video.addEventListener('ended', () => {
+      if (isVideoReady && joinedRoom) {
+        stopLocalTimeUpdate();
+        stopVideoStatusSync();
+        // Отправляем событие окончания видео на сервер
+        socket.emit('video-ended', { roomId: joinedRoom });
+        // Обновляем состояние на паузу
+        socket.emit('pause-video', { roomId: joinedRoom, time: videoDuration });
+        updateVideoStatus(currentVideoFile, videoDuration, false);
+      }
+    });
+
     socket.on('room-state', (state) => {
       stopLocalTimeUpdate();
       stopVideoStatusSync();
@@ -1055,19 +1116,30 @@
       if (state.duration !== undefined) {
         videoDuration = state.duration;
       }
-      updateVideoStatus(videoUrl, currentTime, isPlaying);
+      // ✅ ИСПРАВЛЕНО: Проверяем, не достигло ли видео конца
+      const duration = state.duration || videoDuration;
+      const videoEnded = duration > 0 && currentTime >= duration - 0.5;
+      updateVideoStatus(videoUrl, currentTime, isPlaying && !videoEnded);
       if (videoUrl) {
         video.src = `/videos/${videoUrl}`;
         currentVideoFile = videoUrl;
         isVideoReady = false;
         video.addEventListener('loadedmetadata', () => {
           isVideoReady = true;
-          video.currentTime = currentTime;
           videoDuration = video.duration;
-          if (isPlaying) {
+          // ✅ ИСПРАВЛЕНО: Не устанавливаем время если видео закончилось
+          if (!videoEnded) {
+            video.currentTime = currentTime;
+          } else {
+            video.currentTime = videoDuration;
+          }
+          // ✅ ИСПРАВЛЕНО: Не воспроизводим если видео закончилось
+          if (isPlaying && !videoEnded) {
             video.play().catch(() => {});
             startLocalTimeUpdate(video, currentVideoFile);
             startVideoStatusSync(video);
+          } else {
+            video.pause();
           }
         }, { once: true });
       } else {
@@ -1082,6 +1154,15 @@
 
     socket.on('video-play', (data) => {
       if (isVideoReady) {
+        // ✅ ИСПРАВЛЕНО: Проверяем, не достигло ли видео конца
+        const duration = video.duration || videoDuration;
+        const currentTime = data.time || video.currentTime;
+        if (duration > 0 && currentTime >= duration - 0.5) {
+          // Видео закончилось - не воспроизводим
+          video.pause();
+          updateVideoStatus(currentVideoFile, duration, false);
+          return;
+        }
         video.play().catch(() => {});
         startLocalTimeUpdate(video, currentVideoFile);
         startVideoStatusSync(video);
@@ -1133,6 +1214,14 @@
     socket.on('video-command', (data) => {
       if (!isVideoReady || video.readyState < 1) return;
       if (data.type === 'play' && video.paused) {
+        // ✅ ИСПРАВЛЕНО: Проверяем, не достигло ли видео конца
+        const duration = video.duration || videoDuration;
+        const currentTime = video.currentTime;
+        if (duration > 0 && currentTime >= duration - 0.5) {
+          // Видео закончилось - не воспроизводим
+          video.pause();
+          return;
+        }
         video.play().catch(() => {});
         startLocalTimeUpdate(video, currentVideoFile);
         startVideoStatusSync(video);
@@ -1141,8 +1230,11 @@
         stopLocalTimeUpdate();
         stopVideoStatusSync();
       } else if (data.type === 'seek' && typeof data.time === 'number') {
-        if (Math.abs(video.currentTime - data.time) > 0.5) {
-          video.currentTime = data.time;
+        // ✅ ИСПРАВЛЕНО: Проверяем, не пытаемся ли перемотать за конец видео
+        const duration = video.duration || videoDuration;
+        const seekTime = duration > 0 ? Math.min(data.time, duration - 0.1) : data.time;
+        if (Math.abs(video.currentTime - seekTime) > 0.5) {
+          video.currentTime = seekTime;
         }
       }
     });
@@ -1657,6 +1749,76 @@ ${itemNames}`)) {
         updateExplorerSelection();
         updateExplorerActions();
         loadAndRenderExplorerForPath(currentExplorerPath);
+      });
+
+      // === DRAG-AND-DROP DELETE FUNCTIONALITY ===
+      const deleteDropZone = document.getElementById('deleteDropZone');
+
+      // Show delete zone when dragging
+      document.addEventListener('dragstart', (e) => {
+        if (e.target.closest('.explorer-item')) {
+          deleteDropZone.classList.add('active');
+        }
+      });
+
+      // Hide delete zone when drag ends
+      document.addEventListener('dragend', () => {
+        deleteDropZone.classList.remove('active');
+      });
+
+      // Handle dropping on delete zone
+      deleteDropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        deleteDropZone.style.background = '#b21f2d';
+      });
+
+      deleteDropZone.addEventListener('dragleave', () => {
+        deleteDropZone.style.background = '#c82333';
+      });
+
+      deleteDropZone.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        deleteDropZone.classList.remove('active');
+        deleteDropZone.style.background = '#c82333';
+
+        const draggedItemPath = e.dataTransfer.getData('text/plain');
+        if (!draggedItemPath) return;
+
+        const itemName = draggedItemPath.split('/').pop();
+
+        if (!confirm(`Are you sure you want to delete "${itemName}"?`)) {
+          return;
+        }
+
+        try {
+          const token = localStorage.getItem('authToken');
+          if (!token) {
+            throw new Error('Authentication required. Please log in.');
+          }
+
+          const response = await fetch('/api/files/delete', {
+            method: 'DELETE',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              path: draggedItemPath
+            })
+          });
+
+          const data = await response.json();
+          if (response.ok && data.success) {
+            showNotification(`Successfully deleted: ${itemName}`, 'success');
+            loadAndRenderExplorerForPath(currentExplorerPath);
+          } else {
+            showNotification('Delete failed: ' + (data.error || 'unknown error'), 'error');
+          }
+        } catch (err) {
+          console.error('[DELETE] Error:', err);
+          showNotification('Delete failed: ' + err.message, 'error');
+        }
       });
     });
   </script>

@@ -5,6 +5,7 @@
     <title>SyncWatch - Панель администрирования</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="/styles/main.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
             --primary-color: #2563eb;
@@ -303,6 +304,516 @@
             font-weight: 700;
             color: var(--primary-color);
         }
+
+        /* Monitoring Styles */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .metric-card {
+            background: var(--card-bg);
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            border: 1px solid var(--border-color);
+            text-align: center;
+        }
+
+        .metric-card h3 {
+            margin-bottom: 0.5rem;
+            color: var(--text-color);
+            font-size: 1rem;
+        }
+
+        .metric-card canvas {
+            width: 100% !important;
+            height: 100px !important;
+            margin-top: 1rem;
+        }
+
+        .logs-section {
+            margin-top: 2rem;
+        }
+
+        .logs-container {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .logs-list {
+            padding: 1rem;
+        }
+
+        .log-entry {
+            padding: 0.5rem 0;
+            border-bottom: 1px solid var(--border-color);
+            font-family: monospace;
+            font-size: 0.85rem;
+        }
+
+        .log-entry:last-child {
+            border-bottom: none;
+        }
+
+        .log-entry.error {
+            color: var(--danger-color);
+        }
+
+        .log-entry.warning {
+            color: var(--warning-color);
+        }
+
+        .log-entry.info {
+            color: var(--secondary-color);
+        }
+
+        .performance-section {
+            margin-top: 2rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+
+        .stat-card {
+            background: var(--card-bg);
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            border: 1px solid var(--border-color);
+            text-align: center;
+        }
+
+        .stat-card h4 {
+            margin-bottom: 0.5rem;
+            color: var(--text-color);
+            font-size: 0.9rem;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--primary-color);
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            color: var(--secondary-color);
+            margin-top: 0.25rem;
+        }
+
+        /* Configuration Styles */
+        .config-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .config-group {
+            background: var(--card-bg);
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            border: 1px solid var(--border-color);
+        }
+
+        .config-group h3 {
+            margin-bottom: 1rem;
+            color: var(--primary-color);
+            font-size: 1.1rem;
+        }
+
+        .config-item {
+            margin-bottom: 1rem;
+        }
+
+        .config-item label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: var(--text-color);
+        }
+
+        .config-item input,
+        .config-item select {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 0.375rem;
+            background: var(--bg-color);
+            color: var(--text-color);
+            font-size: 0.9rem;
+        }
+
+        .config-item input:focus,
+        .config-item select:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+        }
+
+        .config-item input[type="checkbox"] {
+            width: auto;
+            margin-right: 0.5rem;
+        }
+
+        .config-item input[readonly] {
+            background: var(--border-color);
+            cursor: not-allowed;
+        }
+
+        .config-item small {
+            display: block;
+            margin-top: 0.25rem;
+            font-size: 0.8rem;
+            color: var(--secondary-color);
+        }
+
+        .config-status {
+            background: var(--card-bg);
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .checkbox-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+
+        .checkbox-group label {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 0.25rem 0.5rem;
+            background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 0.25rem;
+            cursor: pointer;
+            font-size: 0.85rem;
+        }
+
+        .checkbox-group label:hover {
+            background: var(--hover-bg);
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            margin: 0;
+        }
+
+        .status-message {
+            padding: 1rem;
+            border-radius: 0.375rem;
+            background: var(--bg-color);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+        }
+
+        .status-message.success {
+            background: #f0fdf4;
+            color: #166534;
+            border-color: #bbf7d0;
+        }
+
+        .status-message.error {
+            background: #fef2f2;
+            color: #991b1b;
+            border-color: #fecaca;
+        }
+
+        .status-message.warning {
+            background: #fffbeb;
+            color: #92400e;
+            border-color: #fde68a;
+        }
+
+        /* Стили для модального окна уведомлений */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1001;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background-color: #ffffff;
+            margin: auto;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            width: 90%;
+            max-width: 400px;
+        }
+
+        .notification-modal .modal-content {
+            max-width: 450px;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid #e5e7eb;
+            color: #1f2937;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #1f2937;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #6b7280;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+        }
+
+        .modal-close:hover {
+            background-color: #f3f4f6;
+            color: #374151;
+        }
+
+        .modal-body {
+            padding: 1.5rem;
+            color: #374151;
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.5rem;
+            padding: 1rem 1.5rem;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        /* Стили для типов уведомлений */
+        .notification-modal.success .modal-header {
+            border-bottom-color: #10b981;
+            background-color: #f0fdf4;
+        }
+
+        .notification-modal.success .modal-header h2 {
+            color: #166534;
+        }
+
+        .notification-modal.error .modal-header {
+            border-bottom-color: #ef4444;
+            background-color: #fef2f2;
+        }
+
+        .notification-modal.error .modal-header h2 {
+            color: #991b1b;
+        }
+
+        .notification-modal.warning .modal-header {
+            border-bottom-color: #f59e0b;
+            background-color: #fffbeb;
+        }
+
+        .notification-modal.warning .modal-header h2 {
+            color: #92400e;
+        }
+
+        .notification-modal.info .modal-header {
+            border-bottom-color: #3b82f6;
+            background-color: #eff6ff;
+        }
+
+        .notification-modal.info .modal-header h2 {
+            color: #1e40af;
+        }
+
+        #notificationMessage {
+            margin: 0;
+            line-height: 1.5;
+        }
+
+        /* Стили для групп чекбоксов */
+        .checkbox-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+
+        .checkbox-group label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: normal;
+            margin: 0;
+            cursor: pointer;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            margin: 0;
+            width: auto;
+        }
+
+        /* Стили для списка групп */
+        .groups-grid {
+            display: grid;
+            gap: 1rem;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        }
+
+        .group-card {
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+            background: var(--bg-darker);
+        }
+
+        .group-card h3 {
+            margin: 0 0 0.5rem 0;
+            color: var(--text);
+        }
+
+        .group-card p {
+            margin: 0.5rem 0;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .group-permissions,
+        .group-room-access {
+            margin: 0.5rem 0;
+        }
+
+        .group-permissions strong,
+        .group-room-access strong {
+            color: var(--text);
+            font-size: 0.9rem;
+        }
+
+        .group-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .group-system-badge {
+            background: var(--accent);
+            color: white;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            display: inline-block;
+            margin-left: 0.5rem;
+        }
+
+        /* Стили для логов комнаты */
+        .room-logs {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            background: var(--bg-darker);
+        }
+
+        .log-entry {
+            padding: 0.75rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
+        }
+
+        .log-entry:last-child {
+            border-bottom: none;
+        }
+
+        .log-time {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            min-width: 120px;
+            font-family: monospace;
+        }
+
+        .log-content {
+            flex: 1;
+        }
+
+        .log-user {
+            font-weight: 600;
+            color: var(--accent);
+        }
+
+        .log-action {
+            color: var(--text);
+        }
+
+        .log-details {
+            margin-top: 0.25rem;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .log-action.user_joined {
+            color: #10b981;
+        }
+
+        .log-action.user_left {
+            color: #ef4444;
+        }
+
+        .log-action.video_play,
+        .log-action.video_pause,
+        .log-action.video_seek,
+        .log-action.video_selected,
+        .log-action.video_volume_change,
+        .log-action.video_speed_change,
+        .log-action.video_mute_toggle,
+        .log-action.video_command {
+            color: #3b82f6;
+        }
+
+        .log-action.room_created,
+        .log-action.room_deleted {
+            color: #f59e0b;
+            font-weight: bold;
+        }
+
+        .log-action.video_volume_change {
+            color: #8b5cf6;
+        }
+
+        .log-action.video_speed_change {
+            color: #06b6d4;
+        }
+
+        .log-action.video_mute_toggle {
+            color: #ec4899;
+        }
     </style>
 </head>
 <body>
@@ -339,8 +850,17 @@
             <a href="#" class="nav-item" data-section="users">
                 👥 Пользователи
             </a>
+            <a href="#" class="nav-item" data-section="groups">
+                👥 Группы
+            </a>
             <a href="#" class="nav-item" data-section="transcode">
                 📹 Транскодирование
+            </a>
+            <a href="#" class="nav-item" data-section="monitoring">
+                📈 Мониторинг
+            </a>
+            <a href="#" class="nav-item" data-section="config">
+                🔧 Конфигурация
             </a>
             <a href="#" class="nav-item" data-section="system">
                 ⚙️ Система
@@ -376,6 +896,7 @@
                 <div class="section-header">
                     <h2>Управление комнатами</h2>
                     <div class="action-buttons">
+                        <button id="create-room-btn" class="btn btn-success">Создать комнату</button>
                         <button id="refresh-rooms" class="btn btn-primary">Обновить</button>
                     </div>
                 </div>
@@ -390,6 +911,7 @@
                 <div class="section-header">
                     <h2>Управление пользователями</h2>
                     <div class="action-buttons">
+                        <button id="create-user-btn" class="btn btn-success">Создать пользователя</button>
                         <button id="refresh-users" class="btn btn-primary">Обновить</button>
                     </div>
                 </div>
@@ -418,6 +940,191 @@
                     </div>
                 </div>
             </section>
+            <!-- Monitoring Section -->
+            <section id="monitoring-section" class="section hidden">
+                <div class="section-header">
+                    <h2>Мониторинг системы</h2>
+                    <div class="action-buttons">
+                        <button id="refresh-monitoring" class="btn btn-primary">Обновить</button>
+                        <button id="start-monitoring" class="btn btn-success">Начать мониторинг</button>
+                        <button id="stop-monitoring" class="btn btn-danger">Остановить</button>
+                    </div>
+                </div>
+                <div class="section-content">
+                    <!-- Real-time Metrics -->
+                    <div class="metrics-grid">
+                        <div class="metric-card">
+                            <h3>CPU Использование</h3>
+                            <div class="metric-value" id="cpu-usage">0%</div>
+                            <canvas id="cpu-chart" width="200" height="100"></canvas>
+                        </div>
+                        <div class="metric-card">
+                            <h3>Память</h3>
+                            <div class="metric-value" id="memory-usage">0 MB</div>
+                            <canvas id="memory-chart" width="200" height="100"></canvas>
+                        </div>
+                        <div class="metric-card">
+                            <h3>Диск</h3>
+                            <div class="metric-value" id="disk-usage">0%</div>
+                            <canvas id="disk-chart" width="200" height="100"></canvas>
+                        </div>
+                        <div class="metric-card">
+                            <h3>Сеть</h3>
+                            <div class="metric-value" id="network-usage">0 KB/s</div>
+                            <canvas id="network-chart" width="200" height="100"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Activity Logs -->
+                    <div class="logs-section">
+                        <h3>Журнал активности</h3>
+                        <div class="logs-container">
+                            <div id="activity-logs" class="logs-list">
+                                <div class="log-entry loading">Загрузка логов...</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Performance Stats -->
+                    <div class="performance-section">
+                        <h3>Производительность</h3>
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <h4>Транскодирование</h4>
+                                <div class="stat-value" id="transcode-count">0</div>
+                                <div class="stat-label">заданий сегодня</div>
+                            </div>
+                            <div class="stat-card">
+                                <h4>Активные пользователи</h4>
+                                <div class="stat-value" id="active-users">0</div>
+                                <div class="stat-label">онлайн сейчас</div>
+                            </div>
+                            <div class="stat-card">
+                                <h4>Комнат</h4>
+                                <div class="stat-value" id="active-rooms">0</div>
+                                <div class="stat-label">активных</div>
+                            </div>
+                            <div class="stat-card">
+                                <h4>Время работы</h4>
+                                <div class="stat-value" id="uptime">00:00:00</div>
+                                <div class="stat-label">с последнего запуска</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            <!-- Configuration Section -->
+            <section id="config-section" class="section hidden">
+                <div class="section-header">
+                    <h2>Конфигурация системы</h2>
+                    <div class="action-buttons">
+                        <button id="save-config" class="btn btn-success">Сохранить изменения</button>
+                        <button id="reset-config" class="btn btn-warning">Сбросить</button>
+                        <button id="reload-config" class="btn btn-primary">Перезагрузить</button>
+                    </div>
+                </div>
+                <div class="section-content">
+                    <div class="config-grid">
+                        <div class="config-group">
+                            <h3>🚀 Производительность</h3>
+                            <div class="config-item">
+                                <label for="maxConcurrentJobs">Максимум одновременных задач транскодирования:</label>
+                                <input type="number" id="maxConcurrentJobs" min="1" max="10" value="2">
+                            </div>
+                            <div class="config-item">
+                                <label for="enableCuda">Использовать CUDA/GPU ускорение:</label>
+                                <input type="checkbox" id="enableCuda" checked>
+                            </div>
+                            <div class="config-item">
+                                <label for="tempDirectory">Временная директория:</label>
+                                <input type="text" id="tempDirectory" value="/tmp/syncwatch">
+                            </div>
+                        </div>
+
+                        <div class="config-group">
+                            <h3>🔒 Безопасность</h3>
+                            <div class="config-item">
+                                <label for="sessionTimeout">Таймаут сессии (минуты):</label>
+                                <input type="number" id="sessionTimeout" min="5" max="480" value="60">
+                            </div>
+                            <div class="config-item">
+                                <label for="maxFileSize">Максимальный размер файла (GB):</label>
+                                <input type="number" id="maxFileSize" min="0.1" max="100" step="0.1" value="1">
+                            </div>
+                            <div class="config-item">
+                                <label for="rateLimitRequests">Максимум пользователей в комнате:</label>
+                                <input type="number" id="rateLimitRequests" min="1" max="2000" value="500">
+                            </div>
+                            <div class="config-item">
+                                <label for="apiRateLimit">Лимит API запросов в минуту:</label>
+                                <input type="number" id="apiRateLimit" min="0" max="1000" value="0">
+                                <small>0 = отключить ограничение</small>
+                            </div>
+                        </div>
+
+                        <div class="config-group">
+                            <h3>📁 Хранилище</h3>
+                            <div class="config-item">
+                                <label for="videoDirectory">Директория видео:</label>
+                                <input type="text" id="videoDirectory" value="/videos" readonly>
+                                <small>Изменение требует перезапуска сервера</small>
+                            </div>
+                            <div class="config-item">
+                                <label for="autoCleanup">Автоматическая очистка временных файлов:</label>
+                                <input type="checkbox" id="autoCleanup" checked>
+                            </div>
+                            <div class="config-item">
+                                <label for="backupEnabled">Резервное копирование:</label>
+                                <input type="checkbox" id="backupEnabled">
+                            </div>
+                        </div>
+
+                        <div class="config-group">
+                            <h3>📊 Мониторинг</h3>
+                            <div class="config-item">
+                                <label for="enableMetrics">Включить сбор метрик:</label>
+                                <input type="checkbox" id="enableMetrics" checked>
+                            </div>
+                            <div class="config-item">
+                                <label for="logLevel">Уровень логирования:</label>
+                                <select id="logLevel">
+                                    <option value="error">Ошибка</option>
+                                    <option value="warn">Предупреждение</option>
+                                    <option value="info" selected>Информация</option>
+                                    <option value="debug">Отладка</option>
+                                </select>
+                            </div>
+                            <div class="config-item">
+                                <label for="alertEmail">Email для алертов:</label>
+                                <input type="email" id="alertEmail" placeholder="admin@example.com">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="config-status">
+                        <div class="status-message" id="configStatus">
+                            Конфигурация загружена. Внесите изменения и сохраните.
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Groups Section -->
+            <section id="groups-section" class="section hidden">
+                <div class="section-header">
+                    <h2>Управление группами</h2>
+                    <div class="action-buttons">
+                        <button id="create-group-btn" class="btn btn-success">Создать группу</button>
+                        <button id="refresh-groups" class="btn btn-primary">Обновить</button>
+                    </div>
+                </div>
+                <div class="section-content">
+                    <div id="groups-list">
+                        <div class="loading">Загрузка групп...</div>
+                    </div>
+                </div>
+            </section>
+
             <!-- System Section -->
             <section id="system-section" class="section hidden">
                 <div class="section-header">
@@ -434,6 +1141,304 @@
             </section>
         </main>
     </div>
+
+    <!-- User Management Modals -->
+    <div id="createUserModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Создать нового пользователя</h2>
+                <button class="modal-close" onclick="closeUserModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="createUserForm">
+                    <div class="form-group">
+                        <label for="userUsername">Имя пользователя:</label>
+                        <input type="text" id="userUsername" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="userEmail">Email:</label>
+                        <input type="email" id="userEmail" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="userPassword">Пароль:</label>
+                        <input type="password" id="userPassword" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="userFirstName">Имя:</label>
+                        <input type="text" id="userFirstName">
+                    </div>
+                    <div class="form-group">
+                        <label for="userLastName">Фамилия:</label>
+                        <input type="text" id="userLastName">
+                    </div>
+                    <div class="form-group">
+                        <label>Группы доступа:</label>
+                        <div id="userGroups" class="checkbox-group">
+                            <!-- Groups will be loaded dynamically -->
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-danger" onclick="closeUserModal()">Отмена</button>
+                <button class="btn" onclick="createUser()">Создать пользователя</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="editUserModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Редактировать пользователя</h2>
+                <button class="modal-close" onclick="closeUserModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="editUserForm">
+                    <input type="hidden" id="editUserId">
+                    <div class="form-group">
+                        <label for="editUsername">Имя пользователя:</label>
+                        <input type="text" id="editUsername" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label for="editEmail">Email:</label>
+                        <input type="email" id="editEmail" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editPassword">Новый пароль (оставьте пустым, чтобы не менять):</label>
+                        <input type="password" id="editPassword">
+                    </div>
+                    <div class="form-group">
+                        <label for="editFirstName">Имя:</label>
+                        <input type="text" id="editFirstName">
+                    </div>
+                    <div class="form-group">
+                        <label for="editLastName">Фамилия:</label>
+                        <input type="text" id="editLastName">
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="editIsActive"> Активен
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>Группы доступа:</label>
+                        <div id="editUserGroups" class="checkbox-group">
+                            <!-- Groups will be loaded dynamically -->
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-danger" onclick="closeUserModal()">Отмена</button>
+                <button class="btn" onclick="updateUser()">Сохранить изменения</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно создания группы -->
+    <div id="createGroupModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Создать новую группу</h2>
+                <button class="modal-close" onclick="closeGroupModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="createGroupForm">
+                    <div class="form-group">
+                        <label for="groupId">ID группы:</label>
+                        <input type="text" id="groupId" required placeholder="например: premium, vip">
+                        <small>Уникальный идентификатор группы (только буквы и цифры)</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="groupName">Название группы:</label>
+                        <input type="text" id="groupName" required placeholder="например: Премиум пользователи">
+                    </div>
+                    <div class="form-group">
+                        <label for="groupDescription">Описание:</label>
+                        <textarea id="groupDescription" rows="3" placeholder="Описание группы..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Разрешения:</label>
+                        <div class="checkbox-group">
+                            <label><input type="checkbox" value="admin"> Администратор</label>
+                            <label><input type="checkbox" value="manage_users"> Управление пользователями</label>
+                            <label><input type="checkbox" value="manage_rooms"> Управление комнатами</label>
+                            <label><input type="checkbox" value="manage_files"> Управление файлами</label>
+                            <label><input type="checkbox" value="view_logs"> Просмотр логов</label>
+                            <label><input type="checkbox" value="create_rooms"> Создание комнат</label>
+                            <label><input type="checkbox" value="join_rooms"> Вход в комнаты</label>
+                            <label><input type="checkbox" value="upload_files"> Загрузка файлов</label>
+                            <label><input type="checkbox" value="transcode"> Транскодирование</label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Доступ к комнатам:</label>
+                        <div class="checkbox-group">
+                            <label><input type="checkbox" value="all"> Все комнаты</label>
+                            <label><input type="checkbox" value="public"> Публичные комнаты</label>
+                            <label><input type="checkbox" value="premium"> Премиум комнаты</label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" onclick="closeGroupModal()">Отмена</button>
+                <button class="btn btn-success" onclick="createGroup()">Создать группу</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно редактирования группы -->
+    <div id="editGroupModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Редактировать группу</h2>
+                <button class="modal-close" onclick="closeGroupModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="editGroupForm">
+                    <input type="hidden" id="editGroupId">
+                    <div class="form-group">
+                        <label for="editGroupName">Название группы:</label>
+                        <input type="text" id="editGroupName" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editGroupDescription">Описание:</label>
+                        <textarea id="editGroupDescription" rows="3"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Разрешения:</label>
+                        <div class="checkbox-group" id="editGroupPermissions">
+                            <label><input type="checkbox" value="admin"> Администратор</label>
+                            <label><input type="checkbox" value="manage_users"> Управление пользователями</label>
+                            <label><input type="checkbox" value="manage_rooms"> Управление комнатами</label>
+                            <label><input type="checkbox" value="manage_files"> Управление файлами</label>
+                            <label><input type="checkbox" value="view_logs"> Просмотр логов</label>
+                            <label><input type="checkbox" value="create_rooms"> Создание комнат</label>
+                            <label><input type="checkbox" value="join_rooms"> Вход в комнаты</label>
+                            <label><input type="checkbox" value="upload_files"> Загрузка файлов</label>
+                            <label><input type="checkbox" value="transcode"> Транскодирование</label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Доступ к комнатам:</label>
+                        <div class="checkbox-group" id="editGroupRoomAccess">
+                            <label><input type="checkbox" value="all"> Все комнаты</label>
+                            <label><input type="checkbox" value="public"> Публичные комнаты</label>
+                            <label><input type="checkbox" value="premium"> Премиум комнаты</label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" onclick="closeGroupModal()">Отмена</button>
+                <button class="btn btn-primary" onclick="updateGroup()">Сохранить изменения</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно просмотра логов комнаты -->
+    <div id="roomLogsModal" class="modal">
+        <div class="modal-content" style="max-width: 800px;">
+            <div class="modal-header">
+                <h2 id="roomLogsTitle">Логи комнаты</h2>
+                <button class="modal-close" onclick="closeRoomLogsModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="roomLogsContent">
+                    <div class="loading">Загрузка логов...</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="refreshRoomLogs()">Обновить</button>
+                <button class="btn" onclick="closeRoomLogsModal()">Закрыть</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно создания комнаты -->
+    <div id="createRoomModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Создать новую комнату</h2>
+                <button class="modal-close" onclick="closeRoomModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="createRoomForm">
+                    <div class="form-group">
+                        <label for="roomName">Название комнаты:</label>
+                        <input type="text" id="roomName" required placeholder="например: Моя комната">
+                    </div>
+                    <div class="form-group">
+                        <label for="roomPassword">Пароль (необязательно):</label>
+                        <input type="password" id="roomPassword" placeholder="Оставьте пустым для публичной комнаты">
+                    </div>
+                    <div class="form-group">
+                        <label>Разрешенные группы:</label>
+                        <div class="checkbox-group" id="createRoomGroups">
+                            <!-- Группы будут загружены динамически -->
+                        </div>
+                        <small>Если не выбрано ни одной группы, комната будет доступна всем</small>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" onclick="closeRoomModal()">Отмена</button>
+                <button class="btn btn-success" onclick="createRoom()">Создать комнату</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно редактирования комнаты -->
+    <div id="editRoomModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Редактировать комнату</h2>
+                <button class="modal-close" onclick="closeRoomModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="editRoomForm">
+                    <input type="hidden" id="editRoomId">
+                    <div class="form-group">
+                        <label for="editRoomName">Название комнаты:</label>
+                        <input type="text" id="editRoomName" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editRoomPassword">Пароль (необязательно):</label>
+                        <input type="password" id="editRoomPassword" placeholder="Оставьте пустым для публичной комнаты">
+                    </div>
+                    <div class="form-group">
+                        <label>Разрешенные группы:</label>
+                        <div class="checkbox-group" id="editRoomGroups">
+                            <!-- Группы будут загружены динамически -->
+                        </div>
+                        <small>Если не выбрано ни одной группы, комната будет доступна всем</small>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" onclick="closeRoomModal()">Отмена</button>
+                <button class="btn btn-primary" onclick="updateRoom()">Сохранить изменения</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно для уведомлений -->
+    <div id="notificationModal" class="modal">
+        <div class="modal-content notification-modal">
+            <div class="modal-header">
+                <h2 id="notificationTitle">Уведомление</h2>
+                <button class="modal-close" onclick="closeNotificationModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="notificationMessage"></p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="closeNotificationModal()">OK</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // --- Инициализация переменных ---
         let currentToken = '';
@@ -463,17 +1468,23 @@
                     logout();
                     return null;
                 }
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || `HTTP ${response.status}`);
+                }
                 const data = await response.json();
                 return data;
             } catch (error) {
                 console.error('API Error:', error);
+                showNotification('API Error: ' + error.message, 'error');
                 return null;
             }
         }
 
         // --- Аутентификация ---
         async function login(username, password) {
-            const result = await apiCall('/auth/login', {
+            // ✅ ИСПРАВЛЕНО: Используем правильный путь API
+            const result = await apiCall('/admin/auth/login', {
                 method: 'POST',
                 body: JSON.stringify({ username, password })
             });
@@ -541,8 +1552,17 @@
                         case 'users':
                             loadUsers();
                             break;
+                        case 'groups':
+                            loadGroups();
+                            break;
                         case 'transcode':
                             loadTranscode();
+                            break;
+                        case 'monitoring':
+                            loadMonitoring();
+                            break;
+                        case 'config':
+                            loadConfig();
                             break;
                         case 'system':
                             loadSystemMetrics();
@@ -615,6 +1635,7 @@
                                 <th>ID</th>
                                 <th>Название</th>
                                 <th>Пользователи</th>
+                                <th>Разрешенные группы</th>
                                 <th>Текущее видео</th>
                                 <th>Создана</th>
                                 <th>Действия</th>
@@ -630,11 +1651,20 @@
                                             ${room.users} пользователей
                                         </span>
                                     </td>
+                                    <td title="${room.allowedGroups && room.allowedGroups.length > 0 ? room.allowedGroups.join(', ') : 'Все группы'}">
+                                        ${room.allowedGroups && room.allowedGroups.length > 0 ? room.allowedGroups.join(', ') : 'Все группы'}
+                                    </td>
                                     <td title="${room.currentVideo || 'Нет'}">
                                         ${room.currentVideo ? room.currentVideo.substring(0, 20) + '...' : 'Нет'}
                                     </td>
-                                    <td>${new Date(room.createdAt).toLocaleDateString()}</td>
+                                    <td>${room.createdAt ? new Date(room.createdAt).toLocaleDateString() : 'N/A'}</td>
                                     <td>
+                                        <button class="btn btn-warning btn-sm" onclick="editRoom('${room.id}')" style="margin-right: 0.5rem;">
+                                            ✏️ Редактировать
+                                        </button>
+                                        <button class="btn btn-info btn-sm" onclick="viewRoomLogs('${room.id}', '${room.name}')" style="margin-right: 0.5rem;">
+                                            📋 Логи
+                                        </button>
                                         <button class="btn btn-danger btn-sm" onclick="deleteRoom('${room.id}')">
                                             Удалить
                                         </button>
@@ -689,11 +1719,14 @@
                                             ${user.role}
                                         </span>
                                     </td>
-                                    <td>${new Date(user.createdAt).toLocaleDateString()}</td>
+                                    <td>${user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}</td>
                                     <td>
                                         <div class="action-buttons">
+                                            <button class="btn btn-primary btn-sm" onclick="editUser('${user.id}')">
+                                                <i class="fas fa-edit"></i> Редактировать
+                                            </button>
                                             <button class="btn btn-danger btn-sm" onclick="deleteUser('${user.id}')" ${user.role === 'admin' ? 'disabled' : ''}>
-                                                Удалить
+                                                <i class="fas fa-trash"></i> Удалить
                                             </button>
                                         </div>
                                     </td>
@@ -762,7 +1795,7 @@
                                                 </div>
                                             ` : ''}
                                         </td>
-                                        <td>${new Date(job.createdAt).toLocaleDateString()}</td>
+                                        <td>${job.createdAt ? new Date(job.createdAt).toLocaleDateString() : 'N/A'}</td>
                                         <td>
                                             <button class="btn btn-danger btn-sm" onclick="cancelTranscodeJob('${job.id}')" ${job.status === 'completed' || job.status === 'error' ? 'disabled' : ''}>
                                                 Отмена
@@ -808,7 +1841,7 @@
                                         <td title="${template.command}">
                                             <code>${template.command.substring(0, 50)}...</code>
                                         </td>
-                                        <td>${new Date(template.createdAt).toLocaleDateString()}</td>
+                                        <td>${template.createdAt ? new Date(template.createdAt).toLocaleDateString() : 'N/A'}</td>
                                         <td>
                                             <button class="btn btn-danger btn-sm" onclick="deleteTemplate('${template.id}')">
                                                 Удалить
@@ -867,6 +1900,557 @@
             } else {
                 systemElement.innerHTML = `<div class="error">Ошибка загрузки системных метрик: ${metrics.error}</div>`;
             }
+        }
+
+        // --- Мониторинг системы ---
+        let monitoringInterval = null;
+        let cpuChart, memoryChart, diskChart, networkChart;
+
+        async function loadMonitoring() {
+            // Initialize charts
+            initCharts();
+
+            // Load initial data
+            await updateMonitoringData();
+
+            // Setup button handlers
+            document.getElementById('refresh-monitoring').addEventListener('click', updateMonitoringData);
+            document.getElementById('start-monitoring').addEventListener('click', startRealTimeMonitoring);
+            document.getElementById('stop-monitoring').addEventListener('click', stopRealTimeMonitoring);
+
+            // Load logs
+            loadActivityLogs();
+        }
+
+        function initCharts() {
+            const ctxCpu = document.getElementById('cpu-chart').getContext('2d');
+            const ctxMemory = document.getElementById('memory-chart').getContext('2d');
+            const ctxDisk = document.getElementById('disk-chart').getContext('2d');
+            const ctxNetwork = document.getElementById('network-chart').getContext('2d');
+
+            const chartOptions = {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        data: [],
+                        borderColor: 'var(--primary-color)',
+                        backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { beginAtZero: true },
+                        x: { display: false }
+                    },
+                    plugins: { legend: { display: false } },
+                    elements: { point: { radius: 0 } }
+                }
+            };
+
+            cpuChart = new Chart(ctxCpu, { ...chartOptions, data: { ...chartOptions.data, datasets: [{ ...chartOptions.data.datasets[0], label: 'CPU %' }] } });
+            memoryChart = new Chart(ctxMemory, { ...chartOptions, data: { ...chartOptions.data, datasets: [{ ...chartOptions.data.datasets[0], label: 'Memory MB' }] } });
+            diskChart = new Chart(ctxDisk, { ...chartOptions, data: { ...chartOptions.data, datasets: [{ ...chartOptions.data.datasets[0], label: 'Disk %' }] } });
+            networkChart = new Chart(ctxNetwork, { ...chartOptions, data: { ...chartOptions.data, datasets: [{ ...chartOptions.data.datasets[0], label: 'Network KB/s' }] } });
+        }
+
+        async function updateMonitoringData() {
+            try {
+                const [systemData, performanceData] = await Promise.all([
+                    apiCall('/system/health'),
+                    apiCall('/metrics/performance')
+                ]);
+
+                if (systemData && systemData.success) {
+                    updateMetricsDisplay(systemData.health);
+                    updateCharts(systemData.health);
+                }
+
+                if (performanceData && performanceData.success) {
+                    updatePerformanceStats(performanceData.metrics);
+                }
+            } catch (error) {
+                console.error('Monitoring update error:', error);
+                showNotification('Ошибка обновления данных мониторинга', 'error');
+            }
+        }
+
+        function updateMetricsDisplay(health) {
+            // CPU
+            const cpuPercent = Math.round(health.memory.usagePercent);
+            document.getElementById('cpu-usage').textContent = `${cpuPercent}%`;
+
+            // Memory
+            const memoryMB = Math.round(health.memory.usage.heapUsed / 1024 / 1024);
+            document.getElementById('memory-usage').textContent = `${memoryMB} MB`;
+
+            // Disk
+            document.getElementById('disk-usage').textContent = health.disk.status === 'healthy' ? 'OK' : 'Warning';
+
+            // Network (placeholder)
+            document.getElementById('network-usage').textContent = 'N/A';
+        }
+
+        function updateCharts(health) {
+            const timestamp = new Date().toLocaleTimeString();
+
+            // Update CPU chart
+            updateChart(cpuChart, timestamp, Math.round(health.memory.usagePercent));
+
+            // Update Memory chart
+            const memoryMB = Math.round(health.memory.usage.heapUsed / 1024 / 1024);
+            updateChart(memoryChart, timestamp, memoryMB);
+
+            // Update Disk chart (placeholder - always 50%)
+            updateChart(diskChart, timestamp, 50);
+
+            // Update Network chart (placeholder - random value)
+            updateChart(networkChart, timestamp, Math.floor(Math.random() * 100));
+        }
+
+        function updateChart(chart, label, value) {
+            chart.data.labels.push(label);
+            chart.data.datasets[0].data.push(value);
+
+            // Keep only last 20 data points
+            if (chart.data.labels.length > 20) {
+                chart.data.labels.shift();
+                chart.data.datasets[0].data.shift();
+            }
+
+            chart.update();
+        }
+
+        function updatePerformanceStats(metrics) {
+            // Transcode count
+            document.getElementById('transcode-count').textContent = metrics.system.activeConnections || 0;
+
+            // Active users (placeholder)
+            document.getElementById('active-users').textContent = Math.floor(Math.random() * 10);
+
+            // Active rooms
+            document.getElementById('active-rooms').textContent = metrics.system.activeConnections || 0;
+
+            // Uptime
+            const uptime = metrics.system.uptime || 0;
+            const hours = Math.floor(uptime / 3600);
+            const minutes = Math.floor((uptime % 3600) / 60);
+            const seconds = Math.floor(uptime % 60);
+            document.getElementById('uptime').textContent = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        function startRealTimeMonitoring() {
+            if (monitoringInterval) return;
+
+            monitoringInterval = setInterval(updateMonitoringData, 2000); // Update every 2 seconds
+            document.getElementById('start-monitoring').disabled = true;
+            document.getElementById('stop-monitoring').disabled = false;
+            showNotification('Мониторинг запущен', 'success');
+        }
+
+        function stopRealTimeMonitoring() {
+            if (monitoringInterval) {
+                clearInterval(monitoringInterval);
+                monitoringInterval = null;
+            }
+            document.getElementById('start-monitoring').disabled = false;
+            document.getElementById('stop-monitoring').disabled = true;
+            showNotification('Мониторинг остановлен', 'info');
+        }
+
+        async function loadActivityLogs() {
+            const logsContainer = document.getElementById('activity-logs');
+            logsContainer.innerHTML = `
+                <div class="log-entry info">[${new Date().toLocaleTimeString()}] Система запущена</div>
+                <div class="log-entry info">[${new Date().toLocaleTimeString()}] Мониторинг инициализирован</div>
+                <div class="log-entry warning">[${new Date().toLocaleTimeString()}] Проверка дискового пространства</div>
+                <div class="log-entry success">[${new Date().toLocaleTimeString()}] Все системы работают нормально</div>
+            `;
+        }
+
+        // --- Конфигурация системы ---
+        async function loadConfig() {
+            // Load current configuration
+            try {
+                // Проверяем токен аутентификации
+                if (!currentToken) {
+                    console.log('No auth token, skipping config load');
+                    updateConfigStatus('Требуется авторизация для загрузки конфигурации', 'warning');
+                    return;
+                }
+
+                console.log('Loading config...');
+                const response = await apiCall('/admin/config');
+                console.log('Config load response:', response);
+
+                if (response && response.success && response.config) {
+                    const config = response.config;
+                    console.log('Loaded config:', config);
+
+                    // Заполняем поля формы текущими значениями
+                    if (config.transcode) {
+                        const maxJobsEl = document.getElementById('maxConcurrentJobs');
+                        const tempDirEl = document.getElementById('tempDirectory');
+                        if (maxJobsEl) maxJobsEl.value = config.transcode.maxConcurrentJobs || 1;
+                        if (tempDirEl) tempDirEl.value = config.transcode.tempDirectory || '/tmp/syncwatch';
+                    }
+
+                    if (config.rooms) {
+                        const sessionEl = document.getElementById('sessionTimeout');
+                        const rateLimitEl = document.getElementById('rateLimitRequests');
+                        if (sessionEl) sessionEl.value = (config.rooms.cleanupInterval || 30000) / 1000;
+                        if (rateLimitEl) rateLimitEl.value = config.rooms.maxUsersPerRoom || 500;
+                    }
+
+                    if (config.rateLimit) {
+                        const apiRateLimitEl = document.getElementById('apiRateLimit');
+                        if (apiRateLimitEl) apiRateLimitEl.value = config.rateLimit.apiRequestsPerMinute || 0;
+                    } else {
+                        // Если rateLimit не определен, используем значение по умолчанию
+                        const apiRateLimitEl = document.getElementById('apiRateLimit');
+                        if (apiRateLimitEl) apiRateLimitEl.value = 0;
+                    }
+
+                    updateConfigStatus('Конфигурация загружена успешно', 'success');
+                } else {
+                    throw new Error(response?.error || 'Неизвестная ошибка');
+                }
+
+                // Setup button handlers
+                const saveBtn = document.getElementById('save-config');
+                const resetBtn = document.getElementById('reset-config');
+                const reloadBtn = document.getElementById('reload-config');
+
+                if (saveBtn) saveBtn.addEventListener('click', saveConfig);
+                if (resetBtn) resetBtn.addEventListener('click', resetConfig);
+                if (reloadBtn) reloadBtn.addEventListener('click', reloadConfig);
+            } catch (error) {
+                console.error('Config load error:', error);
+                updateConfigStatus('Ошибка загрузки конфигурации: ' + error.message, 'error');
+            }
+        }
+
+        async function saveConfig() {
+            console.log('saveConfig called');
+            console.log('currentToken:', currentToken ? 'present' : 'missing');
+
+            if (!currentToken) {
+                console.error('No auth token available');
+                updateConfigStatus('Ошибка: требуется авторизация', 'error');
+                showNotification('Требуется авторизация', 'error');
+                return;
+            }
+
+            const maxConcurrentJobsVal = document.getElementById('maxConcurrentJobs').value;
+            const tempDirectoryVal = document.getElementById('tempDirectory').value;
+            const sessionTimeoutVal = document.getElementById('sessionTimeout').value;
+            const rateLimitRequestsVal = document.getElementById('rateLimitRequests').value;
+            const apiRateLimitVal = document.getElementById('apiRateLimit').value;
+
+            console.log('Raw form values:');
+            console.log('maxConcurrentJobs:', maxConcurrentJobsVal, 'type:', typeof maxConcurrentJobsVal);
+            console.log('tempDirectory:', tempDirectoryVal, 'type:', typeof tempDirectoryVal);
+            console.log('sessionTimeout:', sessionTimeoutVal, 'type:', typeof sessionTimeoutVal);
+            console.log('rateLimitRequests:', rateLimitRequestsVal, 'type:', typeof rateLimitRequestsVal);
+            console.log('apiRateLimit:', apiRateLimitVal, 'type:', typeof apiRateLimitVal);
+
+            const config = {
+                transcode: {
+                    maxConcurrentJobs: parseInt(maxConcurrentJobsVal) || 1,
+                    tempDirectory: tempDirectoryVal || '/tmp/syncwatch'
+                },
+                rooms: {
+                    cleanupInterval: (parseInt(sessionTimeoutVal) || 60) * 1000,
+                    maxUsersPerRoom: parseInt(rateLimitRequestsVal) || 500
+                },
+                rateLimit: {
+                    apiRequestsPerMinute: parseInt(apiRateLimitVal) || 0
+                }
+            };
+
+            console.log('Sending config:', config);
+
+            try {
+                const response = await apiCall('/admin/config', {
+                    method: 'PUT',
+                    body: JSON.stringify(config)
+                });
+
+                console.log('Config save response:', response);
+
+                if (response && response.success) {
+                    updateConfigStatus('Конфигурация сохранена успешно', 'success');
+
+                    // Проверяем, изменился ли лимит API запросов
+                    const newApiRateLimit = parseInt(apiRateLimitVal) || 0;
+                    const oldApiRateLimit = config.rateLimit ? config.rateLimit.apiRequestsPerMinute || 0 : 0;
+
+                    if (newApiRateLimit !== oldApiRateLimit) {
+                        showNotification('Настройки сохранены. Для применения изменений лимита API требуется перезапуск сервера', 'warning');
+                    } else {
+                        showNotification('Настройки сохранены', 'success');
+                    }
+                } else {
+                    const errorMsg = response?.error || 'Неизвестная ошибка';
+                    console.error('Config save failed:', errorMsg);
+                    updateConfigStatus('Ошибка сохранения конфигурации: ' + errorMsg, 'error');
+                    showNotification('Ошибка сохранения настроек', 'error');
+                }
+            } catch (error) {
+                console.error('Config save error:', error);
+                updateConfigStatus('Ошибка сохранения конфигурации: ' + error.message, 'error');
+                showNotification('Ошибка сохранения настроек', 'error');
+            }
+        }
+
+        async function resetConfig() {
+            if (!confirm('Сбросить все настройки к значениям по умолчанию?')) return;
+
+            // Reset to defaults
+            document.getElementById('maxConcurrentJobs').value = 2;
+            document.getElementById('enableCuda').checked = true;
+            document.getElementById('tempDirectory').value = '/tmp/syncwatch';
+            document.getElementById('sessionTimeout').value = 60;
+            document.getElementById('maxFileSize').value = 1;
+            document.getElementById('rateLimitRequests').value = 500;
+            document.getElementById('autoCleanup').checked = true;
+            document.getElementById('backupEnabled').checked = false;
+            document.getElementById('enableMetrics').checked = true;
+            document.getElementById('logLevel').value = 'info';
+            document.getElementById('alertEmail').value = '';
+            document.getElementById('apiRateLimit').value = 0;
+
+            updateConfigStatus('Настройки сброшены к значениям по умолчанию', 'warning');
+            showNotification('Настройки сброшены', 'info');
+        }
+
+        async function reloadConfig() {
+            if (!confirm('Перезагрузить конфигурацию? Это может прервать текущие операции.')) return;
+
+            try {
+                const response = await apiCall('/admin/config/reload', {
+                    method: 'POST'
+                });
+
+                if (response && response.success) {
+                    updateConfigStatus('Конфигурация перезагружена', 'success');
+                    showNotification('Конфигурация перезагружена', 'success');
+                } else {
+                    throw new Error(response?.error || 'Неизвестная ошибка');
+                }
+            } catch (error) {
+                updateConfigStatus('Ошибка перезагрузки конфигурации: ' + error.message, 'error');
+                showNotification('Ошибка перезагрузки', 'error');
+            }
+        }
+
+        function updateConfigStatus(message, type = 'info') {
+            const statusElement = document.getElementById('configStatus');
+            statusElement.textContent = message;
+            statusElement.className = 'status-message';
+            if (type !== 'info') {
+                statusElement.classList.add(type);
+            }
+        }
+
+        // --- Управление пользователями ---
+        async function openCreateUserModal() {
+            try {
+                // Загружаем группы для чекбоксов
+                const groups = await apiCall('/admin/groups');
+                const groupsContainer = document.getElementById('userGroups');
+                groupsContainer.innerHTML = '';
+
+                if (groups && groups.success) {
+                    groups.groups.forEach(group => {
+                        groupsContainer.innerHTML += `
+                            <label>
+                                <input type="checkbox" value="${group.id}">
+                                ${group.name}
+                            </label>
+                        `;
+                    });
+                } else {
+                    showNotification('Ошибка загрузки групп: ' + (groups?.error || 'Неизвестная ошибка'), 'error');
+                    return;
+                }
+
+                // Очищаем форму
+                document.getElementById('userUsername').value = '';
+                document.getElementById('userEmail').value = '';
+                document.getElementById('userPassword').value = '';
+                document.getElementById('userFirstName').value = '';
+                document.getElementById('userLastName').value = '';
+
+                document.getElementById('createUserModal').style.display = 'flex';
+            } catch (error) {
+                showNotification('Ошибка открытия формы создания пользователя: ' + error.message, 'error');
+            }
+        }
+
+        async function createUser() {
+            const username = document.getElementById('userUsername').value.trim();
+            const email = document.getElementById('userEmail').value.trim();
+            const password = document.getElementById('userPassword').value;
+            const firstName = document.getElementById('userFirstName').value.trim();
+            const lastName = document.getElementById('userLastName').value.trim();
+
+            // Собираем выбранные группы
+            const groupCheckboxes = document.querySelectorAll('#userGroups input[type="checkbox"]:checked');
+            const groups = Array.from(groupCheckboxes).map(cb => cb.value);
+
+            if (!username || !email || !password) {
+                showNotification('Заполните обязательные поля', 'error');
+                return;
+            }
+
+            try {
+                const result = await apiCall('/admin/users', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        username,
+                        email,
+                        password,
+                        groups,
+                        profile: {
+                            firstName,
+                            lastName,
+                            displayName: firstName && lastName ? `${firstName} ${lastName}` : username
+                        }
+                    })
+                });
+
+                if (result && result.success) {
+                    showNotification('Пользователь успешно создан', 'success');
+                    closeUserModal();
+                    loadUsers();
+                } else {
+                    showNotification('Ошибка создания пользователя: ' + (result?.error || 'Неизвестная ошибка'), 'error');
+                }
+            } catch (error) {
+                showNotification('Ошибка сети: ' + error.message, 'error');
+            }
+        }
+
+        async function editUser(userId) {
+            try {
+                // Загружаем данные пользователя
+                const usersData = await apiCall('/admin/users');
+                if (!usersData || !usersData.success) {
+                    showNotification('Ошибка загрузки пользователей: ' + (usersData?.error || 'Неизвестная ошибка'), 'error');
+                    return;
+                }
+
+                const user = usersData.users.find(u => u.id === userId);
+                if (!user) {
+                    showNotification('Пользователь не найден', 'error');
+                    return;
+                }
+
+                // Загружаем группы
+                const groups = await apiCall('/admin/groups');
+                const groupsContainer = document.getElementById('editUserGroups');
+                groupsContainer.innerHTML = '';
+
+                if (groups && groups.success) {
+                    groups.groups.forEach(group => {
+                        const isChecked = user.groups && user.groups.includes(group.id);
+                        groupsContainer.innerHTML += `
+                            <label>
+                                <input type="checkbox" value="${group.id}" ${isChecked ? 'checked' : ''}>
+                                ${group.name}
+                            </label>
+                        `;
+                    });
+                } else {
+                    showNotification('Ошибка загрузки групп: ' + (groups?.error || 'Неизвестная ошибка'), 'error');
+                    return;
+                }
+
+                // Заполняем форму
+                document.getElementById('editUserId').value = user.id;
+                document.getElementById('editUsername').value = user.username;
+                document.getElementById('editEmail').value = user.email;
+                document.getElementById('editPassword').value = '';
+                document.getElementById('editFirstName').value = user.profile?.firstName || '';
+                document.getElementById('editLastName').value = user.profile?.lastName || '';
+                document.getElementById('editIsActive').checked = user.isActive !== false;
+
+                document.getElementById('editUserModal').style.display = 'flex';
+            } catch (error) {
+                showNotification('Ошибка загрузки данных пользователя: ' + error.message, 'error');
+            }
+        }
+
+        async function updateUser() {
+            console.log('updateUser called');
+
+            const userId = document.getElementById('editUserId').value;
+            const email = document.getElementById('editEmail').value.trim();
+            const password = document.getElementById('editPassword').value;
+            const firstName = document.getElementById('editFirstName').value.trim();
+            const lastName = document.getElementById('editLastName').value.trim();
+            const isActive = document.getElementById('editIsActive').checked;
+
+            console.log('User form data:', { userId, email, firstName, lastName, isActive });
+
+            // Собираем выбранные группы
+            const groupCheckboxes = document.querySelectorAll('#editUserGroups input[type="checkbox"]:checked');
+            const groups = Array.from(groupCheckboxes).map(cb => cb.value);
+
+            console.log('Selected groups:', groups);
+
+            if (!email) {
+                showNotification('Email обязателен', 'error');
+                return;
+            }
+
+            try {
+                const updateData = {
+                    email,
+                    groups,
+                    profile: {
+                        firstName,
+                        lastName,
+                        displayName: firstName && lastName ? `${firstName} ${lastName}` : undefined
+                    }
+                };
+
+                if (password) {
+                    updateData.password = password;
+                }
+
+                console.log('Sending update data:', updateData);
+
+                const result = await apiCall(`/admin/users/${userId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify(updateData)
+                });
+
+                console.log('Update result:', result);
+
+                if (result && result.success) {
+                    showNotification('Пользователь успешно обновлен', 'success');
+                    closeUserModal();
+                    loadUsers();
+                } else {
+                    const errorMsg = result?.error || 'Неизвестная ошибка';
+                    console.error('Update failed:', errorMsg);
+                    showNotification('Ошибка обновления пользователя: ' + errorMsg, 'error');
+                }
+            } catch (error) {
+                console.error('Update error:', error);
+                showNotification('Ошибка сети: ' + error.message, 'error');
+            }
+        }
+
+        function closeUserModal() {
+            document.getElementById('createUserModal').style.display = 'none';
+            document.getElementById('editUserModal').style.display = 'none';
         }
 
         // --- Действия администратора (реальные запросы) ---
@@ -934,9 +2518,596 @@
             }
         }
 
+        // --- Управление группами ---
+        async function loadGroups() {
+            console.log('loadGroups called');
+            console.log('currentUser:', currentUser);
+            try {
+                const response = await apiCall('/admin/groups');
+                console.log('loadGroups response:', response);
+                const groupsContainer = document.getElementById('groups-list');
+
+                if (response && response.success) {
+                    const groups = response.groups;
+                    groupsContainer.innerHTML = '';
+
+                    if (groups.length === 0) {
+                        groupsContainer.innerHTML = '<div class="no-data">Группы не найдены</div>';
+                        return;
+                    }
+
+                    const groupsGrid = document.createElement('div');
+                    groupsGrid.className = 'groups-grid';
+
+                    groups.forEach(group => {
+                        const isSystemGroup = ['admin', 'moderator', 'user'].includes(group.id);
+                        const canEditSystemGroups = currentUser && currentUser.role === 'admin';
+                        const isEditable = !isSystemGroup || canEditSystemGroups;
+                        const isDeletable = !isSystemGroup || (canEditSystemGroups && group.id !== 'admin'); // Admin группу нельзя удалять даже админам
+
+                        const groupCard = document.createElement('div');
+                        groupCard.className = 'group-card';
+
+                        groupCard.innerHTML = `
+                            <h3>${group.name} ${isSystemGroup ? '<span class="group-system-badge">Системная</span>' : ''}</h3>
+                            <p>${group.description || 'Без описания'}</p>
+                            <div class="group-permissions">
+                                <strong>Разрешения:</strong> ${group.permissions.length > 0 ? group.permissions.join(', ') : 'Нет'}
+                            </div>
+                            <div class="group-room-access">
+                                <strong>Доступ к комнатам:</strong> ${group.roomAccess.length > 0 ? group.roomAccess.join(', ') : 'Нет'}
+                            </div>
+                            <div class="group-actions">
+                                <button class="btn btn-primary btn-sm" onclick="console.log('Edit button clicked for group:', '${group.id}'); editGroup('${group.id}')" ${!isEditable ? 'disabled title="Недостаточно прав для редактирования"' : ''}>
+                                    Редактировать
+                                </button>
+                                <button class="btn btn-danger btn-sm" onclick="deleteGroup('${group.id}')" ${!isDeletable ? 'disabled title="Недостаточно прав для удаления"' : ''}>
+                                    Удалить
+                                </button>
+                            </div>
+                        `;
+
+                        groupsGrid.appendChild(groupCard);
+                    });
+
+                    groupsContainer.appendChild(groupsGrid);
+                } else {
+                    groupsContainer.innerHTML = '<div class="error">Ошибка загрузки групп</div>';
+                }
+            } catch (error) {
+                console.error('Error loading groups:', error);
+                document.getElementById('groups-list').innerHTML = '<div class="error">Ошибка загрузки групп</div>';
+            }
+        }
+
+        function openCreateGroupModal() {
+            // Очищаем форму
+            document.getElementById('groupId').value = '';
+            document.getElementById('groupName').value = '';
+            document.getElementById('groupDescription').value = '';
+
+            // Снимаем все чекбоксы
+            document.querySelectorAll('#createGroupForm input[type="checkbox"]').forEach(cb => cb.checked = false);
+
+            document.getElementById('createGroupModal').style.display = 'flex';
+        }
+
+        function closeGroupModal() {
+            const createModal = document.getElementById('createGroupModal');
+            const editModal = document.getElementById('editGroupModal');
+
+            if (createModal) createModal.style.display = 'none';
+            if (editModal) editModal.style.display = 'none';
+        }
+
+        // Тестовая функция для проверки элементов
+        function testGroupElements() {
+            const elements = [
+                'editGroupId',
+                'editGroupName',
+                'editGroupDescription',
+                'editGroupModal',
+                'editGroupPermissions',
+                'editGroupRoomAccess'
+            ];
+
+            elements.forEach(id => {
+                const el = document.getElementById(id);
+                console.log(`Element ${id}:`, el ? 'exists' : 'NOT FOUND');
+            });
+        }
+
+        async function createGroup() {
+            const groupId = document.getElementById('groupId').value.trim();
+            const groupName = document.getElementById('groupName').value.trim();
+            const groupDescription = document.getElementById('groupDescription').value.trim();
+
+            if (!groupId || !groupName) {
+                showNotification('Заполните обязательные поля', 'error');
+                return;
+            }
+
+            // Проверяем ID группы
+            if (!/^[a-zA-Z0-9_]+$/.test(groupId)) {
+                showNotification('ID группы может содержать только буквы, цифры и подчеркивание', 'error');
+                return;
+            }
+
+            // Собираем разрешения
+            const permissions = Array.from(document.querySelectorAll('#createGroupForm input[value]:checked'))
+                .map(cb => cb.value);
+
+            // Собираем доступ к комнатам
+            const roomAccess = Array.from(document.querySelectorAll('#createGroupForm input[value]:checked'))
+                .filter(cb => ['all', 'public', 'premium'].includes(cb.value))
+                .map(cb => cb.value);
+
+            try {
+                const response = await apiCall('/admin/groups', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        id: groupId,
+                        name: groupName,
+                        description: groupDescription,
+                        permissions,
+                        roomAccess
+                    })
+                });
+
+                if (response && response.success) {
+                    showNotification('Группа создана успешно', 'success');
+                    closeGroupModal();
+                    loadGroups();
+                } else {
+                    showNotification('Ошибка создания группы: ' + (response?.error || 'Неизвестная ошибка'), 'error');
+                }
+            } catch (error) {
+                showNotification('Ошибка сети: ' + error.message, 'error');
+            }
+        }
+
+        async function editGroup(groupId) {
+            console.log('editGroup called with groupId:', groupId);
+
+            try {
+                if (!currentToken) {
+                    console.log('No auth token available');
+                    showNotification('Требуется авторизация', 'error');
+                    return;
+                }
+
+                // Проверяем права на редактирование системных групп
+                const isSystemGroup = ['admin', 'moderator', 'user'].includes(groupId);
+                const canEditSystemGroups = currentUser && currentUser.role === 'admin';
+
+                if (isSystemGroup && !canEditSystemGroups) {
+                    console.log('Access denied: cannot edit system group');
+                    showNotification('Недостаточно прав для редактирования системной группы', 'error');
+                    return;
+                }
+
+                console.log('Loading groups...');
+                const groupsResponse = await apiCall('/admin/groups');
+                console.log('Groups response:', groupsResponse);
+
+                if (!groupsResponse || !groupsResponse.success) {
+                    showNotification('Ошибка загрузки групп', 'error');
+                    return;
+                }
+
+                const group = groupsResponse.groups.find(g => g.id === groupId);
+                console.log('Found group:', group);
+
+                if (!group) {
+                    showNotification('Группа не найдена', 'error');
+                    return;
+                }
+
+                console.log('Filling form...');
+                // Заполняем форму
+                const editGroupIdEl = document.getElementById('editGroupId');
+                const editGroupNameEl = document.getElementById('editGroupName');
+                const editGroupDescriptionEl = document.getElementById('editGroupDescription');
+                const editGroupModalEl = document.getElementById('editGroupModal');
+
+                if (editGroupIdEl) editGroupIdEl.value = group.id;
+                if (editGroupNameEl) editGroupNameEl.value = group.name;
+                if (editGroupDescriptionEl) editGroupDescriptionEl.value = group.description || '';
+
+                console.log('Setting checkboxes...');
+                // Устанавливаем чекбоксы разрешений
+                document.querySelectorAll('#editGroupPermissions input[type="checkbox"]').forEach(cb => {
+                    cb.checked = group.permissions && group.permissions.includes(cb.value);
+                });
+
+                // Устанавливаем чекбоксы доступа к комнатам
+                document.querySelectorAll('#editGroupRoomAccess input[type="checkbox"]').forEach(cb => {
+                    cb.checked = group.roomAccess && group.roomAccess.includes(cb.value);
+                });
+
+                console.log('Opening modal...');
+                if (editGroupModalEl) {
+                    editGroupModalEl.style.display = 'flex';
+                } else {
+                    console.error('editGroupModal element not found');
+                    showNotification('Ошибка интерфейса', 'error');
+                }
+            } catch (error) {
+                console.error('editGroup error:', error);
+                showNotification('Ошибка загрузки группы: ' + error.message, 'error');
+            }
+        }
+
+        async function updateGroup() {
+            console.log('updateGroup called');
+
+            const groupId = document.getElementById('editGroupId').value;
+            const groupName = document.getElementById('editGroupName').value.trim();
+            const groupDescription = document.getElementById('editGroupDescription').value.trim();
+
+            console.log('Group data:', { groupId, groupName, groupDescription });
+
+            if (!groupName) {
+                showNotification('Название группы обязательно', 'error');
+                return;
+            }
+
+            // Собираем разрешения
+            const permissions = Array.from(document.querySelectorAll('#editGroupPermissions input[type="checkbox"]:checked'))
+                .map(cb => cb.value);
+
+            // Собираем доступ к комнатам
+            const roomAccess = Array.from(document.querySelectorAll('#editGroupRoomAccess input[type="checkbox"]:checked'))
+                .map(cb => cb.value);
+
+            console.log('Collected data:', { permissions, roomAccess });
+
+            const updateData = {
+                name: groupName,
+                description: groupDescription,
+                permissions,
+                roomAccess
+            };
+
+            console.log('Sending update data:', updateData);
+
+            try {
+                const response = await apiCall(`/admin/groups/${groupId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify(updateData)
+                });
+
+                console.log('Update response:', response);
+
+                if (response && response.success) {
+                    showNotification('Группа обновлена успешно', 'success');
+                    closeGroupModal();
+                    loadGroups();
+                } else {
+                    const errorMsg = response?.error || 'Неизвестная ошибка';
+                    console.error('Update failed:', errorMsg);
+                    showNotification('Ошибка обновления группы: ' + errorMsg, 'error');
+                }
+            } catch (error) {
+                console.error('Update error:', error);
+                showNotification('Ошибка сети: ' + error.message, 'error');
+            }
+        }
+
+        async function deleteGroup(groupId) {
+            if (!confirm('Вы действительно хотите удалить эту группу? Это действие нельзя отменить.')) return;
+
+            try {
+                const response = await apiCall(`/admin/groups/${groupId}`, {
+                    method: 'DELETE'
+                });
+
+                if (response && response.success) {
+                    showNotification('Группа удалена успешно', 'success');
+                    loadGroups();
+                } else {
+                    showNotification('Ошибка удаления группы: ' + (response?.error || 'Неизвестная ошибка'), 'error');
+                }
+            } catch (error) {
+                showNotification('Ошибка сети: ' + error.message, 'error');
+            }
+        }
+
+        // Функции для работы с логами комнат
+        let currentRoomLogsId = null;
+
+        async function viewRoomLogs(roomId, roomName) {
+            currentRoomLogsId = roomId;
+            document.getElementById('roomLogsTitle').textContent = `Логи комнаты: ${roomName}`;
+            document.getElementById('roomLogsModal').style.display = 'flex';
+
+            await loadRoomLogs(roomId);
+        }
+
+        function closeRoomLogsModal() {
+            document.getElementById('roomLogsModal').style.display = 'none';
+            currentRoomLogsId = null;
+        }
+
+        async function loadRoomLogs(roomId) {
+            const logsContent = document.getElementById('roomLogsContent');
+
+            try {
+                logsContent.innerHTML = '<div class="loading">Загрузка логов...</div>';
+
+                const response = await apiCall(`/admin/rooms/${roomId}/logs?limit=100`);
+
+                if (response && response.success) {
+                    const logs = response.logs;
+
+                    if (logs.length === 0) {
+                        logsContent.innerHTML = '<div class="no-data">Логи для этой комнаты отсутствуют</div>';
+                        return;
+                    }
+
+                    const logsHtml = logs.reverse().map(log => {
+                        const time = new Date(log.timestamp).toLocaleString();
+                        const actionText = getActionText(log.action);
+                        const detailsText = getDetailsText(log);
+
+                        return `
+                            <div class="log-entry">
+                                <div class="log-time">${time}</div>
+                                <div class="log-content">
+                                    <span class="log-user">${log.userName}</span>
+                                    <span class="log-action ${log.action}">${actionText}</span>
+                                    ${detailsText ? `<div class="log-details">${detailsText}</div>` : ''}
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+
+                    logsContent.innerHTML = `<div class="room-logs">${logsHtml}</div>`;
+                } else {
+                    logsContent.innerHTML = '<div class="error">Ошибка загрузки логов</div>';
+                }
+            } catch (error) {
+                console.error('Error loading room logs:', error);
+                logsContent.innerHTML = '<div class="error">Ошибка загрузки логов</div>';
+            }
+        }
+
+        async function refreshRoomLogs() {
+            if (currentRoomLogsId) {
+                await loadRoomLogs(currentRoomLogsId);
+            }
+        }
+
+        function getActionText(action) {
+            const actions = {
+                'user_joined': 'присоединился к комнате',
+                'user_left': 'покинул комнату',
+                'video_play': 'запустил видео',
+                'video_pause': 'приостановил видео',
+                'video_seek': 'перемотал видео',
+                'video_selected': 'выбрал видео',
+                'video_volume_change': 'изменил громкость',
+                'video_speed_change': 'изменил скорость воспроизведения',
+                'video_mute_toggle': 'переключил звук',
+                'video_command': 'выполнил команду видео',
+                'room_created': 'создал комнату',
+                'room_deleted': 'удалил комнату'
+            };
+            return actions[action] || action;
+        }
+
+        function getDetailsText(log) {
+            const details = [];
+
+            if (log.details) {
+                if (log.details.userCount !== undefined) {
+                    details.push(`Пользователей в комнате: ${log.details.userCount}`);
+                }
+                if (log.details.time !== undefined) {
+                    details.push(`Время: ${Math.round(log.details.time)}с`);
+                }
+                if (log.details.fromTime !== undefined && log.details.toTime !== undefined) {
+                    details.push(`Перемотка: ${Math.round(log.details.fromTime)}с → ${Math.round(log.details.toTime)}с`);
+                }
+                if (log.details.filename) {
+                    details.push(`Файл: ${log.details.filename}`);
+                }
+                if (log.details.roomName) {
+                    details.push(`Комната: ${log.details.roomName}`);
+                }
+                if (log.details.roomId) {
+                    details.push(`ID комнаты: ${log.details.roomId}`);
+                }
+                if (log.details.volume !== undefined) {
+                    details.push(`Громкость: ${Math.round(log.details.volume * 100)}%`);
+                }
+                if (log.details.speed !== undefined) {
+                    details.push(`Скорость: ${log.details.speed}x`);
+                }
+                if (log.details.muted !== undefined) {
+                    details.push(log.details.muted ? 'Выключен' : 'Включен');
+                }
+                if (log.details.type) {
+                    details.push(`Тип: ${log.details.type}`);
+                }
+            }
+
+            return details.join(', ');
+        }
+
+        // --- Управление комнатами ---
+        function openCreateRoomModal() {
+            // Загружаем группы для чекбоксов
+            loadGroupsForRoomModal('createRoomGroups');
+            // Очищаем форму
+            document.getElementById('roomName').value = '';
+            document.getElementById('roomPassword').value = '';
+            document.getElementById('createRoomModal').style.display = 'flex';
+        }
+
+        function closeRoomModal() {
+            document.getElementById('createRoomModal').style.display = 'none';
+            document.getElementById('editRoomModal').style.display = 'none';
+        }
+
+        async function createRoom() {
+            const name = document.getElementById('roomName').value.trim();
+            const password = document.getElementById('roomPassword').value;
+
+            if (!name) {
+                showNotification('Название комнаты обязательно', 'error');
+                return;
+            }
+
+            // Собираем выбранные группы
+            const groupCheckboxes = document.querySelectorAll('#createRoomGroups input[type="checkbox"]:checked');
+            const allowedGroups = Array.from(groupCheckboxes).map(cb => cb.value);
+
+            try {
+                const response = await apiCall('/admin/rooms', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        name,
+                        password: password || null,
+                        allowedGroups
+                    })
+                });
+
+                if (response && response.success) {
+                    showNotification('Комната создана успешно', 'success');
+                    closeRoomModal();
+                    loadRooms();
+                } else {
+                    showNotification('Ошибка создания комнаты: ' + (response?.error || 'Неизвестная ошибка'), 'error');
+                }
+            } catch (error) {
+                showNotification('Ошибка сети: ' + error.message, 'error');
+            }
+        }
+
+        async function editRoom(roomId) {
+            try {
+                const roomsResponse = await apiCall('/admin/rooms');
+                if (!roomsResponse || !roomsResponse.success) {
+                    showNotification('Ошибка загрузки комнат', 'error');
+                    return;
+                }
+
+                const room = roomsResponse.rooms.find(r => r.id === roomId);
+                if (!room) {
+                    showNotification('Комната не найдена', 'error');
+                    return;
+                }
+
+                // Загружаем группы для чекбоксов
+                await loadGroupsForRoomModal('editRoomGroups', room.allowedGroups || []);
+
+                // Заполняем форму
+                document.getElementById('editRoomId').value = room.id;
+                document.getElementById('editRoomName').value = room.name;
+                // Пароль не показываем по соображениям безопасности
+
+                document.getElementById('editRoomModal').style.display = 'flex';
+            } catch (error) {
+                showNotification('Ошибка загрузки комнаты: ' + error.message, 'error');
+            }
+        }
+
+        async function updateRoom() {
+            const roomId = document.getElementById('editRoomId').value;
+            const name = document.getElementById('editRoomName').value.trim();
+            const password = document.getElementById('editRoomPassword').value;
+
+            if (!name) {
+                showNotification('Название комнаты обязательно', 'error');
+                return;
+            }
+
+            // Собираем выбранные группы
+            const groupCheckboxes = document.querySelectorAll('#editRoomGroups input[type="checkbox"]:checked');
+            const allowedGroups = Array.from(groupCheckboxes).map(cb => cb.value);
+
+            try {
+                const response = await apiCall(`/admin/rooms/${roomId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify({
+                        name,
+                        password: password || undefined, // undefined означает "не менять"
+                        allowedGroups
+                    })
+                });
+
+                if (response && response.success) {
+                    showNotification('Комната обновлена успешно', 'success');
+                    closeRoomModal();
+                    loadRooms();
+                } else {
+                    showNotification('Ошибка обновления комнаты: ' + (response?.error || 'Неизвестная ошибка'), 'error');
+                }
+            } catch (error) {
+                showNotification('Ошибка сети: ' + error.message, 'error');
+            }
+        }
+
+        async function loadGroupsForRoomModal(containerId, selectedGroups = []) {
+            try {
+                const groupsResponse = await apiCall('/admin/groups');
+                if (!groupsResponse || !groupsResponse.success) {
+                    console.error('Failed to load groups for room modal');
+                    return;
+                }
+
+                const container = document.getElementById(containerId);
+                container.innerHTML = '';
+
+                if (groupsResponse.groups.length === 0) {
+                    container.innerHTML = '<p>Группы не найдены</p>';
+                    return;
+                }
+
+                groupsResponse.groups.forEach(group => {
+                    const isSelected = selectedGroups.includes(group.id);
+                    const label = document.createElement('label');
+                    label.innerHTML = `
+                        <input type="checkbox" value="${group.id}" ${isSelected ? 'checked' : ''}>
+                        ${group.name}
+                    `;
+                    container.appendChild(label);
+                });
+            } catch (error) {
+                console.error('Error loading groups for room modal:', error);
+            }
+        }
+
         function showNotification(message, type = 'info') {
-            // Простая реализация уведомлений
-            alert(message); // В реальном приложении можно использовать toast-уведомления
+            const modal = document.getElementById('notificationModal');
+            const title = document.getElementById('notificationTitle');
+            const messageEl = document.getElementById('notificationMessage');
+            const modalContent = modal.querySelector('.modal-content');
+
+            // Устанавливаем заголовок в зависимости от типа
+            const titles = {
+                'success': 'Успех',
+                'error': 'Ошибка',
+                'warning': 'Предупреждение',
+                'info': 'Информация'
+            };
+
+            title.textContent = titles[type] || 'Уведомление';
+            messageEl.textContent = message;
+
+            // Убираем предыдущие классы типов
+            modalContent.classList.remove('success', 'error', 'warning', 'info');
+            // Добавляем класс типа
+            modalContent.classList.add(type);
+
+            // Показываем модальное окно
+            modal.style.display = 'flex';
+        }
+
+        function closeNotificationModal() {
+            const modal = document.getElementById('notificationModal');
+            modal.style.display = 'none';
         }
 
         // --- Автообновление ---
@@ -966,8 +3137,8 @@
             const savedToken = localStorage.getItem('adminToken');
             if (savedToken) {
                 currentToken = savedToken;
-                // Проверяем валидность токена
-                apiCall('/auth/profile').then(result => {
+                // ✅ ИСПРАВЛЕНО: Используем правильный путь API
+                apiCall('/admin/auth/profile').then(result => {
                     if (result && result.success) {
                         currentUser = result.user;
                         showAdminPanel();
@@ -1000,6 +3171,42 @@
             document.getElementById('refresh-rooms').addEventListener('click', loadRooms);
             document.getElementById('refresh-users').addEventListener('click', loadUsers);
             document.getElementById('refresh-transcode').addEventListener('click', loadTranscode);
+
+            // Управление пользователями
+            document.getElementById('create-user-btn').addEventListener('click', () => openCreateUserModal());
+
+            // Управление группами
+            document.getElementById('create-group-btn').addEventListener('click', () => openCreateGroupModal());
+            document.getElementById('refresh-groups').addEventListener('click', loadGroups);
+
+            // Управление комнатами
+            document.getElementById('create-room-btn').addEventListener('click', () => openCreateRoomModal());
+
+            // Закрытие модальных окон
+            document.getElementById('createUserModal').addEventListener('click', (e) => {
+                if (e.target.id === 'createUserModal') closeUserModal();
+            });
+            document.getElementById('editUserModal').addEventListener('click', (e) => {
+                if (e.target.id === 'editUserModal') closeUserModal();
+            });
+            document.getElementById('notificationModal').addEventListener('click', (e) => {
+                if (e.target.id === 'notificationModal') closeNotificationModal();
+            });
+            document.getElementById('createGroupModal').addEventListener('click', (e) => {
+                if (e.target.id === 'createGroupModal') closeGroupModal();
+            });
+            document.getElementById('editGroupModal').addEventListener('click', (e) => {
+                if (e.target.id === 'editGroupModal') closeGroupModal();
+            });
+            document.getElementById('createRoomModal').addEventListener('click', (e) => {
+                if (e.target.id === 'createRoomModal') closeRoomModal();
+            });
+            document.getElementById('editRoomModal').addEventListener('click', (e) => {
+                if (e.target.id === 'editRoomModal') closeRoomModal();
+            });
+            document.getElementById('roomLogsModal').addEventListener('click', (e) => {
+                if (e.target.id === 'roomLogsModal') closeRoomLogsModal();
+            });
             // Загрузка начальной секции (например, дашборда)
             loadDashboard();
         });

@@ -6,7 +6,7 @@ const { authenticateToken } = require('../middleware/auth');
 const config = require('../config');
 
 // Создаем экземпляр FileService, передавая ему директорию с видео
-const fileService = new FileService(config.videoDirectory);
+const fileService = new FileService(config.videoDir);
 
 // Маршрут для получения структуры файлов (папки и файлы)
 router.get('/list', authenticateToken, async (req, res) => {

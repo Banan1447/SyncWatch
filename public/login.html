@@ -261,11 +261,11 @@
         const data = await response.json();
 
         if (response.ok && data.success) {
-          // Сохранить токен в localStorage
-          localStorage.setItem('authToken', data.token);
+          // Сохранить токен с помощью новой функции
+          setAuthToken(data.token);
           localStorage.setItem('user', JSON.stringify(data.user));
-          
-          console.log('Токен сохранен в localStorage:', data.token);
+
+          console.log('Токен сохранен:', data.token);
           console.log('Пользователь сохранен:', data.user);
           
           // Показать успех и перенаправить
@@ -299,33 +299,13 @@
 
     // Проверка, если пользователь уже авторизован
     window.addEventListener('load', () => {
-      const token = localStorage.getItem('authToken');
-      if (token) {
-        console.log('Токен уже существует, проверяем валидность...');
-        // Проверить валидность токена
-        fetch('/api/auth/profile', {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        })
-        .then(response => {
-          if (response.ok) {
-            console.log('Токен валидный, перенаправляем на главную страницу');
-            // Если токен валидный, перенаправить
-            window.location.href = '/select-room.html';
-          } else {
-            console.log('Токен недействителен, очищаем localStorage');
-            localStorage.removeItem('authToken');
-            localStorage.removeItem('user');
-          }
-        })
-        .catch(error => {
-          console.error('Ошибка проверки токена:', error);
-          localStorage.removeItem('authToken');
-          localStorage.removeItem('user');
-        });
+      if (isAuthenticated()) {
+        console.log('Пользователь уже авторизован, перенаправляем...');
+        window.location.href = '/select-room.html';
       }
     });
   </script>
+  <!-- Подключаем общие API функции -->
+  <script src="/js/api.js"></script>
 </body>
 </html>

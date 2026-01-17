@@ -5,7 +5,17 @@
     "password": "$2b$10$Qm4sVkBn6RSzyGlrr5kvj.MKwZnYZhleBzLcWS.95kM.yUOH7NUT6",
     "email": "admin@localhost",
     "role": "admin",
-    "createdAt": "2025-10-04T22:55:52.955Z"
+    "createdAt": "2025-10-04T22:55:52.955Z",
+    "groups": [
+      "admin",
+      "moderator",
+      "user",
+      "premium"
+    ],
+    "profile": {
+      "firstName": "",
+      "lastName": ""
+    }
   },
   {
     "id": "user_1759618584717",
@@ -30,5 +40,13 @@
     "password": "$2b$10$Q1NyqupoXK9I0oMQElVh.e5G2sy7.QwagMglF7udFVdHH7TsUsPSO",
     "role": "user",
     "createdAt": "2025-10-08T22:01:27.717Z"
+  },
+  {
+    "id": "user_1760729115955",
+    "username": "lap98",
+    "email": "lap98@mail.ru",
+    "password": "$2b$10$ShK60Yo6yzw/1JfJcdd4neZ0PFFFXymlIA5nLmKy5hq4ya6a8eq/K",
+    "role": "user",
+    "createdAt": "2025-10-17T19:25:15.955Z"
   }
 ]

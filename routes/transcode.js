@@ -37,17 +37,29 @@ router.get('/templates', (req, res) => {
   }
 });
 
-// Добавить в очередь (фронтенд: { fileId, templateId })
+// Добавить в очередь (фронтенд: { fileId, templateId, outputFile?, useCuda? })
 router.post('/add-to-queue', (req, res) => {
-  const { fileId, templateId } = req.body;
+  const { fileId, templateId, outputFile, useCuda } = req.body;
 
-  if (!fileId || !templateId) {
-    return res.status(400).json({ success: false, error: 'Missing fileId or templateId' });
+  // Валидация входных данных
+  if (!fileId || typeof fileId !== 'string' || fileId.length === 0) {
+    return res.status(400).json({ success: false, error: 'Invalid or missing fileId' });
+  }
+
+  if (!templateId || typeof templateId !== 'string' || templateId.length === 0) {
+    return res.status(400).json({ success: false, error: 'Invalid or missing templateId' });
+  }
+
+  if (outputFile && (typeof outputFile !== 'string' || outputFile.length === 0)) {
+    return res.status(400).json({ success: false, error: 'Invalid outputFile format' });
+  }
+
+  if (useCuda !== undefined && typeof useCuda !== 'boolean') {
+    return res.status(400).json({ success: false, error: 'useCuda must be a boolean' });
   }
 
   try {
-    const outputFile = getOutputPath(fileId);
-    const success = transcodeService.addToQueue(fileId, outputFile, templateId, 'default_user');
+    const success = transcodeService.addToQueue(fileId, outputFile, templateId, 'default_user', useCuda);
     if (success) {
       res.json({ success: true, message: 'Job added to queue' });
     } else {
@@ -59,17 +71,33 @@ router.post('/add-to-queue', (req, res) => {
   }
 });
 
-// Быстрое транскодирование (фронтенд: { filename, command })
+// Быстрое транскодирование (фронтенд: { filename, command, useCuda? })
 router.post('/quick-transcode', async (req, res) => {
-  const { filename, command } = req.body;
+  const { filename, command, useCuda } = req.body;
 
-  if (!filename || !command) {
-    return res.status(400).json({ success: false, error: 'Missing filename or command' });
+  // Валидация входных данных
+  if (!filename || typeof filename !== 'string' || filename.length === 0) {
+    return res.status(400).json({ success: false, error: 'Invalid or missing filename' });
+  }
+
+  if (!command || typeof command !== 'string' || command.length === 0) {
+    return res.status(400).json({ success: false, error: 'Invalid or missing command' });
+  }
+
+  if (useCuda !== undefined && typeof useCuda !== 'boolean') {
+    return res.status(400).json({ success: false, error: 'useCuda must be a boolean' });
+  }
+
+  // Проверка на потенциально опасные команды
+  if (command.includes('rm ') || command.includes('del ') || command.includes('unlink') ||
+      command.includes('mv ') || command.includes('cp ') || command.includes('chmod') ||
+      command.includes('chown') || command.includes('sudo') || command.includes('su ')) {
+    return res.status(400).json({ success: false, error: 'Command contains potentially dangerous operations' });
   }
 
   try {
     const outputFile = getOutputPath(filename, '_quick');
-    await transcodeService.quickTranscodeWithCommand(filename, outputFile, command);
+    await transcodeService.quickTranscodeWithCommand(filename, outputFile, command, useCuda);
     res.json({ success: true, output: outputFile });
   } catch (error) {
     console.error('[TRANSCODE] Quick transcode error:', error.message);
@@ -81,8 +109,9 @@ router.post('/quick-transcode', async (req, res) => {
 router.post('/cancel-job', (req, res) => {
   const { jobId } = req.body;
 
-  if (!jobId) {
-    return res.status(400).json({ success: false, error: 'Missing jobId' });
+  // Валидация входных данных
+  if (!jobId || isNaN(Number(jobId))) {
+    return res.status(400).json({ success: false, error: 'Invalid or missing jobId' });
   }
 
   try {
@@ -102,8 +131,9 @@ router.post('/cancel-job', (req, res) => {
 router.post('/delete-template', (req, res) => {
   const { id } = req.body;
 
-  if (!id) {
-    return res.status(400).json({ success: false, error: 'Missing template id' });
+  // Валидация входных данных
+  if (!id || typeof id !== 'string' || id.length === 0) {
+    return res.status(400).json({ success: false, error: 'Invalid or missing template id' });
   }
 
   try {
@@ -123,12 +153,44 @@ router.post('/delete-template', (req, res) => {
 router.post('/save-template', (req, res) => {
   const { name, description, command } = req.body;
 
-  if (!name || !command) {
-    return res.status(400).json({ success: false, error: 'Name and command are required' });
+  // Валидация входных данных
+  if (!name || typeof name !== 'string' || name.trim().length === 0) {
+    return res.status(400).json({ success: false, error: 'Invalid or missing template name' });
+  }
+
+  if (name.length > 100) {
+    return res.status(400).json({ success: false, error: 'Template name too long (max 100 characters)' });
+  }
+
+  if (!command || typeof command !== 'string' || command.trim().length === 0) {
+    return res.status(400).json({ success: false, error: 'Invalid or missing command' });
+  }
+
+  if (command.length > 1000) {
+    return res.status(400).json({ success: false, error: 'Command too long (max 1000 characters)' });
+  }
+
+  // Проверка на потенциально опасные команды
+  if (command.includes('rm ') || command.includes('del ') || command.includes('unlink') ||
+      command.includes('mv ') || command.includes('cp ') || command.includes('chmod') ||
+      command.includes('chown') || command.includes('sudo') || command.includes('su ')) {
+    return res.status(400).json({ success: false, error: 'Command contains potentially dangerous operations' });
+  }
+
+  if (description && typeof description !== 'string') {
+    return res.status(400).json({ success: false, error: 'Invalid description format' });
+  }
+
+  if (description && description.length > 500) {
+    return res.status(400).json({ success: false, error: 'Description too long (max 500 characters)' });
   }
 
   try {
-    const id = transcodeService.saveTemplate(null, { name, description, command });
+    const id = transcodeService.saveTemplate(null, {
+      name: name.trim(),
+      description: description ? description.trim() : '',
+      command: command.trim()
+    });
     res.json({ success: true, id, message: 'Template saved' });
   } catch (error) {
     console.error('[TRANSCODE] Save template error:', error.message);

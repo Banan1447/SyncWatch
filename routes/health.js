@@ -19,11 +19,11 @@ router.get('/health', (req, res) => {
         timestamp: new Date().toISOString()
       },
       videoDirectory: {
-        status: fs.existsSync(config.videoDirectory) ? 'healthy' : 'unhealthy',
-        path: config.videoDirectory,
+        status: fs.existsSync(config.videoDir) ? 'healthy' : 'unhealthy',
+        path: config.videoDir,
         writable: (() => {
           try {
-            fs.accessSync(config.videoDirectory, fs.constants.W_OK);
+            fs.accessSync(config.videoDir, fs.constants.W_OK);
             return true;
           } catch {
             return false;
@@ -112,8 +112,8 @@ router.get('/stats', (req, res) => {
     };
 
     // Получение списка видеофайлов
-    if (fs.existsSync(config.videoDirectory)) {
-      const videoFiles = fs.readdirSync(config.videoDirectory).filter(file => {
+    if (fs.existsSync(config.videoDir)) {
+      const videoFiles = fs.readdirSync(config.videoDir).filter(file => {
         const ext = path.extname(file).toLowerCase();
         return ['.mp4', '.webm', '.ogg', '.avi', '.mkv'].includes(ext); // Пример поддерживаемых форматов
       });
@@ -122,7 +122,7 @@ router.get('/stats', (req, res) => {
       stats.videos.supported = videoFiles.length; // Все отфильтрованные считаются поддерживаемыми
     } else {
         // Папка видео не существует
-        console.warn(`[HEALTH ROUTES] Папка видео ${config.videoDirectory} не найдена при запросе /stats.`);
+        console.warn(`[HEALTH ROUTES] Папка видео ${config.videoDir} не найдена при запросе /stats.`);
         stats.videos.total = -1; // Или другое значение для обозначения ошибки
         stats.videos.supported = -1;
     }

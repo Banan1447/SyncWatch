@@ -17,12 +17,12 @@ const VideoService = require('./services/videoService');
 const FileService = require('./services/fileService');
 
 // Импорт middleware
-const { authenticateToken, isAdmin } = require('./middleware/auth');
+const { authenticateToken, isAdmin, isLocalhostOnly, initializeAuthService } = require('./middleware/auth');
 const { logRequests, logClientRequest } = require('./middleware/logging');
+const { createRateLimit, authRateLimit, fileRateLimit } = require('./middleware/rateLimit');
 
 // Импорт маршрутов
 const authRoutes = require('./routes/auth');
-const adminRoutes = require('./routes/admin');
 const metricsRoutes = require('./routes/metrics');
 const healthRoutes = require('./routes/health');
 const filesRoutes = require('./routes/files');
@@ -44,20 +44,33 @@ class SyncWatchServer {
     this.roomService = new RoomService();
     this.authService = new AuthService();
     this.transcodeService = new TranscodeService();
-    this.adminService = new AdminService();
+    // Инициализируем AuthService асинхронно
+    this.adminService = null; // Будет инициализирован позже
     this.videoService = new VideoService(config.videoDir);
     this.fileService = new FileService(config.videoDir);
 
     this.roomUpdateInterval = null;
     this.roomStatesAutosaveInterval = null;
     this.ROOM_STATES_FILE = path.join(__dirname, 'json', 'room-states.json');
+    this.setupFileUpload();
+  }
+
+  async initialize() {
+    // Асинхронная инициализация AuthService
+    await this.authService.initialize();
+
+    // Инициализируем AuthService в middleware
+    const { initializeAuthService } = require('./middleware/auth');
+    await initializeAuthService();
+
+    // Теперь создаем AdminService с инициализированными сервисами
+    this.adminService = new AdminService(this.roomService, this.authService, this.transcodeService);
 
     this.setupMiddleware();
     this.setupRoutes();
     this.loadRoomStates();
     this.setupSocketIO();
     this.startRoomStatesAutosave();
-    this.setupFileUpload();
   }
 
   loadRoomStates() {
@@ -161,8 +174,25 @@ class SyncWatchServer {
   }
 
   setupRoutes() {
+    // Rate limiting для аутентификации
+    this.app.use('/api/auth/login', authRateLimit);
+    this.app.use('/api/auth/register', authRateLimit);
+    this.app.use('/api/admin/auth/login', authRateLimit);
+
+    // Динамический rate limiting для API (использует значение из конфигурации)
+    this.app.use('/api', (req, res, next) => {
+      const rateLimitValue = config.rateLimit && config.rateLimit.apiRequestsPerMinute !== undefined
+        ? config.rateLimit.apiRequestsPerMinute
+        : 100; // значение по умолчанию
+      const dynamicRateLimit = createRateLimit(rateLimitValue, 60000);
+      return dynamicRateLimit(req, res, next);
+    });
+
+    // Rate limiting для файловых операций
+    this.app.use('/api/files', fileRateLimit);
+
     this.app.use('/api/auth', authRoutes);
-    this.app.use('/api/admin', adminRoutes);
+    // Admin routes are defined directly in this file
     this.app.use('/api/metrics', metricsRoutes);
     this.app.use('/api/system', healthRoutes);
     this.app.use('/api/files', filesRoutes);
@@ -170,7 +200,8 @@ class SyncWatchServer {
     this.app.use('/api/transcode', transcodeRoutes);
     this.app.use('/api/rooms', roomsRoutes);
 
-    this.app.post('/api/auth/login', async (req, res) => {
+    // ✅ ИСПРАВЛЕНО: Админский логин (используется админкой)
+    this.app.post('/api/admin/auth/login', async (req, res) => {
       try {
         const { username, password } = req.body;
         const result = await this.authService.login(username, password);
@@ -190,6 +221,48 @@ class SyncWatchServer {
       }
     });
 
+    // ✅ Обычный логин (используется обычными пользователями)
+    this.app.post('/api/auth/login', async (req, res) => {
+      try {
+        const { username, password } = req.body;
+        const result = await this.authService.login(username, password);
+        res.json(result);
+      } catch (error) {
+        res.status(401).json({ 
+          success: false, 
+          error: error.message 
+        });
+      }
+    });
+
+    // ✅ ИСПРАВЛЕНО: Админский профиль (используется админкой)
+    this.app.get('/api/admin/auth/profile', authenticateToken, isAdmin, (req, res) => {
+      try {
+        const user = this.authService.getUser(req.user.username);
+        if (user) {
+          res.json({ 
+            success: true, 
+            user: {
+              username: user.username,
+              role: user.role,
+              id: user.id
+            }
+          });
+        } else {
+          res.status(404).json({ 
+            success: false, 
+            error: 'Пользователь не найден' 
+          });
+        }
+      } catch (error) {
+        res.status(500).json({ 
+          success: false, 
+          error: 'Ошибка сервера' 
+        });
+      }
+    });
+
+    // ✅ Обычный профиль (используется обычными пользователями)
     this.app.get('/api/auth/profile', authenticateToken, (req, res) => {
       try {
         const user = this.authService.getUser(req.user.username);
@@ -252,9 +325,16 @@ class SyncWatchServer {
 
     this.app.delete('/api/admin/rooms/:roomId', authenticateToken, isAdmin, (req, res) => {
       try {
-        const result = this.adminService.deleteRoom(req.params.roomId);
+        const roomId = req.params.roomId;
+
+        // Валидация входных данных
+        if (!roomId || typeof roomId !== 'string' || roomId.length === 0) {
+          return res.status(400).json({ success: false, error: 'Неверный ID комнаты' });
+        }
+
+        const result = this.adminService.deleteRoom(roomId);
         if (result.success) {
-          this.io.emit('room-deleted', { roomId: req.params.roomId });
+          this.io.emit('room-deleted', { roomId: roomId });
           res.json({ success: true, message: result.message });
         } else {
           res.status(400).json({ success: false, error: result.error });
@@ -275,6 +355,295 @@ class SyncWatchServer {
       }
     });
 
+    // ✅ НОВОЕ: Удаление пользователя
+    this.app.delete('/api/admin/users/:userId', authenticateToken, isAdmin, (req, res) => {
+      try {
+        const userId = req.params.userId;
+
+        // Валидация входных данных
+        if (!userId || typeof userId !== 'string' || userId.length === 0) {
+          return res.status(400).json({ success: false, error: 'Неверный ID пользователя' });
+        }
+
+        const result = this.adminService.deleteUser(userId);
+        if (result.success) {
+          res.json({ success: true, message: result.message });
+        } else {
+          res.status(400).json({ success: false, error: result.error });
+        }
+      } catch (error) {
+        console.error('[ADMIN API] Ошибка удаления пользователя:', error);
+        res.status(500).json({ success: false, error: 'Ошибка сервера при удалении пользователя' });
+      }
+    });
+
+    // ✅ НОВОЕ: Создание пользователя
+    this.app.post('/api/admin/users', authenticateToken, isAdmin, (req, res) => {
+      try {
+        const result = this.authService.createUser(req.body);
+        res.status(201).json({ success: true, user: result });
+      } catch (error) {
+        console.error('[ADMIN API] Ошибка создания пользователя:', error);
+        res.status(400).json({ success: false, error: error.message });
+      }
+    });
+
+    // ✅ НОВОЕ: Обновление пользователя
+    this.app.put('/api/admin/users/:userId', authenticateToken, isAdmin, (req, res) => {
+      try {
+        const userId = req.params.userId;
+        console.log('[ADMIN API] Update user request:', { userId, body: req.body });
+
+        const result = this.authService.updateUser(userId, req.body);
+        console.log('[ADMIN API] Update user result:', result);
+
+        res.json({ success: true, user: result });
+      } catch (error) {
+        console.error('[ADMIN API] Ошибка обновления пользователя:', error);
+        res.status(400).json({ success: false, error: error.message });
+      }
+    });
+
+    // ✅ НОВОЕ: Переключение статуса пользователя
+    this.app.patch('/api/admin/users/:userId/toggle-status', authenticateToken, isAdmin, (req, res) => {
+      try {
+        const userId = req.params.userId;
+        const isActive = this.authService.toggleUserStatus(userId);
+        res.json({ success: true, isActive });
+      } catch (error) {
+        console.error('[ADMIN API] Ошибка изменения статуса пользователя:', error);
+        res.status(400).json({ success: false, error: error.message });
+      }
+    });
+
+    // ✅ НОВОЕ: Получение списка групп
+    this.app.get('/api/admin/groups', authenticateToken, isAdmin, (req, res) => {
+      try {
+        const groups = this.authService.getAllGroups();
+        res.json({ success: true, groups });
+      } catch (error) {
+        console.error('[ADMIN API] Ошибка получения списка групп:', error);
+        res.status(500).json({ success: false, error: 'Ошибка сервера при получении списка групп' });
+      }
+    });
+
+    // API для управления комнатами
+    this.app.post('/api/admin/rooms', authenticateToken, isAdmin, (req, res) => {
+      try {
+        const { name, password, allowedGroups } = req.body;
+
+        if (!name || name.trim().length === 0) {
+          return res.status(400).json({ success: false, error: 'Название комнаты обязательно' });
+        }
+
+        const room = this.roomService.createRoom(name.trim(), 'admin', password || null, allowedGroups);
+        res.json({ success: true, room });
+      } catch (error) {
+        console.error('[ADMIN API] Ошибка создания комнаты:', error);
+        res.status(500).json({ success: false, error: 'Ошибка сервера при создании комнаты' });
+      }
+    });
+
+    this.app.put('/api/admin/rooms/:roomId', authenticateToken, isAdmin, (req, res) => {
+      try {
+        const { roomId } = req.params;
+        const { name, password, allowedGroups } = req.body;
+
+        const result = this.roomService.updateRoom(roomId, {
+          name: name?.trim(),
+          password,
+          allowedGroups
+        });
+
+        if (result.success) {
+          res.json({ success: true, room: result.room });
+        } else {
+          res.status(404).json({ success: false, error: result.error });
+        }
+      } catch (error) {
+        console.error('[ADMIN API] Ошибка обновления комнаты:', error);
+        res.status(500).json({ success: false, error: 'Ошибка сервера при обновлении комнаты' });
+      }
+    });
+
+    // API для логов комнат
+    this.app.get('/api/admin/rooms/:roomId/logs', authenticateToken, isAdmin, (req, res) => {
+      try {
+        const { roomId } = req.params;
+        const { limit = 50 } = req.query;
+
+        const logs = this.roomService.getRoomLogs(roomId, parseInt(limit));
+        res.json({ success: true, logs });
+      } catch (error) {
+        console.error('[ADMIN API] Ошибка получения логов комнаты:', error);
+        res.status(500).json({ success: false, error: 'Ошибка сервера при получении логов комнаты' });
+      }
+    });
+
+    // Создание новой группы
+    this.app.post('/api/admin/groups', authenticateToken, isAdmin, (req, res) => {
+      try {
+        const { id, name, description, permissions, roomAccess } = req.body;
+
+        if (!id || !name) {
+          return res.status(400).json({ success: false, error: 'ID и название группы обязательны' });
+        }
+
+        const result = this.authService.createGroup({
+          id: id.toLowerCase().trim(),
+          name: name.trim(),
+          description: description?.trim() || '',
+          permissions: permissions || [],
+          roomAccess: roomAccess || [],
+          createdAt: new Date().toISOString()
+        });
+
+        if (result.success) {
+          res.json({ success: true, group: result.group, message: 'Группа создана успешно' });
+        } else {
+          res.status(400).json({ success: false, error: result.error });
+        }
+      } catch (error) {
+        console.error('[ADMIN API] Ошибка создания группы:', error);
+        res.status(500).json({ success: false, error: 'Ошибка сервера при создании группы' });
+      }
+    });
+
+    // Обновление группы
+    this.app.put('/api/admin/groups/:groupId', authenticateToken, isAdmin, (req, res) => {
+      try {
+        const { groupId } = req.params;
+        const { name, description, permissions, roomAccess } = req.body;
+
+        console.log('[ADMIN API] Update group request:', { groupId, name, description, permissions, roomAccess });
+
+        const result = this.authService.updateGroup(groupId, {
+          name: name?.trim(),
+          description: description?.trim(),
+          permissions,
+          roomAccess
+        });
+
+        console.log('[ADMIN API] Update group result:', result);
+
+        if (result.success) {
+          res.json({ success: true, group: result.group, message: 'Группа обновлена успешно' });
+        } else {
+          console.log('[ADMIN API] Update group failed:', result.error);
+          res.status(404).json({ success: false, error: result.error });
+        }
+      } catch (error) {
+        console.error('[ADMIN API] Ошибка обновления группы:', error);
+        res.status(500).json({ success: false, error: 'Ошибка сервера при обновлении группы' });
+      }
+    });
+
+    // Удаление группы
+    this.app.delete('/api/admin/groups/:groupId', authenticateToken, isAdmin, (req, res) => {
+      try {
+        const { groupId } = req.params;
+
+        // Нельзя удалять системные группы
+        if (['admin', 'moderator', 'user'].includes(groupId)) {
+          return res.status(400).json({ success: false, error: 'Нельзя удалять системные группы' });
+        }
+
+        const result = this.authService.deleteGroup(groupId);
+
+        if (result.success) {
+          res.json({ success: true, message: 'Группа удалена успешно' });
+        } else {
+          res.status(404).json({ success: false, error: result.error });
+        }
+      } catch (error) {
+        console.error('[ADMIN API] Ошибка удаления группы:', error);
+        res.status(500).json({ success: false, error: 'Ошибка сервера при удалении группы' });
+      }
+    });
+
+    // API для работы с конфигурацией
+    this.app.get('/api/admin/config', authenticateToken, isAdmin, (req, res) => {
+      try {
+        // Возвращаем текущую конфигурацию
+        const currentConfig = {
+          port: config.port,
+          jwtSecret: config.jwtSecret ? '[HIDDEN]' : null, // Не показываем секрет
+          videoDirectory: config.videoDirectory,
+          transcode: config.transcode,
+          rooms: config.rooms,
+          rateLimit: config.rateLimit
+        };
+        res.json({ success: true, config: currentConfig });
+      } catch (error) {
+        console.error('[ADMIN API] Ошибка получения конфигурации:', error);
+        res.status(500).json({ success: false, error: 'Ошибка сервера при получении конфигурации' });
+      }
+    });
+
+    this.app.put('/api/admin/config', authenticateToken, isAdmin, (req, res) => {
+      try {
+        const { transcode, rooms } = req.body;
+
+        // Убедимся, что объекты config существуют
+        if (!config.transcode) {
+          config.transcode = {};
+        }
+        if (!config.rooms) {
+          config.rooms = {};
+        }
+
+        // Обновляем только разрешенные поля
+        if (transcode) {
+          if (typeof transcode.maxConcurrentJobs === 'number') {
+            config.transcode.maxConcurrentJobs = transcode.maxConcurrentJobs;
+          }
+          if (transcode.tempDirectory && typeof transcode.tempDirectory === 'string') {
+            config.transcode.tempDirectory = transcode.tempDirectory;
+          }
+        }
+
+        if (rooms) {
+          if (typeof rooms.cleanupInterval === 'number') {
+            config.rooms.cleanupInterval = rooms.cleanupInterval;
+          }
+          if (typeof rooms.maxUsersPerRoom === 'number') {
+            config.rooms.maxUsersPerRoom = rooms.maxUsersPerRoom;
+          }
+        }
+
+        // Обработка rate limiting
+        if (req.body.rateLimit) {
+          if (!config.rateLimit) {
+            config.rateLimit = {};
+          }
+          if (typeof req.body.rateLimit.apiRequestsPerMinute === 'number') {
+            config.rateLimit.apiRequestsPerMinute = req.body.rateLimit.apiRequestsPerMinute;
+          }
+        }
+
+        // Сохраняем конфигурацию в файл
+        config.save();
+        console.log('[ADMIN API] Конфигурация обновлена и сохранена:', { transcode: config.transcode, rooms: config.rooms, rateLimit: config.rateLimit });
+
+        res.json({ success: true, message: 'Конфигурация обновлена успешно' });
+      } catch (error) {
+        console.error('[ADMIN API] Ошибка обновления конфигурации:', error);
+        console.error('[ADMIN API] Stack trace:', error.stack);
+        res.status(500).json({ success: false, error: 'Ошибка сервера при обновлении конфигурации' });
+      }
+    });
+
+    this.app.post('/api/admin/config/reload', authenticateToken, isAdmin, (req, res) => {
+      try {
+        // Перезагрузка конфигурации - в будущем можно добавить перезапуск сервисов
+        console.log('[ADMIN API] Конфигурация перезагружена');
+        res.json({ success: true, message: 'Конфигурация перезагружена успешно' });
+      } catch (error) {
+        console.error('[ADMIN API] Ошибка перезагрузки конфигурации:', error);
+        res.status(500).json({ success: false, error: 'Ошибка сервера при перезагрузке конфигурации' });
+      }
+    });
+
     this.app.get('/api/admin/transcode/queue', authenticateToken, isAdmin, (req, res) => {
       try {
         const queue = this.adminService.getTranscodeQueue();
@@ -292,6 +661,50 @@ class SyncWatchServer {
       } catch (error) {
         console.error('[ADMIN API] Ошибка получения шаблонов транскодирования:', error);
         res.status(500).json({ success: false, error: 'Ошибка сервера при получении шаблонов транскодирования' });
+      }
+    });
+
+    // ✅ НОВОЕ: Отмена задания транскодирования
+    this.app.delete('/api/admin/transcode/queue/:jobId', authenticateToken, isAdmin, (req, res) => {
+      try {
+        const jobId = req.params.jobId;
+
+        // Валидация входных данных
+        if (!jobId || isNaN(Number(jobId))) {
+          return res.status(400).json({ success: false, error: 'Неверный ID задания' });
+        }
+
+        const result = this.adminService.cancelTranscodeJob(jobId);
+        if (result.success) {
+          res.json({ success: true, message: result.message });
+        } else {
+          res.status(400).json({ success: false, error: result.error });
+        }
+      } catch (error) {
+        console.error('[ADMIN API] Ошибка отмены задания транскодирования:', error);
+        res.status(500).json({ success: false, error: 'Ошибка сервера при отмене задания транскодирования' });
+      }
+    });
+
+    // ✅ НОВОЕ: Удаление шаблона транскодирования
+    this.app.delete('/api/admin/transcode/templates/:templateId', authenticateToken, isAdmin, (req, res) => {
+      try {
+        const templateId = req.params.templateId;
+
+        // Валидация входных данных
+        if (!templateId || typeof templateId !== 'string' || templateId.length === 0) {
+          return res.status(400).json({ success: false, error: 'Неверный ID шаблона' });
+        }
+
+        const result = this.adminService.deleteTranscodeTemplate(templateId);
+        if (result.success) {
+          res.json({ success: true, message: result.message });
+        } else {
+          res.status(400).json({ success: false, error: result.error });
+        }
+      } catch (error) {
+        console.error('[ADMIN API] Ошибка удаления шаблона транскодирования:', error);
+        res.status(500).json({ success: false, error: 'Ошибка сервера при удалении шаблона транскодирования' });
       }
     });
 
@@ -341,17 +754,23 @@ class SyncWatchServer {
       }
     });
 
-    const upload = multer({ 
+    const upload = multer({
       dest: config.videoDir,
       limits: {
-        fileSize: 100 * 1024 * 1024 * 1024
+        fileSize: 1024 * 1024 * 1024 * 1024 // 1TB limit
       },
       fileFilter: (req, file, cb) => {
-         if (file.fieldname === 'video') {
-             cb(null, true);
-         } else {
-             cb(new Error('Unexpected field'), false);
-         }
+        if (file.fieldname !== 'video') {
+          return cb(new Error('Unexpected field'), false);
+        }
+
+        // Проверяем MIME тип
+        const allowedMimes = ['video/mp4', 'video/mpeg', 'video/avi', 'video/quicktime', 'video/x-msvideo', 'video/webm'];
+        if (!allowedMimes.includes(file.mimetype)) {
+          return cb(new Error('Invalid file type. Only video files are allowed.'), false);
+        }
+
+        cb(null, true);
       }
     });
 
@@ -361,18 +780,29 @@ class SyncWatchServer {
         return res.status(400).json({ success: false, error: 'No file uploaded or invalid field name. Expected field "video".' });
       }
 
-      const finalPath = path.join(config.videoDir, req.file.originalname);
-      
+      // Генерируем уникальное имя файла, если файл уже существует
+      const parsedPath = path.parse(req.file.originalname);
+      let finalPath = path.join(config.videoDir, req.file.originalname);
+      let counter = 1;
+
+      while (fs.existsSync(finalPath)) {
+        const newName = `${parsedPath.name}_${counter}${parsedPath.ext}`;
+        finalPath = path.join(config.videoDir, newName);
+        counter++;
+      }
+
       fs.rename(req.file.path, finalPath, (err) => {
         if (err) {
           console.error('Upload error:', err);
+          // Удаляем временный файл в случае ошибки
+          fs.unlink(req.file.path, () => {});
           return res.status(500).json({ success: false, error: 'Failed to save file' });
         }
 
-        res.json({ 
-          success: true, 
+        res.json({
+          success: true,
           message: 'File uploaded successfully',
-          filename: req.file.originalname,
+          filename: path.basename(finalPath),
           path: finalPath
         });
       });
@@ -409,22 +839,30 @@ class SyncWatchServer {
         const { roomId, currentTime, isPlaying, videoFile } = data;
         if (!roomId) return;
 
+        const room = this.roomService.getRoom(roomId);
+        if (!room) return;
+
+        // ✅ ИСПРАВЛЕНО: Проверяем, не достигло ли видео конца
+        const duration = room.duration || 0;
+        const videoEnded = duration > 0 && currentTime >= duration - 0.5;
+        
+        // Если видео закончилось, устанавливаем isPlaying в false
+        const actualIsPlaying = isPlaying && !videoEnded;
+        const actualCurrentTime = videoEnded ? duration : currentTime;
+
         this.roomService.updateRoomState(roomId, {
-          currentTime: currentTime,
-          isPlaying: isPlaying,
+          currentTime: actualCurrentTime,
+          isPlaying: actualIsPlaying,
           currentVideo: videoFile
         });
 
-        const room = this.roomService.getRoom(roomId);
-        if (room) {
-          this.io.emit('room-update', {
-            roomId: roomId,
-            currentTime: currentTime,
-            isPlaying: isPlaying,
-            videoTitle: videoFile ? videoFile.split('/').pop() : null,
-            duration: room.duration || 0
-          });
-        }
+        this.io.emit('room-update', {
+          roomId: roomId,
+          currentTime: actualCurrentTime,
+          isPlaying: actualIsPlaying,
+          videoTitle: videoFile ? videoFile.split('/').pop() : null,
+          duration: duration
+        });
       });
 
       // ✅ NEW: Принимаем метаданные (длительность)
@@ -555,16 +993,29 @@ class SyncWatchServer {
       socket.on('video-ended', (data) => {
         const { roomId } = data || {};
         if (!roomId) return;
+        
+        // ✅ ИСПРАВЛЕНО: Останавливаем воспроизведение при окончании видео
+        const room = this.roomService.getRoom(roomId);
+        if (room) {
+          this.roomService.updateRoomState(roomId, { 
+            isPlaying: false,
+            currentTime: room.duration || 0
+          });
+        }
+        
+        // Проверяем очередь YouTube (если есть)
         const next = this.roomService.getNextVideo(roomId);
         if (next && next.type === 'youtube') {
           this.roomService.updateRoomState(roomId, { currentVideo: next.id });
           this.io.to(roomId).emit('video-changed', { videoUrl: next.id, type: 'youtube' });
         } else {
-          this.roomService.updateRoomState(roomId, { currentVideo: null });
-          this.io.to(roomId).emit('video-changed', { videoUrl: null });
+          // Для обычных видео просто останавливаем воспроизведение
+          this.io.to(roomId).emit('video-pause', { roomId: roomId, time: room?.duration || 0 });
         }
-        const room = this.roomService.getRoom(roomId);
-        this.io.to(roomId).emit('queue-updated', room.youtubeQueue);
+        const updatedRoom = this.roomService.getRoom(roomId);
+        if (updatedRoom) {
+          this.io.to(roomId).emit('queue-updated', updatedRoom.youtubeQueue || []);
+        }
       });
 
       socket.on('video-command', (data) => {
@@ -689,11 +1140,28 @@ class SyncWatchServer {
       });
 
       socket.on('play-video', (data) => {
-        this.roomService.updateRoomState(data.roomId, { 
-          isPlaying: true,
-          currentTime: data.time || 0
-        });
-        socket.to(data.roomId).emit('video-play', data);
+        const room = this.roomService.getRoom(data.roomId);
+        if (!room) return;
+        
+        // ✅ ИСПРАВЛЕНО: Проверяем, не достигло ли видео конца
+        const duration = room.duration || 0;
+        const currentTime = data.time || room.currentTime || 0;
+        const videoEnded = duration > 0 && currentTime >= duration - 0.5;
+        
+        if (videoEnded) {
+          // Видео закончилось - не воспроизводим
+          this.roomService.updateRoomState(data.roomId, { 
+            isPlaying: false,
+            currentTime: duration
+          });
+          socket.to(data.roomId).emit('video-pause', { roomId: data.roomId, time: duration });
+        } else {
+          this.roomService.updateRoomState(data.roomId, { 
+            isPlaying: true,
+            currentTime: currentTime
+          });
+          socket.to(data.roomId).emit('video-play', data);
+        }
       });
 
       socket.on('pause-video', (data) => {
@@ -743,13 +1211,28 @@ class SyncWatchServer {
         const allRooms = this.roomService.getAllRooms();
         allRooms.forEach(room => {
           if (room.id && room.currentVideo) {
+            // ✅ ИСПРАВЛЕНО: Проверяем, не достигло ли видео конца
+            const duration = typeof room.duration === 'number' ? room.duration : 0;
+            const currentTime = typeof room.currentTime === 'number' ? room.currentTime : 0;
+            const videoEnded = duration > 0 && currentTime >= duration - 0.5;
+            const actualIsPlaying = !!room.isPlaying && !videoEnded;
+            const actualCurrentTime = videoEnded ? duration : currentTime;
+
             this.io.emit('room-update', {
               roomId: room.id,
-              currentTime: typeof room.currentTime === 'number' ? room.currentTime : 0,
-              isPlaying: !!room.isPlaying,
+              currentTime: actualCurrentTime,
+              isPlaying: actualIsPlaying,
               videoTitle: room.currentVideo ? room.currentVideo.split('/').pop() : null,
-              duration: typeof room.duration === 'number' ? room.duration : 0
+              duration: duration
             });
+
+            // ✅ ИСПРАВЛЕНО: Если видео закончилось, обновляем состояние на сервере
+            if (videoEnded && room.isPlaying) {
+              this.roomService.updateRoomState(room.id, {
+                isPlaying: false,
+                currentTime: duration
+              });
+            }
           }
         });
       } catch (err) {
@@ -764,7 +1247,10 @@ class SyncWatchServer {
     }
   }
 
-  start(port = config.port || 3000) {
+  async start(port = config.port || 3000) {
+    // Инициализируем асинхронно
+    await this.initialize();
+
     this.server.listen(port, () => {
       console.log(`🚀 SyncWatch server running on port ${port}`);
       console.log(`📊 Admin panel: http://localhost:${port}/admin`);

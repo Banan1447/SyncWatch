@@ -20,7 +20,8 @@ function tryAutoJoinRoomFromUrl(password = null) {
   const name = localStorage.getItem('userName') || prompt('Введите ваше имя:') || `User${Math.floor(Math.random() * 10000)}`;
   const finalPassword = password !== null ? password : (document.getElementById('roomPassword')?.value.trim() || '');
 
-  socket.emit('join-room', { roomId: room, name, password: finalPassword }, res => {
+  // Для script.js группы не доступны, передаем пустой массив
+  socket.emit('join-room', { roomId: room, name, password: finalPassword, userGroups: [] }, res => {
     if (!(res && res.success)) {
       if (res?.error === 'Invalid password') {
         const newPass = prompt('Неверный пароль. Введите правильный пароль:');
