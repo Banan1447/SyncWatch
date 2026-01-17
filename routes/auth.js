@@ -8,97 +8,77 @@ const authService = new AuthService(); // Создаём экземпляр се
 
 // Регистрация
 router.post('/register', async (req, res) => {
-  // Проверяем, что тело запроса существует и является объектом
-  if (!req.body || typeof req.body !== 'object') {
-    return res.status(400).json({
-      success: false,
-      error: 'Invalid request body'
+  console.log('=== РЕГИСТРАЦИЯ ЗАПРОС ===');
+  console.log('Тело запроса:', req.body);
+  console.log('Тип тела:', typeof req.body);
+  console.log('========================');
+  
+  // Проверяем, что тело запроса существует
+  if (!req.body) {
+    return res.status(400).json({ 
+      success: false, 
+      error: 'Тело запроса отсутствует' 
     });
   }
-
+  
   const { username, email, password } = req.body;
 
-  // Строгая валидация полей
-  if (!username || typeof username !== 'string') {
-    return res.status(400).json({
-      success: false,
-      error: 'Username is required and must be a string'
+  // Проверяем конкретные поля
+  if (!username) {
+    return res.status(400).json({ 
+      success: false, 
+      error: 'Username is required' 
+    });
+  }
+  
+  if (typeof username !== 'string' || username.trim().length === 0) {
+    return res.status(400).json({ 
+      success: false, 
+      error: 'Username must be a non-empty string' 
     });
   }
 
-  const trimmedUsername = username.trim();
-  if (trimmedUsername.length === 0) {
-    return res.status(400).json({
-      success: false,
-      error: 'Username cannot be empty'
+  if (!email) {
+    return res.status(400).json({ 
+      success: false, 
+      error: 'Email is required' 
     });
   }
 
-  if (trimmedUsername.length < 3 || trimmedUsername.length > 50) {
-    return res.status(400).json({
-      success: false,
-      error: 'Username must be between 3 and 50 characters'
+  if (typeof email !== 'string' || email.trim().length === 0) {
+    return res.status(400).json({ 
+      success: false, 
+      error: 'Email must be a non-empty string' 
     });
   }
 
-  // Проверка формата username (только буквы, цифры, подчеркивание, дефис)
-  if (!/^[a-zA-Z0-9_-]+$/.test(trimmedUsername)) {
-    return res.status(400).json({
-      success: false,
-      error: 'Username can only contain letters, numbers, underscores and hyphens'
+  if (!password) {
+    return res.status(400).json({ 
+      success: false, 
+      error: 'Password is required' 
     });
   }
 
-  if (!email || typeof email !== 'string') {
-    return res.status(400).json({
-      success: false,
-      error: 'Email is required and must be a string'
+  if (typeof password !== 'string' || password.length === 0) {
+    return res.status(400).json({ 
+      success: false, 
+      error: 'Password must be a non-empty string' 
     });
   }
-
-  const trimmedEmail = email.trim();
-  if (trimmedEmail.length === 0) {
-    return res.status(400).json({
-      success: false,
-      error: 'Email cannot be empty'
-    });
-  }
-
-  // Проверка формата email
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(trimmedEmail)) {
-    return res.status(400).json({
-      success: false,
-      error: 'Invalid email format'
-    });
-  }
-
-  if (!password || typeof password !== 'string') {
-    return res.status(400).json({
-      success: false,
-      error: 'Password is required and must be a string'
-    });
-  }
-
+  
+  // Проверка длины пароля
   if (password.length < 8) {
-    return res.status(400).json({
-      success: false,
-      error: 'Password must be at least 8 characters long'
-    });
-  }
-
-  if (password.length > 128) {
-    return res.status(400).json({
-      success: false,
-      error: 'Password too long (max 128 characters)'
+    return res.status(400).json({ 
+      success: false, 
+      error: 'Password must be at least 8 characters long' 
     });
   }
 
   try {
-    const result = await authService.register(trimmedUsername, trimmedEmail, password);
+    const result = await authService.register(username.trim(), email.trim(), password);
     res.status(201).json(result);
   } catch (error) {
-    console.error('Registration error:', error);
+    console.error('Ошибка регистрации:', error);
     res.status(400).json({ success: false, error: error.message });
   }
 });
@@ -109,62 +89,45 @@ router.post('/login', async (req, res) => {
   console.log('Тело запроса:', req.body);
   console.log('========================');
   
-  // Проверяем, что тело запроса существует и является объектом
-  if (!req.body || typeof req.body !== 'object') {
-    return res.status(400).json({
-      success: false,
-      error: 'Invalid request body'
+  if (!req.body) {
+    return res.status(400).json({ 
+      success: false, 
+      error: 'Тело запроса отсутствует' 
     });
   }
   
   const { username, password } = req.body;
 
-  // Строгая валидация полей
-  if (!username || typeof username !== 'string') {
-    return res.status(400).json({
-      success: false,
-      error: 'Username is required and must be a string'
+  if (!username) {
+    return res.status(400).json({ 
+      success: false, 
+      error: 'Username is required' 
+    });
+  }
+  
+  if (typeof username !== 'string' || username.trim().length === 0) {
+    return res.status(400).json({ 
+      success: false, 
+      error: 'Username must be a non-empty string' 
     });
   }
 
-  const trimmedUsername = username.trim();
-  if (trimmedUsername.length === 0) {
-    return res.status(400).json({
-      success: false,
-      error: 'Username cannot be empty'
+  if (!password) {
+    return res.status(400).json({ 
+      success: false, 
+      error: 'Password is required' 
     });
   }
 
-  if (trimmedUsername.length > 50) {
-    return res.status(400).json({
-      success: false,
-      error: 'Username too long (max 50 characters)'
-    });
-  }
-
-  if (!password || typeof password !== 'string') {
-    return res.status(400).json({
-      success: false,
-      error: 'Password is required and must be a string'
-    });
-  }
-
-  if (password.length === 0) {
-    return res.status(400).json({
-      success: false,
-      error: 'Password cannot be empty'
-    });
-  }
-
-  if (password.length > 128) {
-    return res.status(400).json({
-      success: false,
-      error: 'Password too long (max 128 characters)'
+  if (typeof password !== 'string' || password.length === 0) {
+    return res.status(400).json({ 
+      success: false, 
+      error: 'Password must be a non-empty string' 
     });
   }
 
   try {
-    const result = await authService.login(trimmedUsername, password);
+    const result = await authService.login(username.trim(), password);
     res.json(result);
   } catch (error) {
     res.status(401).json({ success: false, error: error.message });

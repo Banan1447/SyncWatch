@@ -15,7 +15,6 @@ module.exports = (io, roomService) => {
       logClientRequest(clientIP, socket.id, 'SOCKET create-room', `Name: ${name}`);
 
       const room = roomService.createRoom(name, socket.id); // socket.id используется как ownerId
-      roomService.logAction(room.id, 'room_created', socket.id, userName || `User${socket.id.slice(-4)}`, { roomName: name });
       cb && cb({ id: room.id, name: room.name });
       io.emit('room-list', roomService.getAllRooms());
     });
@@ -26,7 +25,7 @@ module.exports = (io, roomService) => {
       cb && cb(roomService.getAllRooms());
     });
 
-    socket.on('join-room', ({ roomId, name, userGroups }, cb) => {
+    socket.on('join-room', ({ roomId, name }, cb) => {
       const { logClientRequest } = require('../middleware/logging');
       logClientRequest(clientIP, socket.id, 'SOCKET join-room', `RoomID: ${roomId}, Name: ${name}`);
 
@@ -35,9 +34,9 @@ module.exports = (io, roomService) => {
         socket.leave(joinedRoom);
       }
 
-      const room = roomService.joinRoom(roomId, socket.id, name || userName, null, userGroups || []);
-      if (!room.success) {
-        cb && cb({ error: room.error });
+      const room = roomService.joinRoom(roomId, socket.id, name || userName);
+      if (!room) {
+        cb && cb({ error: 'Room not found' });
         return;
       }
 
@@ -45,7 +44,7 @@ module.exports = (io, roomService) => {
       userName = name || userName;
       socket.join(roomId);
 
-      cb && cb({ success: true, room: { id: roomId, name: room.room.name } });
+      cb && cb({ success: true, room: { id: roomId, name: room.name } });
       io.to(roomId).emit('room-state', roomService.getRoom(joinedRoom));
       io.emit('room-list', roomService.getAllRooms());
     });
@@ -69,9 +68,6 @@ module.exports = (io, roomService) => {
       const { logClientRequest } = require('../middleware/logging');
       logClientRequest(clientIP, socket.id, 'SOCKET delete-room', `RoomID: ${roomId}`);
 
-      // Логируем удаление комнаты перед ее удалением
-      roomService.logAction(roomId, 'room_deleted', socket.id, userName, { roomId });
-
       const success = roomService.deleteRoom(roomId, socket.id); // socket.id как requestingSocketId
       if (success) {
         io.emit('room-list', roomService.getAllRooms());
@@ -90,25 +86,13 @@ module.exports = (io, roomService) => {
 
         socket.to(joinedRoom).emit('video-command', data);
 
-        // Обновляем состояние комнаты и логируем действия
+        // Обновляем состояние комнаты
         if (data.type === 'play') {
           roomService.updateRoomState(joinedRoom, { isPlaying: true });
-          roomService.logAction(joinedRoom, 'video_play', socket.id, userName, { time: data.time });
         } else if (data.type === 'pause') {
           roomService.updateRoomState(joinedRoom, { isPlaying: false });
-          roomService.logAction(joinedRoom, 'video_pause', socket.id, userName, { time: data.time });
         } else if (data.type === 'seek' && typeof data.time === 'number') {
           roomService.updateRoomState(joinedRoom, { currentTime: data.time });
-          roomService.logAction(joinedRoom, 'video_seek', socket.id, userName, { fromTime: data.currentTime || 0, toTime: data.time });
-        } else if (data.type === 'volume') {
-          roomService.logAction(joinedRoom, 'video_volume_change', socket.id, userName, { volume: data.volume });
-        } else if (data.type === 'speed') {
-          roomService.logAction(joinedRoom, 'video_speed_change', socket.id, userName, { speed: data.speed });
-        } else if (data.type === 'mute') {
-          roomService.logAction(joinedRoom, 'video_mute_toggle', socket.id, userName, { muted: data.muted });
-        } else {
-          // Логируем неизвестные команды видео
-          roomService.logAction(joinedRoom, 'video_command', socket.id, userName, { type: data.type, data });
         }
 
         io.to(joinedRoom).emit('room-state', roomService.getRoom(joinedRoom));
@@ -125,8 +109,6 @@ module.exports = (io, roomService) => {
           currentVideo: filename,
           isPlaying: false
         });
-
-        roomService.logAction(joinedRoom, 'video_selected', socket.id, userName, { filename });
 
         io.to(joinedRoom).emit('video-updated', filename);
         io.to(joinedRoom).emit('room-state', roomService.getRoom(joinedRoom));

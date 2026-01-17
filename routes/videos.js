@@ -28,7 +28,7 @@ router.get('/', async (req, res) => {
     res.json(formattedVideos);
   } catch (error) {
     console.error('[VIDEOS API] Ошибка при получении списка видео:', error);
-    res.status(500).json({ success: false, error: 'Failed to load videos' });
+    res.status(500).json([]); // Возвращаем пустой массив, а не ошибку
   }
 });
 

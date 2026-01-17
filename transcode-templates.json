@@ -47,12 +47,5 @@
     "description": "Simple template with quality/speed slider",
     "command": "-c:v libx264 -crf 51 -preset veryslow output.mp4",
     "createdAt": "2025-10-03T22:03:13.939Z"
-  },
-  {
-    "id": "tmpl_er8j2aldd",
-    "name": "Test Template",
-    "description": "Test template",
-    "command": "-c:v libx264 -crf 25 {output}",
-    "createdAt": "2026-01-16T15:28:36.294Z"
   }
 ]

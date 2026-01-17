@@ -2,32 +2,8 @@
 
 // === ГЛОБАЛЬНОЕ СОСТОЯНИЕ ===
 window.selectedFiles = new Set(); // Имена выбранных файлов
-window.authToken = null; // JWT токен пользователя
 
 // === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===
-
-// Получить JWT токен из localStorage
-function getAuthToken() {
-  if (!window.authToken) {
-    window.authToken = localStorage.getItem('authToken');
-  }
-  return window.authToken;
-}
-
-// Установить JWT токен
-function setAuthToken(token) {
-  window.authToken = token;
-  if (token) {
-    localStorage.setItem('authToken', token);
-  } else {
-    localStorage.removeItem('authToken');
-  }
-}
-
-// Проверить, авторизован ли пользователь
-function isAuthenticated() {
-  return !!getAuthToken();
-}
 
 function showNotification(message, type = 'info') {
   const notifications = document.getElementById('notifications');
@@ -45,20 +21,13 @@ function showNotification(message, type = 'info') {
 }
 
 // === API CALLS ===
-async function apiCall(url, method = 'GET', data = null) {
+async function apiCall(url, method = 'POST', data = null) {
   try {
     const config = {
       method,
       headers: { 'Content-Type': 'application/json' }
     };
-
-    // Добавляем JWT токен в headers, если он есть
-    const token = getAuthToken();
-    if (token) {
-      config.headers['Authorization'] = `Bearer ${token}`;
-    }
-
-    if (data && (method === 'POST' || method === 'PUT' || method === 'PATCH' || method === 'DELETE')) {
+    if (data && (method === 'POST' || method === 'PUT' || method === 'DELETE')) {
       config.body = JSON.stringify(data);
     }
 
@@ -235,57 +204,33 @@ async function applyTemplateToSelected(templateId) {
   }
 
   const filesArray = Array.from(window.selectedFiles);
-  const useCuda = getCudaEnabled();
   let successCount = 0;
 
   for (const fileId of filesArray) {
-    const res = await apiCall('/api/transcode/add-to-queue', 'POST', {
-      fileId,
-      templateId,
-      useCuda
-    });
+    const res = await apiCall('/api/transcode/add-to-queue', 'POST', { fileId, templateId });
     if (res.success) successCount++;
   }
 
-  const cudaMsg = useCuda ? ' (with CUDA)' : '';
-  showNotification(`Added ${successCount} of ${filesArray.length} files to queue${cudaMsg}`, 'success');
+  showNotification(`Added ${successCount} of ${filesArray.length} files to queue`, 'success');
   window.selectedFiles.clear();
   updateApplyButtons();
   loadFiles(); // Сбросит чекбоксы
   loadQueue();
 }
 
-// Получить состояние CUDA чекбокса
-function getCudaEnabled() {
-  const checkbox = document.getElementById('useCudaCheckbox');
-  return checkbox ? checkbox.checked : false;
-}
-
 // Быстрое транскодирование
 async function quickTranscode(filename) {
-  const useCuda = getCudaEnabled();
-  const confirmMessage = useCuda
-    ? `Start quick transcode with CUDA acceleration for "${filename}"?\nThis will use GPU for faster processing.`
-    : `Start quick transcode (copy stream) for "${filename}"?\nThis will create an MP4 without re-encoding.`;
-
-  if (!confirm(confirmMessage)) return;
+  if (!confirm(`Start quick transcode (copy stream) for "${filename}"?\nThis will create an MP4 without re-encoding.`)) return;
 
   try {
-    // Формируем команду с учетом CUDA
-    let command = '-c copy -map 0';
-    if (useCuda) {
-      command = '-hwaccel cuda -hwaccel_device 0 -c:v h264_nvenc -preset fast -c:a aac -b:a 128k';
-    }
-
     const res = await fetch('/api/transcode/quick-transcode', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ filename, command, useCuda })
+      body: JSON.stringify({ filename, command: '-c copy -map 0' })
     });
     const data = await res.json();
     if (data.success) {
-      const cudaMsg = useCuda ? ' (CUDA)' : '';
-      showNotification(`✅ Quick transcode completed${cudaMsg}: ${data.output}`, 'success');
+      showNotification(`✅ Quick transcode completed: ${data.output}`, 'success');
       loadFiles();
       loadQueue();
     } else {
@@ -340,7 +285,7 @@ async function loadQueue() {
         <div class="queue-header">
           <div>
             <div class="queue-file">${item.fileId}</div>
-            <div class="queue-template">${item.templateName || 'Unknown'} ${item.useCuda ? '<i class="fas fa-microchip" title="CUDA acceleration" style="color: #007bff; margin-left: 0.25rem;"></i>' : ''}</div>
+            <div class="queue-template">${item.templateName || 'Unknown'}</div>
           </div>
           <div style="display: flex; align-items: center; gap: 0.5rem;">
             <span class="status-badge ${statusClass}">${statusText}</span>
@@ -387,90 +332,7 @@ async function deleteTemplate(templateId) {
     if (res.success) {
       showNotification('Template deleted', 'success');
       loadTemplates();
-    } else {
-      showNotification('Failed to delete template: ' + (res.error || 'Unknown error'), 'error');
     }
-  }
-}
-
-// ✅ НОВОЕ: Открытие модального окна для создания шаблона
-function openTemplateModal() {
-  const modal = document.getElementById('templateModal');
-  if (modal) {
-    modal.style.display = 'flex';
-    // Очищаем поля
-    document.getElementById('templateName').value = '';
-    document.getElementById('templateDescription').value = '';
-    document.getElementById('templateCommand').value = '';
-  }
-}
-
-// ✅ НОВОЕ: Закрытие модального окна
-function closeTemplateModal() {
-  const modal = document.getElementById('templateModal');
-  if (modal) {
-    modal.style.display = 'none';
-  }
-}
-
-// ✅ НОВОЕ: Заполнение примера
-function fillExample(type) {
-  const nameInput = document.getElementById('templateName');
-  const descInput = document.getElementById('templateDescription');
-  const commandInput = document.getElementById('templateCommand');
-
-  switch(type) {
-    case '720p':
-      nameInput.value = 'HD 720p';
-      descInput.value = 'High quality 720p MP4 for web playback';
-      commandInput.value = '-vf scale=1280:720 -c:v libx264 -crf 23 -preset medium -c:a aac -b:a 128k';
-      break;
-    case '1080p':
-      nameInput.value = 'Full HD 1080p';
-      descInput.value = 'Full HD 1080p MP4 with high quality';
-      commandInput.value = '-vf scale=1920:1080 -c:v libx264 -crf 20 -preset slow -c:a aac -b:a 192k';
-      break;
-    case '480p':
-      nameInput.value = 'SD 480p';
-      descInput.value = 'Standard definition 480p MP4 for smaller file size';
-      commandInput.value = '-vf scale=854:480 -c:v libx264 -crf 25 -preset fast -c:a aac -b:a 96k';
-      break;
-  }
-}
-
-// ✅ НОВОЕ: Сохранение шаблона
-async function saveTemplate() {
-  const name = document.getElementById('templateName').value.trim();
-  const description = document.getElementById('templateDescription').value.trim();
-  const command = document.getElementById('templateCommand').value.trim();
-
-  if (!name) {
-    showNotification('Template name is required', 'error');
-    return;
-  }
-
-  if (!command) {
-    showNotification('FFmpeg command is required', 'error');
-    return;
-  }
-
-  try {
-    const res = await apiCall('/api/transcode/save-template', 'POST', {
-      name,
-      description,
-      command
-    });
-
-    if (res.success) {
-      showNotification(`Template "${name}" saved successfully!`, 'success');
-      closeTemplateModal();
-      loadTemplates();
-    } else {
-      showNotification('Failed to save template: ' + (res.error || 'Unknown error'), 'error');
-    }
-  } catch (err) {
-    console.error('[TRANSCODE] Save template error:', err);
-    showNotification('Error saving template: ' + err.message, 'error');
   }
 }
 
@@ -492,136 +354,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // ✅ ИСПРАВЛЕНО: Кнопка добавления шаблона открывает модальное окно
-  document.getElementById('addTemplateBtn')?.addEventListener('click', openTemplateModal);
-
-  // Закрытие модального окна при клике вне его
-  document.getElementById('templateModal')?.addEventListener('click', (e) => {
-    if (e.target.id === 'templateModal') {
-      closeTemplateModal();
-    }
-  });
-
-  // Закрытие модального окна по Escape
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      const modal = document.getElementById('templateModal');
-      if (modal && modal.style.display === 'flex') {
-        closeTemplateModal();
-      }
-    }
+  // Кнопка добавления шаблона (временно)
+  document.getElementById('addTemplateBtn')?.addEventListener('click', () => {
+    alert('Template creation UI is not implemented in this demo.\nUse system "Copy Stream" or contact admin.');
   });
 
   // Кнопка обновления файлов
   document.getElementById('refreshFilesBtn')?.addEventListener('click', loadFiles);
-
-  // Управление очередью транскодирования
-  document.getElementById('refreshQueueBtn')?.addEventListener('click', loadQueue);
-
-  document.getElementById('clearCompletedBtn')?.addEventListener('click', async () => {
-    if (!confirm('Clear all completed jobs from queue?')) return;
-
-    try {
-      // This would need a backend endpoint to clear completed jobs
-      showNotification('Clear completed jobs feature not implemented yet', 'info');
-    } catch (err) {
-      showNotification('Error clearing completed jobs: ' + err.message, 'error');
-    }
-  });
-
-  document.getElementById('clearFailedBtn')?.addEventListener('click', async () => {
-    if (!confirm('Clear all failed jobs from queue?')) return;
-
-    try {
-      // This would need a backend endpoint to clear failed jobs
-      showNotification('Clear failed jobs feature not implemented yet', 'info');
-    } catch (err) {
-      showNotification('Error clearing failed jobs: ' + err.message, 'error');
-    }
-  });
-
-  // Массовые операции с файлами
-  document.getElementById('selectAllFilesBtn')?.addEventListener('click', () => {
-    const checkboxes = document.querySelectorAll('#filesList .file-checkbox');
-    checkboxes.forEach(checkbox => {
-      checkbox.checked = true;
-      const filename = checkbox.dataset.file;
-      window.selectedFiles.add(filename);
-    });
-    updateBulkButtons();
-  });
-
-  document.getElementById('clearSelectionBtn')?.addEventListener('click', () => {
-    const checkboxes = document.querySelectorAll('#filesList .file-checkbox');
-    checkboxes.forEach(checkbox => {
-      checkbox.checked = false;
-      const filename = checkbox.dataset.file;
-      window.selectedFiles.delete(filename);
-    });
-    updateBulkButtons();
-  });
-
-  document.getElementById('bulkDeleteBtn')?.addEventListener('click', async () => {
-    if (window.selectedFiles.size === 0) return;
-
-    const filesToDelete = Array.from(window.selectedFiles);
-    const confirmMessage = `Are you sure you want to delete ${filesToDelete.length} file(s)?\n\n${filesToDelete.join('\n')}`;
-
-    if (!confirm(confirmMessage)) return;
-
-    let successCount = 0;
-    let failCount = 0;
-
-    for (const filePath of filesToDelete) {
-      try {
-        const res = await apiCall('/api/files/delete', 'DELETE', {
-          path: filePath
-        });
-        if (res.success) {
-          successCount++;
-        } else {
-          failCount++;
-        }
-      } catch (err) {
-        failCount++;
-        console.error('Delete error:', err);
-      }
-    }
-
-    if (failCount === 0) {
-      showNotification(`Successfully deleted ${successCount} file(s)`, 'success');
-    } else {
-      showNotification(`Deleted ${successCount} file(s). Failed to delete ${failCount} file(s).`, 'warning');
-    }
-
-    window.selectedFiles.clear();
-    updateBulkButtons();
-    loadFiles();
-  });
-
-  // Обновление состояния чекбоксов при изменении selectedFiles
-  function updateFileCheckboxes() {
-    const checkboxes = document.querySelectorAll('#filesList .file-checkbox');
-    checkboxes.forEach(checkbox => {
-      const filename = checkbox.dataset.file;
-      checkbox.checked = window.selectedFiles.has(filename);
-    });
-    updateBulkButtons();
-  }
-
-  // Обновление состояния кнопок массовых операций
-  function updateBulkButtons() {
-    const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
-    const hasSelection = window.selectedFiles.size > 0;
-    bulkDeleteBtn.disabled = !hasSelection;
-  }
-
-  // Переопределяем updateApplyButtons чтобы он также обновлял bulk buttons
-  const originalUpdateApplyButtons = window.updateApplyButtons;
-  window.updateApplyButtons = function() {
-    if (originalUpdateApplyButtons) originalUpdateApplyButtons();
-    updateBulkButtons();
-  };
 
   // Загрузка данных
   loadTemplates();

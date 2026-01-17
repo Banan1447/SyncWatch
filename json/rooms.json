@@ -1,14 +1,26 @@
 [
   {
+    "id": "UX_6_VB-u",
+    "name": "1",
+    "ownerId": "f0ZS-yNceZ1bbAsjAAAB",
+    "password": "1",
+    "users": {},
+    "currentVideo": null,
+    "currentTime": 0,
+    "isPlaying": false,
+    "duration": 0,
+    "youtubeQueue": []
+  },
+  {
     "id": "wjdkmFdOo",
     "name": "3",
     "ownerId": "uuju6yOPIzcYigM0AAAF",
     "password": "3",
     "users": {},
-    "currentVideo": "Superman.mp4",
-    "currentTime": 5301.224165,
+    "currentVideo": "Solo_Leveling_Ep01.mp4",
+    "currentTime": 456.922326,
     "isPlaying": false,
-    "duration": 7763.68,
+    "duration": 1422.003,
     "youtubeQueue": []
   },
   {
@@ -16,12 +28,7 @@
     "name": "2",
     "ownerId": "h52ibTPVlV3jkgxTAAAJ",
     "password": null,
-    "users": {
-      "dUNfaZWFXwHWc3GvAAAD": {
-        "name": "Artur",
-        "socketId": "dUNfaZWFXwHWc3GvAAAD"
-      }
-    },
+    "users": {},
     "currentVideo": "Alien.Earth.S01E08.WEB-DLRip.RGzsRutracker.mp4",
     "currentTime": 870.564544,
     "isPlaying": false,
@@ -29,65 +36,15 @@
     "youtubeQueue": []
   },
   {
-    "id": "Culn1hhfo",
-    "name": "Alisa",
-    "ownerId": "frkcLQpZuYc_MlxZAAAB",
-    "password": null,
-    "users": {
-      "5GRTAObriDIzh8nTAAAD": {
-        "name": "lap98",
-        "socketId": "5GRTAObriDIzh8nTAAAD"
-      },
-      "nGnBqY5LVaMw7os5AAAZ": {
-        "name": "Artur",
-        "socketId": "nGnBqY5LVaMw7os5AAAZ"
-      },
-      "GieWYHK3wzulVdHQAAAF": {
-        "name": "Artur",
-        "socketId": "GieWYHK3wzulVdHQAAAF"
-      },
-      "OzPToKR8hMg7dHG6AAAJ": {
-        "name": "Artur",
-        "socketId": "OzPToKR8hMg7dHG6AAAJ"
-      },
-      "imhDNDvsnF4YBO3OAAAH": {
-        "name": "Artur",
-        "socketId": "imhDNDvsnF4YBO3OAAAH"
-      },
-      "FPZRBqoQirO6t8AhAAAF": {
-        "name": "Artur",
-        "socketId": "FPZRBqoQirO6t8AhAAAF"
-      },
-      "w7JtxjPoAfPLL2JcAAAD": {
-        "name": "Artur",
-        "socketId": "w7JtxjPoAfPLL2JcAAAD"
-      },
-      "MGOQludp_ed0GGFJAAAD": {
-        "name": "Artur",
-        "socketId": "MGOQludp_ed0GGFJAAAD"
-      }
-    },
-    "currentVideo": "Superman.mp4",
-    "currentTime": 1488.008886,
+    "id": "9AFOmrjFa",
+    "name": "4",
+    "ownerId": "6-NRyN51YaEyQ5ScAAAh",
+    "password": "4",
+    "users": {},
+    "currentVideo": null,
+    "currentTime": 0,
     "isPlaying": false,
-    "duration": 7763.68,
-    "youtubeQueue": []
-  },
-  {
-    "id": "cB8y_ZQaN",
-    "name": "123",
-    "ownerId": "VsmjR3MbCmki_l0VAAAF",
-    "password": "123",
-    "users": {
-      "uaTTxrFSZs5ETV1yAAAH": {
-        "name": "Artur",
-        "socketId": "uaTTxrFSZs5ETV1yAAAH"
-      }
-    },
-    "currentVideo": "Superman.mp4",
-    "currentTime": 3040.934713,
-    "isPlaying": false,
-    "duration": 7763.68,
+    "duration": 0,
     "youtubeQueue": []
   }
 ]
