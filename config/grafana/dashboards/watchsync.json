@@ -1,0 +1,166 @@
+{
+  "title": "WatchSync Overview",
+  "uid": "watchsync-overview",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "10s",
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Active WebSocket Connections",
+      "type": "stat",
+      "gridPos": { "x": 0, "y": 0, "w": 4, "h": 4 },
+      "targets": [
+        {
+          "expr": "ws_gateway_active_connections",
+          "legendFormat": "Connections"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 2,
+      "title": "Active Rooms",
+      "type": "stat",
+      "gridPos": { "x": 4, "y": 0, "w": 4, "h": 4 },
+      "targets": [
+        {
+          "expr": "ws_gateway_active_rooms",
+          "legendFormat": "Rooms"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 3,
+      "title": "Chat Messages (rate)",
+      "type": "stat",
+      "gridPos": { "x": 8, "y": 0, "w": 4, "h": 4 },
+      "targets": [
+        {
+          "expr": "rate(chat_service_messages_processed_total[5m])",
+          "legendFormat": "msg/s"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 4,
+      "title": "Rate Limit Hits",
+      "type": "stat",
+      "gridPos": { "x": 12, "y": 0, "w": 4, "h": 4 },
+      "targets": [
+        {
+          "expr": "increase(chat_service_rate_limit_hits_total[5m])",
+          "legendFormat": "hits/5m"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 5,
+      "title": "WS Messages Processed",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 4, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "rate(ws_gateway_messages_total[1m])",
+          "legendFormat": "WS messages/s"
+        },
+        {
+          "expr": "rate(chat_service_messages_processed_total[1m])",
+          "legendFormat": "Chat messages/s"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "HTTP Request Rate per Service",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 4, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "rate(http_requests_total{job=\"auth-service\"}[1m])",
+          "legendFormat": "auth"
+        },
+        {
+          "expr": "rate(http_requests_total{job=\"room-service\"}[1m])",
+          "legendFormat": "room"
+        },
+        {
+          "expr": "rate(http_requests_total{job=\"video-service\"}[1m])",
+          "legendFormat": "video"
+        },
+        {
+          "expr": "rate(http_requests_total{job=\"user-service\"}[1m])",
+          "legendFormat": "user"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Redis Memory Usage",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 12, "w": 8, "h": 6 },
+      "targets": [
+        {
+          "expr": "redis_memory_used_bytes",
+          "legendFormat": "Used"
+        },
+        {
+          "expr": "redis_memory_max_bytes",
+          "legendFormat": "Max"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "PostgreSQL Active Connections",
+      "type": "timeseries",
+      "gridPos": { "x": 8, "y": 12, "w": 8, "h": 6 },
+      "targets": [
+        {
+          "expr": "pg_stat_activity_count",
+          "legendFormat": "Active connections"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "title": "Transcoder Jobs",
+      "type": "timeseries",
+      "gridPos": { "x": 16, "y": 12, "w": 8, "h": 6 },
+      "targets": [
+        {
+          "expr": "rate(transcoder_jobs_processed_total[5m])",
+          "legendFormat": "processed/s"
+        },
+        {
+          "expr": "rate(transcoder_jobs_failed_total[5m])",
+          "legendFormat": "failed/s"
+        },
+        {
+          "expr": "transcoder_active_jobs",
+          "legendFormat": "active"
+        }
+      ]
+    }
+  ]
+}

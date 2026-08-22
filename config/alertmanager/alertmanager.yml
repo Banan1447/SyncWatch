@@ -1,0 +1,64 @@
+global:
+  resolve_timeout: 5m
+
+# Template files for custom message formatting
+templates:
+  - /etc/alertmanager/templates/*.tmpl
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Routing tree
+# ─────────────────────────────────────────────────────────────────────────────
+route:
+  receiver: telegram-critical
+  group_by: ['alertname', 'severity']
+  group_wait: 30s        # wait for more alerts before first notification
+  group_interval: 5m     # how long to wait before sending notification about new alerts in the group
+  repeat_interval: 4h    # re-send if not resolved
+
+  routes:
+    # Critical alerts go to Telegram immediately
+    - matchers:
+        - severity = "critical"
+      receiver: telegram-critical
+      group_wait: 10s
+      repeat_interval: 1h
+
+    # Warnings go to Telegram with less urgency
+    - matchers:
+        - severity = "warning"
+      receiver: telegram-warning
+      group_wait: 2m
+      repeat_interval: 6h
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Inhibition rules — suppress lower-priority alerts when higher ones are firing
+# ─────────────────────────────────────────────────────────────────────────────
+inhibit_rules:
+  # If a service is completely down, suppress its resource warnings
+  - source_matchers:
+      - alertname = "ServiceDown"
+    target_matchers:
+      - severity = "warning"
+    equal: ['job']
+
+  # If Redis is down, suppress Redis-related warnings
+  - source_matchers:
+      - alertname = "RedisDown"
+    target_matchers:
+      - alertname =~ "HighRedisMemory|RedisKeyEviction"
+
+  # If host is at critical CPU, suppress warning CPU
+  - source_matchers:
+      - alertname = "CriticalCPU"
+    target_matchers:
+      - alertname = "HighCPU"
+    equal: ['instance']
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Receivers
+# ─────────────────────────────────────────────────────────────────────────────
+# To enable Telegram notifications set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in .env
+# and replace these receivers with telegram_configs entries.
+receivers:
+  - name: telegram-critical
+  - name: telegram-warning

@@ -1,0 +1,710 @@
+_format_version: "3.0"
+_transform: true
+
+# ─────────────────────────────────────────────────────────────────────────────
+# JWT Consumer — must use the same secret as JWT_SECRET env var in auth-service
+# ─────────────────────────────────────────────────────────────────────────────
+consumers:
+  - username: watchsync-app
+    jwt_secrets:
+      - key: watchsync
+        algorithm: HS256
+        # IMPORTANT: must match JWT_SECRET in .env
+        secret: watchsync-jwt-secret-change-in-production-32c
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Services
+# ─────────────────────────────────────────────────────────────────────────────
+services:
+  # Auth Service — public: login/register/refresh; protected: me, users
+  - name: auth-service
+    url: http://auth-service:8080
+    routes:
+      # Per-endpoint brute-force protection (rate-limiting keyed by client IP).
+      - name: auth-login
+        paths:
+          - /api/v1/auth/login
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+        plugins:
+          - name: rate-limiting
+            config:
+              minute: 5
+              policy: local
+      - name: auth-register
+        paths:
+          - /api/v1/auth/register
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+        plugins:
+          - name: rate-limiting
+            config:
+              minute: 3
+              policy: local
+      - name: auth-anonymous
+        paths:
+          - /api/v1/auth/anonymous
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+        plugins:
+          - name: rate-limiting
+            config:
+              minute: 10
+              policy: local
+      - name: auth-public
+        paths:
+          - /api/v1/auth/refresh
+          - /api/v1/auth/logout
+          - /api/v1/auth/verify
+          - /api/v1/auth/verify-email
+          - /api/v1/auth/totp/verify
+          - /api/v1/auth/totp/setup
+          - /api/v1/auth/totp/enable
+          - /api/v1/auth/desktop/version
+        strip_path: false
+      - name: auth-resend-verification
+        paths:
+          - /api/v1/auth/resend-verification
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+        plugins:
+          - name: jwt
+            config:
+              key_claim_name: iss
+              claims_to_verify:
+                - exp
+      - name: auth-protected
+        paths:
+          - /api/v1/auth/me
+          - /api/v1/auth/users
+          - /api/v1/auth/users/
+          - /api/v1/auth/change-password
+          - /api/v1/auth/totp/disable
+        strip_path: false
+        plugins:
+          - name: jwt
+            config:
+              key_claim_name: iss
+              claims_to_verify:
+                - exp
+      - name: auth-admin-docker
+        paths:
+          - /api/v1/auth/admin/docker
+          - /api/v1/auth/admin/broadcast
+          - /api/v1/auth/admin/redis
+          - /api/v1/auth/admin/users
+        strip_path: false
+        plugins:
+          - name: jwt
+            config:
+              key_claim_name: iss
+              claims_to_verify:
+                - exp
+      - name: push-vapid-key
+        paths:
+          - /api/v1/push/vapid-key
+        methods:
+          - GET
+          - OPTIONS
+        strip_path: false
+      - name: push-subscribe
+        paths:
+          - /api/v1/push/subscribe
+        methods:
+          - POST
+          - DELETE
+          - OPTIONS
+        strip_path: false
+        plugins:
+          - name: jwt
+            config:
+              key_claim_name: iss
+              claims_to_verify:
+                - exp
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 30
+          policy: local
+      - name: cors
+        config:
+          origins:
+            - "*"
+          methods:
+            - GET
+            - POST
+            - PUT
+            - PATCH
+            - DELETE
+            - OPTIONS
+          headers:
+            - Authorization
+            - Content-Type
+          max_age: 3600
+
+  # User Service
+  - name: user-service
+    url: http://user-service:8080
+    routes:
+      - name: user-routes
+        paths:
+          - /api/v1/users
+        strip_path: false
+    plugins:
+      - name: jwt
+        config:
+          key_claim_name: iss
+          claims_to_verify:
+            - exp
+      - name: rate-limiting
+        config:
+          minute: 100
+          policy: local
+      - name: cors
+        config:
+          origins: ["*"]
+
+  # Room Service
+  - name: room-service
+    url: http://room-service:8080
+    routes:
+      - name: room-routes-public
+        paths:
+          - /api/v1/rooms
+        methods:
+          - GET
+          - OPTIONS
+        strip_path: false
+      - name: room-routes-protected
+        paths:
+          - /api/v1/rooms
+        methods:
+          - POST
+          - PUT
+          - PATCH
+          - DELETE
+        strip_path: false
+        plugins:
+          - name: jwt
+            config:
+              key_claim_name: iss
+              claims_to_verify:
+                - exp
+      - name: room-events-route
+        paths:
+          - ~/api/v1/rooms/[^/]+/events$
+        methods:
+          - GET
+          - OPTIONS
+        strip_path: false
+        regex_priority: 10
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 60
+          policy: local
+      - name: cors
+        config:
+          origins: ["*"]
+          methods:
+            - GET
+            - POST
+            - PUT
+            - PATCH
+            - DELETE
+            - OPTIONS
+          headers:
+            - Authorization
+            - Content-Type
+          max_age: 3600
+
+  # Video Service
+  - name: video-service
+    url: http://video-service:8080
+    connect_timeout: 10000
+    read_timeout: 300000    # 5 min — needed for long-running proxy/stream responses
+    write_timeout: 300000
+    routes:
+      - name: video-stream-route
+        paths:
+          - ~/api/v1/videos/stream/.+
+        methods:
+          - GET
+          - HEAD
+          - OPTIONS
+        strip_path: false
+        regex_priority: 30
+      - name: video-prebuffer-route
+        paths:
+          - ~/api/v1/videos/prebuffer/.+
+        methods:
+          - GET
+          - OPTIONS
+        strip_path: false
+        regex_priority: 31
+      - name: video-routes-public
+        paths:
+          - /api/v1/videos
+        methods:
+          - GET
+          - OPTIONS
+        strip_path: false
+      - name: video-routes-protected
+        paths:
+          - /api/v1/videos
+        methods:
+          - POST
+          - PUT
+          - DELETE
+        strip_path: false
+        plugins:
+          - name: jwt
+            config:
+              key_claim_name: iss
+              claims_to_verify:
+                - exp
+      - name: video-queue-routes
+        paths:
+          - ~/api/v1/rooms/[^/]+/queue
+        strip_path: false
+        regex_priority: 10
+      - name: embed-extract
+        paths:
+          - /api/v1/embed/extract
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+      - name: proxy-url-route
+        paths:
+          - ~/api/v1/rooms/[^/]+/proxy-url
+        methods:
+          - GET
+          - OPTIONS
+        strip_path: false
+        regex_priority: 20
+        plugins:
+          - name: rate-limiting
+            config:
+              minute: 3000
+              policy: local
+      - name: proxy-config-route
+        paths:
+          - ~/api/v1/rooms/[^/]+/proxy-config
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+        regex_priority: 20
+      - name: file-upload-route
+        paths:
+          - /api/v1/files/upload
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+        plugins:
+          - name: jwt
+            config:
+              key_claim_name: iss
+              claims_to_verify:
+                - exp
+      # Proxy Upstream Registry
+      - name: proxy-upstreams
+        paths:
+          - /api/v1/proxy/upstreams
+        methods:
+          - GET
+          - POST
+          - OPTIONS
+        strip_path: false
+        plugins:
+          - name: jwt
+            config:
+              key_claim_name: iss
+              claims_to_verify:
+                - exp
+      - name: proxy-upstream-item
+        paths:
+          - ~/api/v1/proxy/upstreams/.+
+        methods:
+          - PUT
+          - DELETE
+          - POST
+          - OPTIONS
+        strip_path: false
+        regex_priority: 10
+        plugins:
+          - name: jwt
+            config:
+              key_claim_name: iss
+              claims_to_verify:
+                - exp
+      # Proxy fetch (generic proxy endpoint)
+      - name: proxy-fetch
+        paths:
+          - /api/v1/proxy/fetch
+        methods:
+          - GET
+          - OPTIONS
+        strip_path: false
+        plugins:
+          - name: jwt
+            config:
+              key_claim_name: iss
+              claims_to_verify:
+                - exp
+      # Proxy health (upstream health status)
+      - name: proxy-health
+        paths:
+          - /api/v1/proxy/health
+        methods:
+          - GET
+          - OPTIONS
+        strip_path: false
+        plugins:
+          - name: jwt
+            config:
+              key_claim_name: iss
+              claims_to_verify:
+                - exp
+      # Video qualities endpoint
+      - name: video-qualities
+        paths:
+          - /api/v1/videos/qualities
+        methods:
+          - GET
+          - OPTIONS
+        strip_path: false
+        plugins:
+          - name: jwt
+            config:
+              key_claim_name: iss
+              claims_to_verify:
+                - exp
+      # Resolve Twitch/YouTube page URL → playable HLS stream URL (yt-dlp -g)
+      - name: video-resolve-stream
+        paths:
+          - /api/v1/videos/resolve-stream
+        methods:
+          - GET
+          - OPTIONS
+        strip_path: false
+        plugins:
+          - name: rate-limiting
+            config:
+              minute: 300
+              policy: local
+      # File Manager routes
+      - name: file-manager-info
+        paths:
+          - /api/v1/files/info
+        methods:
+          - GET
+          - OPTIONS
+        strip_path: false
+        plugins:
+          - name: jwt
+            config:
+              key_claim_name: iss
+              claims_to_verify:
+                - exp
+      - name: file-manager-list-delete
+        paths:
+          - /api/v1/files
+        methods:
+          - GET
+          - DELETE
+          - OPTIONS
+        strip_path: false
+        plugins:
+          - name: jwt
+            config:
+              key_claim_name: iss
+              claims_to_verify:
+                - exp
+      - name: file-manager-folder
+        paths:
+          - /api/v1/files/folder
+        methods:
+          - POST
+          - DELETE
+          - OPTIONS
+        strip_path: false
+        plugins:
+          - name: jwt
+            config:
+              key_claim_name: iss
+              claims_to_verify:
+                - exp
+      - name: file-manager-move
+        paths:
+          - /api/v1/files/move
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+        plugins:
+          - name: jwt
+            config:
+              key_claim_name: iss
+              claims_to_verify:
+                - exp
+      - name: file-manager-copy
+        paths:
+          - /api/v1/files/copy
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+        plugins:
+          - name: jwt
+            config:
+              key_claim_name: iss
+              claims_to_verify:
+                - exp
+      - name: file-manager-fm-upload
+        paths:
+          - /api/v1/files/fm-upload
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+        plugins:
+          - name: jwt
+            config:
+              key_claim_name: iss
+              claims_to_verify:
+                - exp
+      - name: stream-cache-routes
+        paths:
+          - /api/v1/cache
+        methods:
+          - GET
+          - POST
+          - DELETE
+          - OPTIONS
+        strip_path: false
+        plugins:
+          - name: jwt
+            config:
+              key_claim_name: iss
+              claims_to_verify:
+                - exp
+      - name: youtube-cookies
+        paths:
+          - /api/v1/youtube/cookies
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+        plugins:
+          - name: jwt
+            config:
+              key_claim_name: iss
+              claims_to_verify:
+                - exp
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 120
+          policy: local
+      - name: cors
+        config:
+          origins: ["*"]
+          methods:
+            - GET
+            - POST
+            - PUT
+            - DELETE
+            - OPTIONS
+          headers:
+            - Authorization
+            - Content-Type
+          max_age: 3600
+
+  # Chat Service
+  - name: chat-service
+    url: http://chat-service:8080
+    routes:
+      - name: chat-routes
+        paths:
+          - /api/v1/chat
+        strip_path: false
+      - name: chat-messages-routes
+        paths:
+          - ~/api/v1/rooms/[^/]+/messages$
+        strip_path: false
+        regex_priority: 10
+      - name: chat-message-modify-route
+        paths:
+          - ~/api/v1/rooms/[^/]+/messages/[^/]+
+        methods:
+          - DELETE
+          - PATCH
+        strip_path: false
+        regex_priority: 11
+        plugins:
+          - name: jwt
+            config:
+              key_claim_name: iss
+              claims_to_verify:
+                - exp
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 200
+          policy: local
+      - name: cors
+        config:
+          origins: ["*"]
+
+  # Transcoder Service
+  - name: transcoder-service
+    url: http://transcoder:8080
+    routes:
+      - name: transcode-templates
+        paths:
+          - /api/v1/transcode/templates
+        methods:
+          - GET
+          - POST
+          - OPTIONS
+        strip_path: false
+        plugins:
+          - name: jwt
+            config:
+              key_claim_name: iss
+              claims_to_verify:
+                - exp
+      - name: transcode-template-delete
+        paths:
+          - ~/api/v1/transcode/templates/.+$
+        methods:
+          - DELETE
+          - OPTIONS
+        strip_path: false
+        regex_priority: 15
+        plugins:
+          - name: jwt
+            config:
+              key_claim_name: iss
+              claims_to_verify:
+                - exp
+      - name: transcode-protected
+        paths:
+          - /api/v1/transcode
+          - /api/v1/transcode/extract-subtitles
+          - /api/v1/transcode/quick
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+        plugins:
+          - name: jwt
+            config:
+              key_claim_name: iss
+              claims_to_verify:
+                - exp
+      - name: transcode-job-status
+        paths:
+          - ~/api/v1/transcode/[^/]+$
+        methods:
+          - GET
+          - OPTIONS
+        strip_path: false
+        regex_priority: 5
+        plugins:
+          - name: jwt
+            config:
+              key_claim_name: iss
+              claims_to_verify:
+                - exp
+      - name: transcode-cancel
+        paths:
+          - ~/api/v1/transcode/[^/]+/cancel$
+        methods:
+          - POST
+          - OPTIONS
+        strip_path: false
+        regex_priority: 10
+        plugins:
+          - name: jwt
+            config:
+              key_claim_name: iss
+              claims_to_verify:
+                - exp
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 20
+          policy: local
+      - name: cors
+        config:
+          origins: ["*"]
+          methods:
+            - GET
+            - POST
+            - OPTIONS
+          headers:
+            - Authorization
+            - Content-Type
+          max_age: 3600
+
+  # Sync Service (internal only)
+  - name: sync-service
+    url: http://sync-service:8080
+    routes: []
+
+  # Parser Service — anime site parser
+  - name: parser-service
+    url: http://parser-service:8080
+    routes:
+      - name: parser-routes
+        paths:
+          - /api/v1/anime
+        strip_path: false
+        methods:
+          - GET
+          - POST
+          - OPTIONS
+        plugins:
+          - name: jwt
+            config:
+              key_claim_name: iss
+              claims_to_verify:
+                - exp
+          - name: cors
+            config:
+              origins: ["*"]
+              methods:
+                - GET
+                - POST
+                - OPTIONS
+              headers:
+                - Authorization
+                - Content-Type
+                - X-Anime-Cookies
+              max_age: 3600
+
+  # Media SFU Service (Mediasoup)
+  - name: media-service
+    url: http://media-server:8080
+    routes:
+      - name: media-routes
+        paths:
+          - /api/v1/sfu
+          - /api/v1/media
+        strip_path: false
+    plugins:
+      - name: cors
+        config:
+          origins: ["*"]

@@ -1,0 +1,932 @@
+# =============================================================================
+# WATCHSYNC PLATFORM - Docker Compose Configuration
+# Full microservices architecture for video synchronization platform
+# =============================================================================
+
+services:
+  # ===========================================================================
+  # DATABASE LAYER
+  # ===========================================================================
+
+  # PostgreSQL - Primary database for users, rooms, metadata
+  postgres:
+    image: postgres:16-alpine
+    container_name: watchsync-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-watchsync}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
+      POSTGRES_DB: ${DB_NAME:-watchsync}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init/postgres:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-watchsync} -d ${DB_NAME:-watchsync}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - backend
+
+  # Redis - Cache, sessions, and Pub/Sub for WebSocket scaling
+  redis:
+    image: redis:7-alpine
+    container_name: watchsync-redis
+    restart: unless-stopped
+    command: >
+      redis-server
+      --appendonly yes
+      --appendfsync everysec
+      --maxmemory 1gb
+      --maxmemory-policy volatile-lru
+      --tcp-keepalive 300
+      --timeout 0
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - backend
+
+  # ScyllaDB - High-performance chat and real-time data
+  scylla:
+    image: scylladb/scylla:5.4
+    container_name: watchsync-scylla
+    restart: unless-stopped
+    command: >
+      --smp 2
+      --memory 2G
+      --overprovisioned 1
+      --listen-address 0.0.0.0
+      --rpc-address 0.0.0.0
+      --broadcast-address 127.0.0.1
+      --broadcast-rpc-address 127.0.0.1
+      --developer-mode 1
+    volumes:
+      - scylla_data:/var/lib/scylla
+    ports:
+      - "9042:9042"
+      - "9180:9180"
+    healthcheck:
+      test: ["CMD", "cqlsh", "-e", "describe keyspaces"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    networks:
+      - backend
+
+  # ScyllaDB auto-init: applies CQL schema after ScyllaDB is ready
+  scylla-init:
+    image: scylladb/scylla:5.4
+    container_name: watchsync-scylla-init
+    profiles: ["init"]
+    restart: "no"
+    depends_on:
+      scylla:
+        condition: service_healthy
+    entrypoint: ["sh", "-c", "cqlsh scylla 9042 -f /init/01_chat.cql && echo 'ScyllaDB schema applied'"]
+    volumes:
+      - ./init/scylla:/init:ro
+    networks:
+      - backend
+
+  # MinIO - S3-compatible object storage for videos
+  minio:
+    image: minio/minio:latest
+    container_name: watchsync-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD:-minioadmin}
+      MINIO_BROWSER_REDIRECT_URL: http://localhost:9001
+    volumes:
+      - minio_data:/data
+      - ./videos:/import:ro
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    networks:
+      - backend
+
+  # Create MinIO buckets on startup
+  minio-init:
+    image: minio/mc:latest
+    container_name: watchsync-minio-init
+    profiles: ["init"]
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc alias set myminio http://minio:9000 ${MINIO_USER:-minioadmin} ${MINIO_PASSWORD:-minioadmin};
+      /usr/bin/mc mb myminio/videos || true;
+      /usr/bin/mc mb myminio/thumbnails || true;
+      /usr/bin/mc mb myminio/avatars || true;
+      /usr/bin/mc anonymous set download myminio/videos;
+      /usr/bin/mc anonymous set download myminio/thumbnails;
+      /usr/bin/mc anonymous set download myminio/avatars;
+      exit 0;
+      "
+    networks:
+      - backend
+
+  # ===========================================================================
+  # MESSAGE BROKER
+  # ===========================================================================
+
+  # NATS - High-performance message broker
+  nats:
+    image: nats:2-alpine
+    container_name: watchsync-nats
+    restart: unless-stopped
+    command: >
+      -js
+      -m 8222
+      --store_dir /data/jetstream
+    volumes:
+      - nats_data:/data/jetstream
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8222/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - backend
+
+  # ===========================================================================
+  # API GATEWAY
+  # ===========================================================================
+
+  # Kong API Gateway
+  kong:
+    image: kong:3.5
+    container_name: watchsync-kong
+    restart: unless-stopped
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /kong/declarative/kong.yml
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_PLUGINS: bundled,rate-limiting,cors
+      KONG_PROXY_LISTEN: 0.0.0.0:8000
+      KONG_ADMIN_LISTEN: 0.0.0.0:8001
+      KONG_NGINX_HTTP_CLIENT_MAX_BODY_SIZE: 4096m
+    volumes:
+      - ./config/kong:/kong/declarative:ro
+    ports:
+      - "8000:8000"
+      - "8001:8001"
+    networks:
+      - backend
+    depends_on:
+      - redis
+    healthcheck:
+      test: ["CMD", "kong", "health"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  # ===========================================================================
+  # BACKEND SERVICES
+  # ===========================================================================
+
+  # Auth Service - Authentication and authorization
+  auth-service:
+    build:
+      context: ./services/auth
+      dockerfile: Dockerfile
+      target: production
+    container_name: watchsync-auth
+    restart: unless-stopped
+    environment:
+      SERVICE_NAME: auth-service
+      PORT: 8080
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-watchsync}
+      DB_PASSWORD: ${DB_PASSWORD:-changeme}
+      DB_NAME: ${DB_NAME:-watchsync}
+      DB_SSL_MODE: disable
+      JWT_SECRET: ${JWT_SECRET:-your-secret-key-change-in-production}
+      JWT_ACCESS_TTL: 15m
+      JWT_REFRESH_TTL: 168h
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DB: 0
+      BCRYPT_COST: 12
+      LOG_LEVEL: info
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-noreply@watchsync.local}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
+      EMAIL_VERIFY_TIMEOUT_DAYS: ${EMAIL_VERIFY_TIMEOUT_DAYS:-0}
+    ports:
+      - "8081:8080"
+    networks:
+      - backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    user: root
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # User Service - User profile management
+  user-service:
+    build:
+      context: ./services/user
+      dockerfile: Dockerfile
+      target: production
+    container_name: watchsync-user
+    restart: unless-stopped
+    environment:
+      SERVICE_NAME: user-service
+      PORT: 8080
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-watchsync}
+      DB_PASSWORD: ${DB_PASSWORD:-changeme}
+      DB_NAME: ${DB_NAME:-watchsync}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_USER:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_PASSWORD:-minioadmin}
+      MINIO_BUCKET_AVATARS: avatars
+      LOG_LEVEL: info
+    ports:
+      - "8082:8080"
+    networks:
+      - backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # Room Service - Room management
+  room-service:
+    build:
+      context: ./services/room
+      dockerfile: Dockerfile
+      target: production
+    container_name: watchsync-room
+    restart: unless-stopped
+    environment:
+      SERVICE_NAME: room-service
+      PORT: 8080
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-watchsync}
+      DB_PASSWORD: ${DB_PASSWORD:-changeme}
+      DB_NAME: ${DB_NAME:-watchsync}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      NATS_URL: nats://nats:4222
+      MAX_ROOM_SIZE: 100
+      DEFAULT_ROOM_TTL: 24h
+      LOG_LEVEL: info
+    ports:
+      - "8083:8080"
+    networks:
+      - backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # FlareSolverr — headless Chrome proxy for Cloudflare-protected sites (animego.me etc.)
+  flaresolverr:
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    container_name: watchsync-flaresolverr
+    restart: unless-stopped
+    environment:
+      LOG_LEVEL: info
+      TZ: Europe/Moscow
+    ports:
+      - "8191:8191"
+    networks:
+      - backend
+
+  # Parser Service — anime site parser (animego.me, Kodik, Aniboom)
+  parser-service:
+    build:
+      context: ./services/parser
+      dockerfile: Dockerfile
+      target: production
+    container_name: watchsync-parser
+    restart: unless-stopped
+    environment:
+      PORT: 8080
+      FLARESOLVERR_URL: http://flaresolverr:8191
+      REDIS_URL: redis://redis:6379
+    ports:
+      - "8089:8080"
+    networks:
+      - backend
+    depends_on:
+      - flaresolverr
+      - redis
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # Video Service - Video queue and metadata
+  video-service:
+    build:
+      context: ./services/video
+      dockerfile: Dockerfile
+      target: production
+    container_name: watchsync-video
+    restart: unless-stopped
+    environment:
+      SERVICE_NAME: video-service
+      PORT: 8080
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-watchsync}
+      DB_PASSWORD: ${DB_PASSWORD:-changeme}
+      DB_NAME: ${DB_NAME:-watchsync}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_USER:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_PASSWORD:-minioadmin}
+      YOUTUBE_API_KEY: ${YOUTUBE_API_KEY:-}
+      MAX_QUEUE_SIZE: 100
+      LOG_LEVEL: info
+      FLARESOLVERR_URL: http://flaresolverr:8191
+      NATS_URL: nats://nats:4222
+      FORWARD_PROXY_PORT: 8090
+    ports:
+      - "8084:8080"
+      - "9094:8090"
+    networks:
+      - backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      nats:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ===========================================================================
+  # REAL-TIME SERVICES
+  # ===========================================================================
+
+  # WebSocket Gateway - Main WebSocket connection entry point
+  ws-gateway:
+    build:
+      context: ./services/ws-gateway
+      dockerfile: Dockerfile
+      target: production
+    container_name: watchsync-ws-gateway
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: '1.0'
+    environment:
+      SERVICE_NAME: ws-gateway
+      PORT: 8080
+      WS_PATH: /ws
+      PING_INTERVAL: 30s
+      PONG_TIMEOUT: 10s
+      MAX_CONNECTIONS: 100000
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DB: 1
+      NATS_URL: nats://nats:4222
+      SYNC_SERVICE_URL: http://sync-service:8080
+      AUTH_SERVICE_URL: http://auth-service:8080
+      LOG_LEVEL: info
+    ports:
+      - "8085:8080"
+    networks:
+      - backend
+    depends_on:
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # Sync Service - Video synchronization engine (CRDT-based)
+  sync-service:
+    build:
+      context: ./services/sync
+      dockerfile: Dockerfile
+      target: production
+    container_name: watchsync-sync
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+          cpus: '0.5'
+    environment:
+      SERVICE_NAME: sync-service
+      PORT: 8080
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DB: 2
+      NATS_URL: nats://nats:4222
+      SYNC_INTERVAL: 50ms
+      MAX_DRIFT: 100ms
+      BUFFER_OFFSET: 50ms
+      LOG_LEVEL: info
+    ports:
+      - "8086:8080"
+    networks:
+      - backend
+    depends_on:
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # Chat Service - Real-time chat with ScyllaDB history
+  chat-service:
+    build:
+      context: ./services/chat
+      dockerfile: Dockerfile
+      target: production
+    container_name: watchsync-chat
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+          cpus: '0.5'
+    environment:
+      SERVICE_NAME: chat-service
+      PORT: 8080
+      SCYLLA_HOSTS: scylla:9042
+      SCYLLA_KEYSPACE: chat
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DB: 3
+      NATS_URL: nats://nats:4222
+      MAX_MESSAGE_LENGTH: 2000
+      RATE_LIMIT_MESSAGES: 30
+      RATE_LIMIT_WINDOW: 60s
+      LOG_LEVEL: info
+    ports:
+      - "8087:8080"
+    networks:
+      - backend
+    depends_on:
+      scylla:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  # ===========================================================================
+  # MEDIA SERVICES
+  # ===========================================================================
+
+  # TURN Server - NAT traversal for WebRTC
+  coturn:
+    image: coturn/coturn:4.6.2
+    container_name: watchsync-coturn
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      DETECT_EXTERNAL_IP: "yes"
+    volumes:
+      - ./config/coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
+    command: -c /etc/coturn/turnserver.conf
+
+  # Video Transcoding Service - FFmpeg-based HLS transcoder
+  transcoder:
+    build:
+      context: ./services/transcoder
+      dockerfile: Dockerfile
+    container_name: watchsync-transcoder
+    restart: unless-stopped
+    environment:
+      SERVICE_NAME: transcoder
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DB: 4
+      NATS_URL: nats://nats:4222
+      MINIO_HOST: minio
+      MINIO_PORT: 9000
+      MINIO_ROOT_USER: ${MINIO_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD:-minioadmin}
+      MINIO_BUCKET: videos
+      TEMP_DIR: /tmp/transcoder
+    volumes:
+      - transcoder_temp:/tmp/transcoder
+    networks:
+      - backend
+    depends_on:
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  # Media Server - WebRTC SFU placeholder (implement with Mediasoup in Stage 9)
+  media-server:
+    build:
+      context: ./services/media
+      dockerfile: Dockerfile
+    container_name: watchsync-media
+    restart: unless-stopped
+    ports:
+      - "8088:8080"
+      - "40000-40099:40000-40099/udp"
+    environment:
+      PORT: "8080"
+      ANNOUNCED_IP: "${EXTERNAL_IP:-127.0.0.1}"
+      RTC_MIN_PORT: "40000"
+      RTC_MAX_PORT: "40099"
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:8080/health',(r)=>{process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1))"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
+  # ===========================================================================
+  # FRONTEND
+  # ===========================================================================
+
+  # React Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: production
+    container_name: watchsync-frontend
+    restart: unless-stopped
+    networks:
+      - backend
+    depends_on:
+      - kong
+      - ws-gateway
+
+  # ===========================================================================
+  # LOAD BALANCER
+  # ===========================================================================
+
+  # NGINX - Main reverse proxy and load balancer
+  nginx:
+    build: ./config/nginx
+    container_name: watchsync-nginx
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "/etc/nginx/entrypoint.sh"]
+    environment:
+      EXTERNAL_IP: ${EXTERNAL_IP:-127.0.0.1}
+      LE_DOMAIN: ${LE_DOMAIN:-}
+      LE_EMAIL: ${LE_EMAIL:-}
+      REGRU_USERNAME: ${REGRU_USERNAME:-}
+      REGRU_PASSWORD: ${REGRU_PASSWORD:-}
+    volumes:
+      - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - nginx_cache:/var/cache/nginx
+      - nginx_ssl:/etc/nginx/ssl
+      - ./downloads:/usr/share/nginx/downloads:ro
+    ports:
+      - "8080:80"
+      - "8443:443"
+      - "443:443"
+    networks:
+      - backend
+    depends_on:
+      - ws-gateway
+      - kong
+      - frontend
+
+  # ===========================================================================
+  # MONITORING & OBSERVABILITY
+  # ===========================================================================
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: watchsync-prometheus
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=15d'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ./config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./config/prometheus/alerts:/etc/prometheus/alerts:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - backend
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: watchsync-alertmanager
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+      - '--web.listen-address=0.0.0.0:9093'
+    environment:
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-0}
+    volumes:
+      - ./config/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+    ports:
+      - "9093:9093"
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9093/-/healthy"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: watchsync-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/watchsync.json
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_SECURITY_ALLOW_EMBEDDING: "true"
+      GF_SERVER_ROOT_URL: "%(protocol)s://%(domain)s:%(http_port)s/"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./config/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./config/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./config/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ./config/grafana/alerting:/etc/grafana/provisioning/alerting:ro
+    ports:
+      - "3001:3000"
+    networks:
+      - backend
+    depends_on:
+      - prometheus
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: watchsync-jaeger
+    restart: unless-stopped
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686"
+      - "4317:4317"
+      - "4318:4318"
+    networks:
+      - backend
+
+  loki:
+    image: grafana/loki:latest
+    container_name: watchsync-loki
+    restart: unless-stopped
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - ./config/loki/loki.yml:/etc/loki/local-config.yaml:ro
+      - loki_data:/loki
+    ports:
+      - "3100:3100"
+    networks:
+      - backend
+
+  promtail:
+    image: grafana/promtail:latest
+    container_name: watchsync-promtail
+    restart: unless-stopped
+    volumes:
+      - ./config/promtail/promtail.yml:/etc/promtail/config.yml:ro
+      - /var/log:/var/log:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    command: -config.file=/etc/promtail/config.yml
+    networks:
+      - backend
+    depends_on:
+      - loki
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: watchsync-node-exporter
+    restart: unless-stopped
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    ports:
+      - "9100:9100"
+    networks:
+      - backend
+
+  redis-exporter:
+    image: oliver006/redis_exporter:latest
+    container_name: watchsync-redis-exporter
+    restart: unless-stopped
+    environment:
+      REDIS_ADDR: redis://redis:6379
+    ports:
+      - "9121:9121"
+    networks:
+      - backend
+    depends_on:
+      - redis
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:latest
+    container_name: watchsync-postgres-exporter
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_NAME: postgresql://${DB_USER:-watchsync}:${DB_PASSWORD:-changeme}@postgres:5432/${DB_NAME:-watchsync}?sslmode=disable
+    ports:
+      - "9187:9187"
+    networks:
+      - backend
+    depends_on:
+      - postgres
+
+# =============================================================================
+# MCP SERVER — project file tools
+# =============================================================================
+  mcp-server:
+    build:
+      context: ./mcp-servers/project-mcp
+      dockerfile: Dockerfile
+    container_name: watchsync-mcp
+    restart: unless-stopped
+    ports:
+      - "3333:3333"
+    volumes:
+      - .:/project
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      PORT: 3333
+      PROJECT_ROOT: /project
+      LM_STUDIO_URL: ${LM_STUDIO_URL:-http://host.docker.internal:1234}
+      LM_STUDIO_MODEL: ${LM_STUDIO_MODEL:-mistralai/ministral-3-3b}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3333/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - backend
+
+# =============================================================================
+# TEST
+# =============================================================================
+  test-work:
+    build:
+      context: ./services/test-work
+      dockerfile: Dockerfile
+    container_name: watchsync-test
+    profiles: ["test"]
+    restart: "no"
+    environment:
+      KONG_URL: http://kong:8000
+      WS_URL: ws://ws-gateway:8080/ws
+    networks:
+      - backend
+    depends_on:
+      kong:
+        condition: service_healthy
+      ws-gateway:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+      room-service:
+        condition: service_healthy
+      video-service:
+        condition: service_healthy
+      transcoder:
+        condition: service_healthy
+      media-server:
+        condition: service_healthy
+
+# =============================================================================
+# VOLUMES
+# =============================================================================
+volumes:
+  postgres_data:
+  redis_data:
+  scylla_data:
+  minio_data:
+  nats_data:
+  transcoder_temp:
+  prometheus_data:
+  alertmanager_data:
+  grafana_data:
+  loki_data:
+  nginx_cache:
+  nginx_ssl:
+
+# =============================================================================
+# NETWORKS
+# =============================================================================
+networks:
+  backend:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

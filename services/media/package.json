@@ -1,0 +1,19 @@
+{
+  "name": "watchsync-media-server",
+  "version": "1.0.0",
+  "description": "WatchSync Mediasoup SFU",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "mediasoup": "^3.14.8",
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "ws": "^8.17.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

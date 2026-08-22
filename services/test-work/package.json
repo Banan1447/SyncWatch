@@ -1,0 +1,11 @@
+{
+  "name": "watchsync-test-work",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "test": "node test.mjs"
+  },
+  "dependencies": {
+    "ws": "^8.17.0"
+  }
+}

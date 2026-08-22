@@ -1,0 +1,132 @@
+_format_version: "3.0"
+_transform: true
+
+services:
+  # Auth Service
+  - name: auth-service
+    url: http://auth-service:8080
+    routes:
+      - name: auth-routes
+        paths:
+          - /api/v1/auth
+        strip_path: false
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 30
+          policy: redis
+          redis_host: redis
+          redis_port: 6379
+      - name: cors
+        config:
+          origins:
+            - "*"
+          methods:
+            - GET
+            - POST
+            - PUT
+            - PATCH
+            - DELETE
+            - OPTIONS
+          headers:
+            - Authorization
+            - Content-Type
+          max_age: 3600
+
+  # User Service
+  - name: user-service
+    url: http://user-service:8080
+    routes:
+      - name: user-routes
+        paths:
+          - /api/v1/users
+        strip_path: false
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 100
+          policy: redis
+          redis_host: redis
+          redis_port: 6379
+      - name: cors
+        config:
+          origins: ["*"]
+
+  # Room Service
+  - name: room-service
+    url: http://room-service:8080
+    routes:
+      - name: room-routes
+        paths:
+          - /api/v1/rooms
+        strip_path: false
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 60
+          policy: redis
+          redis_host: redis
+          redis_port: 6379
+      - name: cors
+        config:
+          origins: ["*"]
+
+  # Video Service
+  - name: video-service
+    url: http://video-service:8080
+    routes:
+      - name: video-routes
+        paths:
+          - /api/v1/videos
+          - /api/v1/queue
+        strip_path: false
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 120
+          policy: redis
+          redis_host: redis
+          redis_port: 6379
+      - name: cors
+        config:
+          origins: ["*"]
+
+  # Chat Service
+  - name: chat-service
+    url: http://chat-service:8080
+    routes:
+      - name: chat-routes
+        paths:
+          - /api/v1/chat
+          - /api/v1/messages
+        strip_path: false
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 200
+          policy: redis
+          redis_host: redis
+          redis_port: 6379
+      - name: cors
+        config:
+          origins: ["*"]
+
+  # Sync Service (internal only)
+  - name: sync-service
+    url: http://sync-service:8080
+    routes: []
+
+  # Media Service
+  - name: media-service
+    url: http://media-server:8080
+    routes:
+      - name: media-routes
+        paths:
+          - /api/v1/media
+        strip_path: false
+    plugins:
+      - name: cors
+        config:
+          origins: ["*"]
+
+consumers: []

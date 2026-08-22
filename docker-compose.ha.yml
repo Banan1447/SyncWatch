@@ -1,0 +1,226 @@
+# docker-compose.ha.yml — High-Availability overlay
+# Usage: docker compose -f docker-compose.yml -f docker-compose.ha.yml up -d
+#
+# Adds:
+#   - PostgreSQL streaming replica (postgres-replica)
+#   - Redis replica (redis-replica) + 3 Redis Sentinel nodes
+#   - ScyllaDB second node (scylla-node2)
+#   - MinIO distributed mode (4 nodes)
+
+services:
+
+  # ── PostgreSQL: enable WAL replication on primary ──────────────────────────
+  postgres:
+    command: >
+      postgres
+      -c wal_level=replica
+      -c max_wal_senders=3
+      -c wal_keep_size=64
+      -c hot_standby=on
+    environment:
+      POSTGRES_USER: ${DB_USER:-watchsync}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
+      POSTGRES_DB: ${DB_NAME:-watchsync}
+      PGDATA: /var/lib/postgresql/data/pgdata
+
+  # PostgreSQL streaming replica
+  postgres-replica:
+    image: postgres:16-alpine
+    container_name: watchsync-postgres-replica
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGUSER: ${DB_USER:-watchsync}
+      PGPASSWORD: ${DB_PASSWORD:-changeme}
+      POSTGRES_HOST_AUTH_METHOD: trust
+    command: >
+      bash -c "
+        until pg_basebackup -h postgres -U ${DB_USER:-watchsync} -D /var/lib/postgresql/data/pgdata -Fp -Xs -P -R; do
+          echo 'Waiting for primary...'; sleep 3;
+        done
+        exec postgres -D /var/lib/postgresql/data/pgdata
+      "
+    volumes:
+      - postgres_replica_data:/var/lib/postgresql/data
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-watchsync}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Redis: primary stays the same, add replica + Sentinels ─────────────────
+  redis-replica:
+    image: redis:7-alpine
+    container_name: watchsync-redis-replica
+    restart: unless-stopped
+    depends_on:
+      - redis
+    command: >
+      redis-server
+      --replicaof redis 6379
+      --appendonly yes
+      --appendfsync everysec
+      --maxmemory 1gb
+      --maxmemory-policy volatile-lru
+    volumes:
+      - redis_replica_data:/data
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis-sentinel-1:
+    image: redis:7-alpine
+    container_name: watchsync-redis-sentinel-1
+    restart: unless-stopped
+    depends_on:
+      - redis
+      - redis-replica
+    command: >
+      sh -c "
+        echo 'sentinel monitor mymaster redis 6379 2' > /sentinel.conf &&
+        echo 'sentinel down-after-milliseconds mymaster 5000' >> /sentinel.conf &&
+        echo 'sentinel failover-timeout mymaster 10000' >> /sentinel.conf &&
+        echo 'sentinel parallel-syncs mymaster 1' >> /sentinel.conf &&
+        redis-sentinel /sentinel.conf
+      "
+    networks:
+      - backend
+
+  redis-sentinel-2:
+    image: redis:7-alpine
+    container_name: watchsync-redis-sentinel-2
+    restart: unless-stopped
+    depends_on:
+      - redis
+      - redis-replica
+    command: >
+      sh -c "
+        echo 'sentinel monitor mymaster redis 6379 2' > /sentinel.conf &&
+        echo 'sentinel down-after-milliseconds mymaster 5000' >> /sentinel.conf &&
+        echo 'sentinel failover-timeout mymaster 10000' >> /sentinel.conf &&
+        echo 'sentinel parallel-syncs mymaster 1' >> /sentinel.conf &&
+        redis-sentinel /sentinel.conf
+      "
+    networks:
+      - backend
+
+  redis-sentinel-3:
+    image: redis:7-alpine
+    container_name: watchsync-redis-sentinel-3
+    restart: unless-stopped
+    depends_on:
+      - redis
+      - redis-replica
+    command: >
+      sh -c "
+        echo 'sentinel monitor mymaster redis 6379 2' > /sentinel.conf &&
+        echo 'sentinel down-after-milliseconds mymaster 5000' >> /sentinel.conf &&
+        echo 'sentinel failover-timeout mymaster 10000' >> /sentinel.conf &&
+        echo 'sentinel parallel-syncs mymaster 1' >> /sentinel.conf &&
+        redis-sentinel /sentinel.conf
+      "
+    networks:
+      - backend
+
+  # ── ScyllaDB: second node ──────────────────────────────────────────────────
+  scylla-node2:
+    image: scylladb/scylla:5.4
+    container_name: watchsync-scylla-node2
+    restart: unless-stopped
+    depends_on:
+      - scylla
+    command: --seeds=scylla --smp=1 --memory=512M --overprovisioned=1
+    volumes:
+      - scylla_node2_data:/var/lib/scylla
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "nodetool status | grep -q UN"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
+  # ── MinIO distributed (4 nodes) ────────────────────────────────────────────
+  # NOTE: MinIO distributed mode requires identical minio image + MINIO_VOLUMES
+  minio-node1:
+    image: minio/minio:latest
+    container_name: watchsync-minio-node1
+    restart: unless-stopped
+    command: server http://minio-node{1...4}/data{1...2} --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD:-minioadmin}
+    volumes:
+      - minio_node1_data1:/data1
+      - minio_node1_data2:/data2
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  minio-node2:
+    image: minio/minio:latest
+    container_name: watchsync-minio-node2
+    restart: unless-stopped
+    command: server http://minio-node{1...4}/data{1...2} --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD:-minioadmin}
+    volumes:
+      - minio_node2_data1:/data1
+      - minio_node2_data2:/data2
+    networks:
+      - backend
+
+  minio-node3:
+    image: minio/minio:latest
+    container_name: watchsync-minio-node3
+    restart: unless-stopped
+    command: server http://minio-node{1...4}/data{1...2} --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD:-minioadmin}
+    volumes:
+      - minio_node3_data1:/data1
+      - minio_node3_data2:/data2
+    networks:
+      - backend
+
+  minio-node4:
+    image: minio/minio:latest
+    container_name: watchsync-minio-node4
+    restart: unless-stopped
+    command: server http://minio-node{1...4}/data{1...2} --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD:-minioadmin}
+    volumes:
+      - minio_node4_data1:/data1
+      - minio_node4_data2:/data2
+    networks:
+      - backend
+
+volumes:
+  postgres_replica_data:
+  redis_replica_data:
+  scylla_node2_data:
+  minio_node1_data1:
+  minio_node1_data2:
+  minio_node2_data1:
+  minio_node2_data2:
+  minio_node3_data1:
+  minio_node3_data2:
+  minio_node4_data1:
+  minio_node4_data2:

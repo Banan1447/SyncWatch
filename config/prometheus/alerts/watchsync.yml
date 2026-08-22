@@ -1,0 +1,178 @@
+groups:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Service Availability
+  # ─────────────────────────────────────────────────────────────────────────────
+  - name: service_availability
+    rules:
+      - alert: ServiceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Service {{ $labels.job }} is DOWN"
+          description: "{{ $labels.job }} ({{ $labels.instance }}) has been unreachable for more than 1 minute."
+
+      - alert: WSGatewayDown
+        expr: absent(up{job="ws-gateway"} == 1)
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "WS Gateway is DOWN"
+          description: "WebSocket Gateway is not responding — all real-time connections are broken."
+
+      - alert: AuthServiceDown
+        expr: absent(up{job="auth-service"} == 1)
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Auth Service is DOWN"
+          description: "Authentication service is unavailable — users cannot log in or register."
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # WebSocket Gateway
+  # ─────────────────────────────────────────────────────────────────────────────
+  - name: ws_gateway
+    rules:
+      - alert: HighConnectionCount
+        expr: ws_gateway_active_connections > 80000
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "WS Gateway connection count is high"
+          description: "{{ $value }} active WebSocket connections (limit: 100 000). Approaching capacity."
+
+      - alert: CriticalConnectionCount
+        expr: ws_gateway_active_connections > 95000
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "WS Gateway near connection limit"
+          description: "{{ $value }} / 100 000 connections — server will start refusing new connections."
+
+      - alert: HighRoomCount
+        expr: ws_gateway_active_rooms > 5000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Large number of active rooms ({{ $value }})"
+          description: "More than 5 000 active rooms — check for room cleanup logic."
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Infrastructure
+  # ─────────────────────────────────────────────────────────────────────────────
+  - name: infrastructure
+    rules:
+      - alert: RedisDown
+        expr: redis_up == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis is DOWN"
+          description: "Redis is unreachable — session data and real-time sync will fail."
+
+      - alert: PostgresDown
+        expr: pg_up == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "PostgreSQL is DOWN"
+          description: "Primary database is unreachable — all persistent data operations will fail."
+
+      - alert: HighRedisMemory
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis memory usage is high ({{ $value | humanizePercentage }})"
+          description: "Redis is using more than 85% of maxmemory — eviction may start."
+
+      - alert: RedisKeyEviction
+        expr: increase(redis_evicted_keys_total[5m]) > 100
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis is evicting keys"
+          description: "{{ $value }} keys evicted in last 5 minutes — increase maxmemory or reduce key retention."
+
+      - alert: PostgresConnectionsHigh
+        expr: pg_stat_activity_count > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "PostgreSQL connections high ({{ $value }})"
+          description: "More than 80 active database connections. Connection pool may be exhausted."
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Host Resources
+  # ─────────────────────────────────────────────────────────────────────────────
+  - name: host_resources
+    rules:
+      - alert: HighCPU
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[2m])) * 100) > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Host CPU usage is high ({{ $value | humanize }}%)"
+          description: "CPU usage above 85% on {{ $labels.instance }} for more than 5 minutes."
+
+      - alert: CriticalCPU
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[2m])) * 100) > 95
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Host CPU critical ({{ $value | humanize }}%)"
+          description: "CPU usage above 95% on {{ $labels.instance }} — services may be throttled."
+
+      - alert: HighMemory
+        expr: (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Host memory usage high ({{ $value | humanize }}%)"
+          description: "Memory usage above 85% on {{ $labels.instance }}."
+
+      - alert: DiskSpaceLow
+        expr: (1 - node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) * 100 > 80
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Disk space low ({{ $value | humanize }}% used)"
+          description: "Root filesystem on {{ $labels.instance }} is {{ $value | humanize }}% full."
+
+      - alert: DiskSpaceCritical
+        expr: (1 - node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) * 100 > 95
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Disk space critical ({{ $value | humanize }}% used)"
+          description: "Root filesystem almost full — services may start failing."
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # NATS Message Broker
+  # ─────────────────────────────────────────────────────────────────────────────
+  - name: nats
+    rules:
+      - alert: NATSDown
+        expr: absent(up{job="nats"} == 1)
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "NATS message broker is DOWN"
+          description: "NATS is unreachable — inter-service messaging (sync, chat, relay) will fail."

@@ -1,0 +1,110 @@
+apiVersion: 1
+
+groups:
+  - name: WatchSync Alerts
+    folder: WatchSync
+    interval: 1m
+    rules:
+      - uid: watchsync-ws-down
+        title: WS Gateway Down
+        condition: A
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: absent(up{job="ws-gateway"} == 1)
+              instant: true
+        noDataState: NoData
+        execErrState: Error
+        for: 2m
+        annotations:
+          summary: "WebSocket Gateway недоступен более 2 минут"
+        labels:
+          severity: critical
+
+      - uid: watchsync-auth-down
+        title: Auth Service Down
+        condition: A
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: absent(up{job="auth-service"} == 1)
+              instant: true
+        noDataState: NoData
+        execErrState: Error
+        for: 2m
+        annotations:
+          summary: "Auth Service недоступен более 2 минут"
+        labels:
+          severity: critical
+
+      - uid: watchsync-high-connections
+        title: High WS Connections
+        condition: A
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: ws_gateway_active_connections > 5000
+              instant: true
+        noDataState: OK
+        execErrState: Error
+        for: 5m
+        annotations:
+          summary: "Количество WS-соединений превышает 5000 (текущее: {{ $value }})"
+        labels:
+          severity: warning
+
+      - uid: watchsync-transcode-fail-rate
+        title: High Transcode Failure Rate
+        condition: A
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: rate(transcoder_jobs_failed_total[5m]) > 0.1
+              instant: true
+        noDataState: OK
+        execErrState: Error
+        for: 5m
+        annotations:
+          summary: "Высокий процент ошибок транскодирования ({{ $value | humanize }}/s)"
+        labels:
+          severity: warning
+
+      - uid: watchsync-chat-rate-limit
+        title: Chat Rate Limits Elevated
+        condition: A
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: rate(chat_service_rate_limit_hits_total[5m]) > 1
+              instant: true
+        noDataState: OK
+        execErrState: Error
+        for: 3m
+        annotations:
+          summary: "Участились срабатывания rate-limit в чате ({{ $value | humanize }}/s)"
+        labels:
+          severity: info
+
+contactPoints:
+  - name: default
+    receivers: []
